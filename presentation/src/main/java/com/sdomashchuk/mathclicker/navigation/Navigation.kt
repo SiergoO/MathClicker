@@ -27,7 +27,8 @@ fun SetupNavGraph(navController: NavHostController) {
             SplashScreen(navController = navController)
         }
 
-        composable(route = Screen.Menu.route,
+        composable(
+            route = Screen.Menu.route,
             enterTransition = { fadeIn(animationSpec = keyframes { this.durationMillis = MENU_SCREEN_FADE_IN_DURATION }) },
             exitTransition = { fadeOut() }
         ) {
