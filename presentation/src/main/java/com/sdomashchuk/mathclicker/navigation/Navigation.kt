@@ -8,7 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController
 import com.google.accompanist.navigation.animation.AnimatedNavHost
 import com.google.accompanist.navigation.animation.composable
-import com.sdomashchuk.mathclicker.main.MainScreen
+import com.sdomashchuk.mathclicker.game.GameScreen
 import com.sdomashchuk.mathclicker.menu.MenuScreen
 import com.sdomashchuk.mathclicker.splash.SplashScreen
 
@@ -36,7 +36,7 @@ fun SetupNavGraph(navController: NavHostController) {
         }
 
         composable(route = Screen.Main.route) {
-            MainScreen(navController = navController)
+            GameScreen(navController = navController)
         }
     }
 }

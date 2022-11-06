@@ -1,4 +1,4 @@
-package com.sdomashchuk.mathclicker.main
+package com.sdomashchuk.mathclicker.game
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -12,7 +12,7 @@ import androidx.navigation.NavController
 import com.sdomashchuk.mathclicker.ui.theme.MathClickerTheme
 
 @Composable
-fun MainScreen(
+fun GameScreen(
     navController: NavController
 ) {
     MathClickerTheme {

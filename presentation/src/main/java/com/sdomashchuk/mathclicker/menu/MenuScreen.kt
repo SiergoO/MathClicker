@@ -2,11 +2,8 @@ package com.sdomashchuk.mathclicker.menu
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -18,16 +15,17 @@ import androidx.compose.material.ButtonDefaults
 import androidx.compose.material.IconButton
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.constraintlayout.compose.ChainStyle
+import androidx.constraintlayout.compose.ConstraintLayout
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.sdomashchuk.mathclicker.R
 import com.sdomashchuk.mathclicker.component.MathClickerDialog
@@ -35,75 +33,123 @@ import com.sdomashchuk.mathclicker.navigation.Screen
 import com.sdomashchuk.mathclicker.ui.theme.MathClickerTheme
 import com.sdomashchuk.mathclicker.ui.theme.Red500
 import com.sdomashchuk.mathclicker.ui.theme.Shapes
+import com.sdomashchuk.mathclicker.ui.theme.Typography
+import kotlinx.coroutines.flow.receiveAsFlow
 
 @Composable
 fun MenuScreen(
     navController: NavController
 ) {
-    val shouldShowHelpDialog: MutableState<Boolean> = remember {
-        mutableStateOf(false)
-    }
 
-    if (shouldShowHelpDialog.value) {
+    val menuViewModel: MenuViewModel = hiltViewModel()
+    val state = menuViewModel.state.collectAsState()
+
+    CollectEventsUI(
+        viewModel = menuViewModel,
+        navController = navController
+    )
+
+    if (state.value.isOpenDialog) {
         MathClickerDialog(
-            shouldShowHelpDialog,
-            stringResource(id = R.string.how_to_play_dialog_header),
-            stringResource(id = R.string.how_to_play_dialog_body),
-            stringResource(id = R.string.how_to_play_dialog_button_positive)
+            headerText = stringResource(id = R.string.how_to_play_dialog_header),
+            bodyText = stringResource(id = R.string.how_to_play_dialog_body),
+            onDismiss = { menuViewModel.sendAction(MenuViewModel.Action.CloseDialog) },
+            positiveButtonText = stringResource(id = R.string.how_to_play_dialog_button_positive),
+            onPositive = { menuViewModel.sendAction(MenuViewModel.Action.CloseDialog) }
         )
     }
 
     MathClickerTheme {
-        Box(
+        ConstraintLayout(
             modifier = Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
                 .navigationBarsPadding()
         ) {
-            Row(
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically,
+            val (howToPlayButton, logoImage, menuButtons) = createRefs()
+
+            IconButton(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-            ) {
-                IconButton(
-                    content = {
-                        Image(
-                            painter = painterResource(id = R.drawable.ic_help),
-                            contentDescription = "Help",
-                            modifier = Modifier.size(40.dp)
-                        )
-                    },
-                    onClick = {
-                        shouldShowHelpDialog.value = true
+                    .constrainAs(howToPlayButton) {
+                        end.linkTo(parent.end)
+                        top.linkTo(parent.top)
                     }
-                )
-            }
+                    .padding(16.dp),
+                content = {
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_help),
+                        contentDescription = stringResource(id = R.string.how_to_play_icon_content_description),
+                        modifier = Modifier.size(40.dp)
+                    )
+                },
+                onClick = {
+                    menuViewModel.sendAction(MenuViewModel.Action.OpenDialog)
+                }
+            )
+            Image(
+                painter = painterResource(id = R.drawable.logo),
+                contentDescription = stringResource(id = R.string.logo),
+                modifier = Modifier
+                    .constrainAs(logoImage) {
+                        top.linkTo(parent.top)
+                        bottom.linkTo(parent.bottom)
+                        start.linkTo(parent.start)
+                        end.linkTo(parent.end)
+                    }
+                    .padding(horizontal = 40.dp)
+            )
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.SpaceEvenly,
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier.constrainAs(menuButtons) {
+                    top.linkTo(logoImage.bottom)
+                    bottom.linkTo(parent.bottom)
+                    start.linkTo(parent.start)
+                    end.linkTo(parent.end)
+                }
             ) {
-                Image(
-                    painter = painterResource(id = R.drawable.logo),
-                    contentDescription = "Logo",
-                    modifier = Modifier.padding(40.dp)
+                MenuButton(
+                    text = stringResource(id = R.string.menu_button_play),
+                    onClick = { menuViewModel.sendAction(MenuViewModel.Action.ButtonPlayClicked) }
                 )
-                Button(
-                    onClick = { navController.navigate(Screen.Main.route) },
-                    colors = ButtonDefaults.buttonColors(backgroundColor = Red500),
-                    modifier = Modifier
-                        .width(200.dp)
-                        .height(60.dp)
-                        .clip(Shapes.large)
-                ) {
-                    Text(
-                        text = "PLAY",
-                        fontSize = 28.sp
-                    )
+            }
+            createVerticalChain(logoImage, menuButtons, chainStyle = ChainStyle.Spread)
+        }
+    }
+}
+
+@Composable
+fun MenuButton(text: String, onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        colors = ButtonDefaults.buttonColors(backgroundColor = Red500),
+        modifier = Modifier
+            .width(200.dp)
+            .height(60.dp)
+            .clip(Shapes.large)
+    ) {
+        Text(
+            text = text,
+            style = Typography.h1
+        )
+    }
+}
+
+@Composable
+fun CollectEventsUI(
+    viewModel: MenuViewModel,
+    navController: NavController
+) {
+    LaunchedEffect(
+        key1 = null,
+        block = {
+            viewModel.eventsUi.receiveAsFlow().collect {
+                when (it) {
+                    is MenuViewModel.EventUi.NavigateToGameScreen -> {
+                        navController.navigate(Screen.Main.route)
+                    }
                 }
             }
         }
-    }
+    )
 }

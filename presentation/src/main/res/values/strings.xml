@@ -1,7 +1,12 @@
 <resources>
     <string name="app_name">MathClicker</string>
     <string name="logo">Logo</string>
+
+    <!-- Menu screen -->
+    <string name="menu_button_play">PLAY</string>
     <string name="how_to_play_dialog_header">How to play?</string>
+    <string name="how_to_play_icon_content_description">How to play?</string>
     <string name="how_to_play_dialog_body">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Suspendisse sit amet nisi lorem. Donec a ipsum semper, porttitor sapien a, pharetra dui. Mauris accumsan, tellus volutpat rhoncus tempus, dolor nulla mollis nisi, ut placerat nibh risus eget tellus. Phasellus fermentum posuere augue. Nullam scelerisque scelerisque augue, quis suscipit lacus iaculis maximus. Nulla sagittis magna ex, nec mollis lorem molestie ac. Nam aliquam diam nulla, id pellentesque metus vestibulum faucibus. Curabitur ex elit, semper et consequat a, malesuada at tortor. Suspendisse lobortis cursus ex, in fermentum nunc dapibus sit amet. Vivamus eget lobortis orci. Nullam egestas, mauris vitae ornare semper, libero urna maximus ipsum, eu efficitur metus erat ac nulla.</string>
     <string name="how_to_play_dialog_button_positive">Got it</string>
+
 </resources>

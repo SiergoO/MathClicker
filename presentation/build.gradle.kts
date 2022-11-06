@@ -4,6 +4,8 @@ plugins {
     id("com.android.application")
     // If there will be problems with that plugin delete it + sync + rebuild
     id("dagger.hilt.android.plugin")
+    id("kotlinx-serialization")
+    id("kotlin-parcelize")
 }
 
 android {
@@ -83,6 +85,9 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-service:2.5.1")
     implementation("androidx.lifecycle:lifecycle-extensions:2.2.0")
 
+    //Serialization
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.3.3")
+
     //ViewModel
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.5.1")
 
@@ -90,10 +95,12 @@ dependencies {
     implementation("androidx.compose.ui:ui:1.3.0")
     implementation("androidx.compose.ui:ui-tooling-preview:1.3.0")
     implementation("androidx.compose.material:material:1.3.0")
+    implementation("androidx.constraintlayout:constraintlayout-compose:1.0.1")
 
     //Hilt
     implementation("com.google.dagger:hilt-android-gradle-plugin:2.41")
     implementation("com.google.dagger:hilt-android:2.40")
+    implementation("androidx.hilt:hilt-navigation-compose:1.0.0")
     kapt("com.google.dagger:hilt-android-compiler:2.40")
     kapt("androidx.hilt:hilt-compiler:1.0.0")
 }

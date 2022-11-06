@@ -7,7 +7,9 @@ import androidx.compose.animation.ExperimentalAnimationApi
 import com.google.accompanist.navigation.animation.rememberAnimatedNavController
 import com.sdomashchuk.mathclicker.navigation.SetupNavGraph
 import com.sdomashchuk.mathclicker.ui.theme.MathClickerTheme
+import dagger.hilt.android.AndroidEntryPoint
 
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
     @OptIn(ExperimentalAnimationApi::class)
