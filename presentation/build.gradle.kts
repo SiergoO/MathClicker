@@ -75,7 +75,7 @@ dependencies {
     //Navigation
     implementation("com.google.accompanist:accompanist-navigation-animation:0.27.0")
 
-    // Splash screen
+    //Splash screen
     implementation("androidx.core:core-splashscreen:1.0.0")
 
     //Lottie
@@ -92,10 +92,13 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.5.1")
 
     //Compose
-    implementation("androidx.compose.ui:ui:1.3.0")
-    implementation("androidx.compose.ui:ui-tooling-preview:1.3.0")
-    implementation("androidx.compose.material:material:1.3.0")
+    implementation("androidx.compose.ui:ui:1.3.1")
+    implementation("androidx.compose.ui:ui-tooling-preview:1.3.1")
+    implementation("androidx.compose.material:material:1.3.1")
     implementation("androidx.constraintlayout:constraintlayout-compose:1.0.1")
+
+    //Immutable collections
+    implementation("org.jetbrains.kotlinx:kotlinx-collections-immutable:0.3.5")
 
     //Hilt
     implementation("com.google.dagger:hilt-android-gradle-plugin:2.41")

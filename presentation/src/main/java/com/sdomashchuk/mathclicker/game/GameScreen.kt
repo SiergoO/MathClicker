@@ -1,5 +1,6 @@
 package com.sdomashchuk.mathclicker.game
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateOffsetAsState
 import androidx.compose.animation.core.tween
@@ -18,13 +19,18 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.Button
+import androidx.compose.material.ButtonDefaults
 import androidx.compose.material.Divider
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -32,6 +38,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -56,6 +63,7 @@ import com.sdomashchuk.mathclicker.ui.theme.Red200
 import com.sdomashchuk.mathclicker.ui.theme.Translucent
 import com.sdomashchuk.mathclicker.ui.theme.Typography
 import com.sdomashchuk.mathclicker.ui.theme.White
+import com.sdomashchuk.mathclicker.util.toSymbol
 
 @Composable
 fun GameScreen(
@@ -69,21 +77,30 @@ fun GameScreen(
         Column(
             modifier = Modifier.fillMaxSize()
         ) {
-            if (!state.value.isReadyToPlay) {
-                ReadyToPlayOverlay { gameViewModel.sendAction(GameViewModel.Action.ReadyToPlayButtonClicked) }
-            } else {
-                if (!state.value.isGameActive) {
-                    CountdownOverlay { gameViewModel.sendAction(GameViewModel.Action.StartGame) }
-                } else {
-                    GameField()
-                }
+            when {
+                state.value.isGamePaused -> GamePausedOverlay { gameViewModel.sendAction(GameViewModel.Action.ReadyToPlayButtonClicked) }
+                !state.value.isGameStarted -> CountdownOverlay { gameViewModel.sendAction(GameViewModel.Action.StartGame) }
+                else -> GameField(
+                    state,
+                    onTargetClicked = { gameViewModel.sendAction(GameViewModel.Action.FireButtonClicked) }
+                )
             }
+        }
+        BackHandler {
+            gameViewModel.sendAction(GameViewModel.Action.PauseGame)
         }
     }
 }
 
 @Composable
-fun GameField() {
+fun GameField(
+    state: State<GameViewModel.State>,
+    onTargetClicked: () -> Unit
+) {
+    var gameColumnWidth by remember { mutableStateOf(0) }
+    var gameColumnHeight by remember { mutableStateOf(0) }
+    val localDensity = LocalDensity.current
+
     Row(
         modifier = Modifier
             .statusBarsPadding()
@@ -95,57 +112,91 @@ fun GameField() {
                 .weight(1f)
                 .align(Alignment.CenterVertically),
             textAlign = TextAlign.Center,
-            text = "Level: 0",
-            style = Typography.body2,
+            text = stringResource(id = R.string.game_session_level, state.value.session.level).toUpperCase(Locale.current),
+            style = Typography.body1,
         )
         Text(
             modifier = Modifier
                 .weight(1f)
                 .align(Alignment.CenterVertically),
             textAlign = TextAlign.Center,
-            text = "Score: 0",
-            style = Typography.body2,
+            text = stringResource(id = R.string.game_session_score, state.value.session.score).toUpperCase(Locale.current),
+            style = Typography.body1,
         )
     }
     Divider()
-    var gameColumnWidth by remember { mutableStateOf(0) }
-    val localDensity = LocalDensity.current
-    Row(
+    LazyRow(
         modifier = Modifier
             .fillMaxWidth()
             .fillMaxHeight(0.75f)
             .onGloballyPositioned { coordinates ->
                 gameColumnWidth = with(localDensity) { (coordinates.size.width.toDp().value.toInt() - 3) / 4 }
-            },
-        horizontalArrangement = Arrangement.SpaceEvenly,
-        verticalAlignment = Alignment.Bottom
+            }
     ) {
-        GameColumn(gameColumnWidth = gameColumnWidth, 5500)
-        VerticalDivider()
-        GameColumn(gameColumnWidth = gameColumnWidth, 6300)
-        VerticalDivider()
-        GameColumn(gameColumnWidth = gameColumnWidth, 4700)
-        VerticalDivider()
-        GameColumn(gameColumnWidth = gameColumnWidth, 8000)
+        items(state.value.buttons) {
+            Column(
+                Modifier
+                    .fillMaxHeight()
+                    .width(gameColumnWidth.dp)
+                    .onGloballyPositioned { coordinates ->
+                        gameColumnHeight =
+                            with(localDensity) { coordinates.size.height.toDp().value.toInt() - (gameColumnWidth * 0.8).toInt() }
+                    },
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                TargetButton(gameColumnWidth, gameColumnHeight, it.animationDurationMs, it.id)
+            }
+            if (it.id < state.value.buttons.lastIndex) {
+                VerticalDivider()
+            }
+        }
     }
     Divider()
-    Box(
+    Row(
         modifier = Modifier
             .navigationBarsPadding()
-            .fillMaxWidth()
-            .fillMaxHeight(),
-        contentAlignment = Alignment.Center
+            .fillMaxSize(),
+        verticalAlignment = Alignment.CenterVertically
     ) {
+        Text(
+            modifier = Modifier.weight(1f),
+            textAlign = TextAlign.Center,
+            text = stringResource(
+                id = R.string.game_session_combo,
+                state.value.session.bonusMultiplier,
+            ).toUpperCase(Locale.current),
+            style = Typography.h1,
+        )
         Button(
-            onClick = { },
+            onClick = onTargetClicked,
             modifier = Modifier
+                .weight(1f)
+                .wrapContentSize()
                 .clip(CircleShape)
                 .width(100.dp)
                 .height(100.dp),
         ) {
             Text(
-                text = "÷7",
+                text = state.value.session.let { "${it.currentOperationSign.toSymbol()}${it.currentOperationDigit}" },
                 fontSize = 36.sp,
+                color = White
+            )
+        }
+        Button(
+            onClick = {},
+            colors = ButtonDefaults.buttonColors(backgroundColor = Red200),
+            modifier = Modifier
+                .weight(1f)
+                .wrapContentSize()
+                .clip(CircleShape)
+                .width(48.dp)
+                .height(48.dp)
+                .alpha(0.8f)
+
+        ) {
+            Text(
+                text = state.value.session.let { "${it.nextOperationSign.toSymbol()}${it.nextOperationDigit}" },
+                fontSize = 12.sp,
                 color = White
             )
         }
@@ -153,7 +204,7 @@ fun GameField() {
 }
 
 @Composable
-fun ReadyToPlayOverlay(onClick: () -> Unit) {
+fun GamePausedOverlay(onClick: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -162,7 +213,10 @@ fun ReadyToPlayOverlay(onClick: () -> Unit) {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Box(contentAlignment = Alignment.Center) {
+        Box(
+            modifier = Modifier.fillMaxHeight(0.5f),
+            contentAlignment = Alignment.Center
+        ) {
             val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.tap_higlight))
             LottieAnimation(composition = composition, iterations = LottieConstants.IterateForever)
             Text(
@@ -200,42 +254,31 @@ fun CountdownOverlay(onFinish: () -> Unit) {
 }
 
 @Composable
-fun GameColumn(gameColumnWidth: Int, duration: Int) {
-    val localDensity = LocalDensity.current
-    var gameColumnHeight by remember { mutableStateOf(0) }
-    Column(
-        Modifier
-            .fillMaxHeight()
-            .width(gameColumnWidth.dp)
-            .onGloballyPositioned { coordinates ->
-                gameColumnHeight = with(localDensity) { coordinates.size.height.toDp().value.toInt() - (gameColumnWidth * 0.8).toInt() }
-            },
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        TargetButton(gameColumnWidth, gameColumnHeight, duration)
-    }
-}
-
-@Composable
 fun TargetButton(
     parentWidth: Int,
     parentHeight: Int,
-    duration: Int
+    duration: Int,
+    id: Int
 ) {
+    val gameViewModel: GameViewModel = hiltViewModel()
+    val state = gameViewModel.state.collectAsState()
+    val isVisible = remember { mutableStateOf(true) }
     val targetButtonOffset by animateOffsetAsState(
         targetValue = Offset(0f, (parentHeight).toFloat()),
-        animationSpec = tween(duration, easing = LinearEasing)
+        animationSpec = tween(duration, easing = LinearEasing),
+        finishedListener = { isVisible.value = false }
     )
-
-    Button(
-        modifier = Modifier
-            .offset(targetButtonOffset.x.dp, targetButtonOffset.y.dp)
-            .height((parentWidth * 0.8).dp)
-            .width((parentWidth * 0.8).dp)
-            .clip(CircleShape),
-        onClick = { }
-    ) {
-        Text(text = "5", fontSize = 20.sp, color = Color.White)
+    if (isVisible.value && state.value.buttons[id].isAlive) {
+        Button(
+            modifier = Modifier
+                .offset(targetButtonOffset.x.dp, targetButtonOffset.y.dp)
+                .height((parentWidth * 0.8).dp)
+                .width((parentWidth * 0.8).dp)
+                .clip(CircleShape),
+            onClick = { gameViewModel.sendAction(GameViewModel.Action.TargetButtonClicked(id)) }
+        ) {
+            Text(text = state.value.buttons[id].value.toString(), fontSize = 20.sp, color = Color.White)
+        }
     }
 }
 

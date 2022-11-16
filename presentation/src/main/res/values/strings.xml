@@ -12,5 +12,8 @@
 
     <!-- Game screen -->
     <string name="ready_to_pay_overlay_hint">Touch screen to start</string>
+    <string name="game_session_level">Level: %d</string>
+    <string name="game_session_score">Score: %d</string>
+    <string name="game_session_combo">Combo\n x%d</string>
 
 </resources>
