@@ -8,9 +8,22 @@ class DifficultyHelperImpl: DifficultyHelper {
     override val sessionLevelRange = IntRange(1, 1000)
     override val initialTargetValueRange = IntRange(1, 20)
     override val initialTargetAnimationDurationMsRange = IntRange(27000, 54000)
-    override val initialLevelTargetAmountRange = 4
+    override val initialTargetAnimationDelayMsRange = IntRange(13500, 27000)
+    override val initialTargetAmountRange = IntRange(4, 6)
     override val initialDivisionValueRange = IntRange(2, 5)
     override val initialSubtractionValueRange = IntRange(1, 3)
+
+    override fun getTargetAnimationDurationMsByLevel(level: Int): Int {
+        val minThreshold = initialTargetAnimationDurationMsRange.first - level * 25
+        val maxThreshold = initialTargetAnimationDurationMsRange.last - level * 50
+        return IntRange(minThreshold, maxThreshold).random()
+    }
+
+    override fun getTargetAnimationDelayMsById(id: Int): Int {
+        val minThreshold = initialTargetAnimationDelayMsRange.first * (id / 4)
+        val maxThreshold = initialTargetAnimationDelayMsRange.last * (id / 4)
+        return IntRange(minThreshold, maxThreshold).random()
+    }
 
     override fun getTargetValueByLevel(level: Int): Int {
         val minThreshold = initialTargetValueRange.first
@@ -18,9 +31,9 @@ class DifficultyHelperImpl: DifficultyHelper {
         return IntRange(minThreshold, maxThreshold).random()
     }
 
-    override fun getTargetAnimationDurationMsByLevel(level: Int): Int {
-        val minThreshold = initialTargetAnimationDurationMsRange.first - level * 25
-        val maxThreshold = initialTargetAnimationDurationMsRange.last - level * 50
+    override fun getTargetAmountByLevel(level: Int): Int {
+        val minThreshold = initialTargetAmountRange.first + level / 5
+        val maxThreshold = initialTargetAmountRange.last + level / 4
         return IntRange(minThreshold, maxThreshold).random()
     }
 

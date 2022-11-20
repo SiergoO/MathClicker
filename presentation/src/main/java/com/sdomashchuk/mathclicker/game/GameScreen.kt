@@ -20,8 +20,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.Button
 import androidx.compose.material.ButtonDefaults
@@ -29,12 +27,14 @@ import androidx.compose.material.Divider
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,6 +44,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.intl.Locale
 import androidx.compose.ui.text.style.TextAlign
@@ -51,6 +52,9 @@ import androidx.compose.ui.text.toUpperCase
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.LifecycleOwner
 import androidx.navigation.NavController
 import com.airbnb.lottie.compose.LottieAnimation
 import com.airbnb.lottie.compose.LottieCompositionSpec
@@ -58,6 +62,7 @@ import com.airbnb.lottie.compose.LottieConstants
 import com.airbnb.lottie.compose.animateLottieCompositionAsState
 import com.airbnb.lottie.compose.rememberLottieComposition
 import com.sdomashchuk.mathclicker.R
+import com.sdomashchuk.mathclicker.domain.model.game.session.TargetParams
 import com.sdomashchuk.mathclicker.ui.theme.MathClickerTheme
 import com.sdomashchuk.mathclicker.ui.theme.Red200
 import com.sdomashchuk.mathclicker.ui.theme.Translucent
@@ -71,18 +76,28 @@ fun GameScreen(
 ) {
 
     val gameViewModel: GameViewModel = hiltViewModel()
-    val state = gameViewModel.state.collectAsState()
+    val gameState = gameViewModel.state.collectAsState()
 
     MathClickerTheme {
         Column(
             modifier = Modifier.fillMaxSize()
         ) {
             when {
-                state.value.isGamePaused -> GamePausedOverlay { gameViewModel.sendAction(GameViewModel.Action.ReadyToPlayButtonClicked) }
-                !state.value.isGameStarted -> CountdownOverlay { gameViewModel.sendAction(GameViewModel.Action.StartGame) }
+                gameState.value.isGamePaused -> GamePausedOverlay { gameViewModel.sendAction(GameViewModel.Action.ReadyToPlayButtonClicked) }
+                !gameState.value.isGameStarted -> CountdownOverlay { gameViewModel.sendAction(GameViewModel.Action.StartGame) }
                 else -> GameField(
-                    state,
-                    onTargetClicked = { gameViewModel.sendAction(GameViewModel.Action.FireButtonClicked) }
+                    gameState,
+                    onTargetClicked = { id -> gameViewModel.sendAction(GameViewModel.Action.TargetClicked(id)) },
+                    onTargetBreakout = { id -> gameViewModel.sendAction(GameViewModel.Action.TargetBreakout(id)) },
+                    onTargetPositionSave = { id, position ->
+                        gameViewModel.sendAction(
+                            GameViewModel.Action.SaveTargetPosition(
+                                id,
+                                position
+                            )
+                        )
+                    },
+                    onFireClicked = { gameViewModel.sendAction(GameViewModel.Action.FireButtonClicked) }
                 )
             }
         }
@@ -94,8 +109,11 @@ fun GameScreen(
 
 @Composable
 fun GameField(
-    state: State<GameViewModel.State>,
-    onTargetClicked: () -> Unit
+    gameState: State<GameViewModel.State>,
+    onTargetClicked: (Int) -> Unit,
+    onTargetBreakout: (Int) -> Unit,
+    onTargetPositionSave: (Int, Int) -> Unit,
+    onFireClicked: () -> Unit
 ) {
     var gameColumnWidth by remember { mutableStateOf(0) }
     var gameColumnHeight by remember { mutableStateOf(0) }
@@ -112,7 +130,10 @@ fun GameField(
                 .weight(1f)
                 .align(Alignment.CenterVertically),
             textAlign = TextAlign.Center,
-            text = stringResource(id = R.string.game_session_level, state.value.session.level).toUpperCase(Locale.current),
+            text = stringResource(
+                id = R.string.game_session_level,
+                gameState.value.gameSession.gameField.level
+            ).toUpperCase(Locale.current),
             style = Typography.body1,
         )
         Text(
@@ -120,12 +141,15 @@ fun GameField(
                 .weight(1f)
                 .align(Alignment.CenterVertically),
             textAlign = TextAlign.Center,
-            text = stringResource(id = R.string.game_session_score, state.value.session.score).toUpperCase(Locale.current),
+            text = stringResource(
+                id = R.string.game_session_score,
+                gameState.value.gameSession.gameField.score
+            ).toUpperCase(Locale.current),
             style = Typography.body1,
         )
     }
     Divider()
-    LazyRow(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
             .fillMaxHeight(0.75f)
@@ -133,8 +157,8 @@ fun GameField(
                 gameColumnWidth = with(localDensity) { (coordinates.size.width.toDp().value.toInt() - 3) / 4 }
             }
     ) {
-        items(state.value.buttons) {
-            Column(
+        repeat(4) { columnId ->
+            Box(
                 Modifier
                     .fillMaxHeight()
                     .width(gameColumnWidth.dp)
@@ -142,11 +166,20 @@ fun GameField(
                         gameColumnHeight =
                             with(localDensity) { coordinates.size.height.toDp().value.toInt() - (gameColumnWidth * 0.8).toInt() }
                     },
-                horizontalAlignment = Alignment.CenterHorizontally
+                contentAlignment = Alignment.TopCenter
             ) {
-                TargetButton(gameColumnWidth, gameColumnHeight, it.animationDurationMs, it.id)
+                gameState.value.buttons.filter { target -> target.columnId == columnId }.forEach {
+                    TargetButton(
+                        it,
+                        gameColumnWidth,
+                        gameColumnHeight,
+                        onTargetClicked = onTargetClicked,
+                        onTargetBreakout = onTargetBreakout,
+                        onTargetPositionSave = onTargetPositionSave
+                    )
+                }
             }
-            if (it.id < state.value.buttons.lastIndex) {
+            if (columnId < 4) {
                 VerticalDivider()
             }
         }
@@ -163,12 +196,12 @@ fun GameField(
             textAlign = TextAlign.Center,
             text = stringResource(
                 id = R.string.game_session_combo,
-                state.value.session.bonusMultiplier,
+                gameState.value.gameSession.gameField.bonusMultiplier,
             ).toUpperCase(Locale.current),
             style = Typography.h1,
         )
         Button(
-            onClick = onTargetClicked,
+            onClick = onFireClicked,
             modifier = Modifier
                 .weight(1f)
                 .wrapContentSize()
@@ -177,7 +210,7 @@ fun GameField(
                 .height(100.dp),
         ) {
             Text(
-                text = state.value.session.let { "${it.currentOperationSign.toSymbol()}${it.currentOperationDigit}" },
+                text = gameState.value.gameSession.gameField.let { "${it.currentOperationSign.toSymbol()}${it.currentOperationDigit}" },
                 fontSize = 36.sp,
                 color = White
             )
@@ -192,10 +225,9 @@ fun GameField(
                 .width(48.dp)
                 .height(48.dp)
                 .alpha(0.8f)
-
         ) {
             Text(
-                text = state.value.session.let { "${it.nextOperationSign.toSymbol()}${it.nextOperationDigit}" },
+                text = gameState.value.gameSession.gameField.let { "${it.nextOperationSign.toSymbol()}${it.nextOperationDigit}" },
                 fontSize = 12.sp,
                 color = White
             )
@@ -255,29 +287,42 @@ fun CountdownOverlay(onFinish: () -> Unit) {
 
 @Composable
 fun TargetButton(
+    targetParams: TargetParams,
     parentWidth: Int,
     parentHeight: Int,
-    duration: Int,
-    id: Int
+    onTargetClicked: (Int) -> Unit,
+    onTargetBreakout: (Int) -> Unit,
+    onTargetPositionSave: (Int, Int) -> Unit
 ) {
-    val gameViewModel: GameViewModel = hiltViewModel()
-    val state = gameViewModel.state.collectAsState()
-    val isVisible = remember { mutableStateOf(true) }
+
     val targetButtonOffset by animateOffsetAsState(
-        targetValue = Offset(0f, (parentHeight).toFloat()),
-        animationSpec = tween(duration, easing = LinearEasing),
-        finishedListener = { isVisible.value = false }
+        targetValue = Offset(0f, parentHeight.toFloat() - targetParams.position.toFloat()),
+        animationSpec = tween(
+            targetParams.animationDurationMs,
+            easing = LinearEasing,
+            delayMillis = targetParams.animationDelayMs
+        ),
+        finishedListener = { onTargetBreakout.invoke(targetParams.id) }
     )
-    if (isVisible.value && state.value.buttons[id].isAlive) {
+    if (targetParams.isAlive && targetButtonOffset.y.dp + targetParams.position.dp > 0.dp) {
         Button(
+            onClick = { onTargetClicked.invoke(targetParams.id) },
             modifier = Modifier
-                .offset(targetButtonOffset.x.dp, targetButtonOffset.y.dp)
-                .height((parentWidth * 0.8).dp)
                 .width((parentWidth * 0.8).dp)
-                .clip(CircleShape),
-            onClick = { gameViewModel.sendAction(GameViewModel.Action.TargetButtonClicked(id)) }
+                .height((parentWidth * 0.8).dp)
+                .offset(targetButtonOffset.x.dp, targetButtonOffset.y.dp + targetParams.position.dp)
+                .clip(CircleShape)
         ) {
-            Text(text = state.value.buttons[id].value.toString(), fontSize = 20.sp, color = Color.White)
+            Text(text = targetParams.value.toString(), fontSize = 20.sp, color = Color.White)
+        }
+    }
+    OnLifecycleEvent { _, event ->
+        when (event) {
+            Lifecycle.Event.ON_PAUSE, Lifecycle.Event.ON_STOP, Lifecycle.Event.ON_DESTROY -> {
+                onTargetPositionSave.invoke(targetParams.id, targetButtonOffset.y.toInt())
+            }
+            else -> { /* do nothing */
+            }
         }
     }
 }
@@ -290,4 +335,22 @@ fun VerticalDivider() {
             .width(1.dp)
             .background(color = MaterialTheme.colors.onSurface.copy(alpha = 0.12f))
     )
+}
+
+@Composable
+fun OnLifecycleEvent(onEvent: (owner: LifecycleOwner, event: Lifecycle.Event) -> Unit) {
+    val eventHandler = rememberUpdatedState(onEvent)
+    val lifecycleOwner = rememberUpdatedState(LocalLifecycleOwner.current)
+
+    DisposableEffect(lifecycleOwner.value) {
+        val lifecycle = lifecycleOwner.value.lifecycle
+        val observer = LifecycleEventObserver { owner, event ->
+            eventHandler.value(owner, event)
+        }
+
+        lifecycle.addObserver(observer)
+        onDispose {
+            lifecycle.removeObserver(observer)
+        }
+    }
 }

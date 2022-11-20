@@ -3,8 +3,9 @@ package com.sdomashchuk.mathclicker.game
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.sdomashchuk.mathclicker.domain.model.game.OperationSign
-import com.sdomashchuk.mathclicker.domain.model.game.session.Session
-import com.sdomashchuk.mathclicker.domain.model.game.session.TargetParam
+import com.sdomashchuk.mathclicker.domain.model.game.session.GameField
+import com.sdomashchuk.mathclicker.domain.model.game.session.GameSession
+import com.sdomashchuk.mathclicker.domain.model.game.session.TargetParams
 import com.sdomashchuk.mathclicker.domain.repository.GameRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.ImmutableList
@@ -38,7 +39,7 @@ class GameViewModel @Inject constructor(
 
     private fun handleAction() {
         viewModelScope.launch {
-            action.consumeAsFlow().collect() { action ->
+            action.consumeAsFlow().collect { action ->
                 when (action) {
                     Action.ReadyToPlayButtonClicked -> {
                         _state.value = state.value.copy(
@@ -61,31 +62,43 @@ class GameViewModel @Inject constructor(
                             isGameStarted = false
                         )
                     }
-                    is Action.TargetButtonClicked -> {
+                    is Action.TargetClicked -> {
+                        val updatedTargetParams = updateTargetValueState(action)
+                        gameRepository.updateTargetParams(updatedTargetParams[action.id - 1])
                         _state.value = state.value.copy(
-                            buttons = state.value.buttons.map {
-                                if (action.id == it.id) {
-                                    it.copy(
-                                        value = it.value - 1,
-                                        isAlive = it.value - 1 > 0
-                                    )
-                                } else it
-                            }.toImmutableList()
+                            buttons = updatedTargetParams.toImmutableList()
+                        )
+                    }
+                    is Action.TargetBreakout -> {
+                        val updatedTargetParams = updateTargetAliveState(action)
+                        gameRepository.updateTargetParams(updatedTargetParams[action.id - 1])
+                        _state.value = state.value.copy(
+                            buttons = updatedTargetParams.toImmutableList()
+                        )
+                    }
+                    is Action.SaveTargetPosition -> {
+                        val updatedTargetParams = updateTargetPositionState(action)
+                        gameRepository.updateTargetParams(updatedTargetParams[action.id - 1])
+                        _state.value = state.value.copy(
+                            isGamePaused = true,
+                            isGameStarted = false
                         )
                     }
                     is Action.FireButtonClicked -> {
                         _state.value = state.value.copy(
-                            buttons = state.value.buttons.map {
-                                val nextValue =
-                                    if (state.value.session.currentOperationSign == OperationSign.DIVISION) {
-                                        it.value / state.value.session.currentOperationDigit
-                                    } else {
-                                        it.value - state.value.session.currentOperationDigit
-                                    }
-                                it.copy(
-                                    value = nextValue,
-                                    isAlive = nextValue > 0
-                                )
+                            buttons = state.value.buttons.map { tp ->
+                                state.value.gameSession.gameField.let { session ->
+                                    val nextValue =
+                                        if (session.currentOperationSign == OperationSign.DIVISION) {
+                                            tp.value / session.currentOperationDigit
+                                        } else {
+                                            tp.value - session.currentOperationDigit
+                                        }
+                                    tp.copy(
+                                        value = nextValue,
+                                        isAlive = nextValue > 0
+                                    )
+                                }
                             }.toImmutableList()
                         )
                     }
@@ -96,27 +109,64 @@ class GameViewModel @Inject constructor(
 
     private fun initSession() {
         viewModelScope.launch {
-            val session = gameRepository.getSession()
-            val targetParams = gameRepository.getTargetParams(session.level)
+            val gameSession = gameRepository.getUnfinishedSession().let {
+                it ?: with(gameRepository) {
+                    val gameField = initGameField()
+                    initTargetParams(gameField)
+                    getUnfinishedSession()!!
+                }
+            }
             _state.value = state.value.copy(
-                session = session,
-                buttons = targetParams.toImmutableList()
+                gameSession = gameSession,
+                buttons = gameSession.targetParams.toImmutableList()
             )
         }
     }
+
+    private fun updateTargetValueState(action: Action.TargetClicked) =
+        state.value.buttons.map {
+            if (action.id == it.id) {
+                it.copy(
+                    value = it.value - 1,
+                    isAlive = it.value - 1 > 0
+                )
+            } else it
+        }
+
+    private fun updateTargetAliveState(action: Action.TargetBreakout) =
+        state.value.buttons.map {
+            if (action.id == it.id) {
+                it.copy(
+                    isAlive = false
+                )
+            } else it
+        }
+
+    private fun updateTargetPositionState(action: Action.SaveTargetPosition) =
+        state.value.buttons.map {
+            if (action.id == it.id) {
+                it.copy(
+                    position = action.position,
+                    animationDurationMs = it.animationDurationMs * action.position / 495,
+                    animationDelayMs = if (action.position > 0) 0 else it.animationDelayMs
+                )
+            } else it
+        }
 
     sealed class Action {
         object ReadyToPlayButtonClicked : Action()
         object ShowCountDown : Action()
         object StartGame : Action()
         object PauseGame : Action()
-        data class TargetButtonClicked(val id: Int) : Action()
+        data class TargetClicked(val id: Int) : Action()
+        data class TargetBreakout(val id: Int) : Action()
+        data class SaveTargetPosition(val id: Int, val position: Int) : Action()
         object FireButtonClicked : Action()
     }
 
     data class State(
-        val buttons: ImmutableList<TargetParam> = persistentListOf(),
-        val session: Session = Session(),
+        val buttons: ImmutableList<TargetParams> = persistentListOf(),
+        val gameSession: GameSession = GameSession(GameField(), listOf()),
         val isGamePaused: Boolean = true,
         val isGameStarted: Boolean = false
     )

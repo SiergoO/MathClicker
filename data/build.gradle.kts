@@ -1,10 +1,11 @@
 plugins {
     id("com.android.library")
-    id("org.jetbrains.kotlin.android")
+    kotlin("android")
+    kotlin("kapt")
 }
 
 android {
-    namespace = "com.example.data"
+    namespace = "com.sdomashchuk.mathclicker"
     compileSdk = 33
 
     defaultConfig {
@@ -26,13 +27,25 @@ android {
         targetCompatibility = JavaVersion.VERSION_11
     }
     kotlinOptions {
-        jvmTarget = "1.8"
+        jvmTarget = "11"
     }
     buildToolsVersion = "33.0.0"
 }
 
 dependencies {
+    val roomVersion = "2.4.3"
+
     implementation(project(":domain"))
     implementation("androidx.core:core-ktx:1.9.0")
     implementation("androidx.appcompat:appcompat:1.5.1")
+
+    //Coroutines
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.6.4")
+
+    //Room
+    kapt("androidx.room:room-compiler:$roomVersion")
+    implementation("androidx.room:room-common:$roomVersion")
+    implementation("androidx.room:room-ktx:$roomVersion")
+    implementation("androidx.room:room-runtime:$roomVersion")
+
 }

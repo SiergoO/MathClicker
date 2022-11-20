@@ -2,12 +2,13 @@ package com.sdomashchuk.mathclicker.domain.model.game.session
 
 import com.sdomashchuk.mathclicker.domain.model.game.OperationSign
 
-data class Session(
-    val level: Int = 1,
+data class GameField(
+    val id: Int = 0,
+    val level: Int = 0,
     val score: Int = 0,
     val bonusMultiplier: Int = 0,
-    val currentOperationDigit: Int = 2,
     val currentOperationSign: OperationSign = OperationSign.DIVISION,
-    val nextOperationDigit: Int = 3,
-    val nextOperationSign: OperationSign = OperationSign.SUBTRACTION
+    val currentOperationDigit: Int = 0,
+    val nextOperationSign: OperationSign = OperationSign.DIVISION,
+    val nextOperationDigit: Int = 0
 )

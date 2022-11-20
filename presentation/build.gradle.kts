@@ -104,6 +104,7 @@ dependencies {
     implementation("com.google.dagger:hilt-android-gradle-plugin:2.41")
     implementation("com.google.dagger:hilt-android:2.40")
     implementation("androidx.hilt:hilt-navigation-compose:1.0.0")
+    implementation("androidx.room:room-ktx:2.4.3")
     kapt("com.google.dagger:hilt-android-compiler:2.40")
     kapt("androidx.hilt:hilt-compiler:1.0.0")
 }
