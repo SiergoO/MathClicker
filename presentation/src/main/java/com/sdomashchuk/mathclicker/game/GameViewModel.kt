@@ -1,12 +1,15 @@
 package com.sdomashchuk.mathclicker.game
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.sdomashchuk.mathclicker.domain.model.game.OperationSign
 import com.sdomashchuk.mathclicker.domain.model.game.session.GameField
-import com.sdomashchuk.mathclicker.domain.model.game.session.GameSession
 import com.sdomashchuk.mathclicker.domain.model.game.session.TargetParams
 import com.sdomashchuk.mathclicker.domain.repository.GameRepository
+import com.sdomashchuk.mathclicker.domain.usecase.UseCase
+import com.sdomashchuk.mathclicker.domain.usecase.game.session.UpdateLevelUseCaseParam
+import com.sdomashchuk.mathclicker.domain.usecase.game.session.UpdateLevelUseCaseResult
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
@@ -20,7 +23,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class GameViewModel @Inject constructor(
-    private val gameRepository: GameRepository
+    private val gameRepository: GameRepository,
+    private val updateLevelUseCase: UseCase<UpdateLevelUseCaseParam, UpdateLevelUseCaseResult>
 ) : ViewModel() {
 
     private val action = Channel<Action>(Channel.UNLIMITED)
@@ -62,49 +66,109 @@ class GameViewModel @Inject constructor(
                             isGameStarted = false
                         )
                     }
+                    is Action.TargetRevealed -> {
+                        val updatedTargetParams = updateTargetVisibilityState(action)
+                        _state.value = state.value.copy(
+                            targetParamsList = updatedTargetParams.toImmutableList()
+                        )
+                        gameRepository.updateTargetParams(updatedTargetParams[action.id - 1])
+                    }
                     is Action.TargetClicked -> {
                         val updatedTargetParams = updateTargetValueState(action)
-                        gameRepository.updateTargetParams(updatedTargetParams[action.id - 1])
                         _state.value = state.value.copy(
-                            buttons = updatedTargetParams.toImmutableList()
+                            targetParamsList = updatedTargetParams.toImmutableList()
                         )
+                        gameRepository.updateTargetParams(updatedTargetParams[action.id - 1])
+                        updateLevelIfNecessary()
                     }
                     is Action.TargetBreakout -> {
                         val updatedTargetParams = updateTargetAliveState(action)
-                        gameRepository.updateTargetParams(updatedTargetParams[action.id - 1])
                         _state.value = state.value.copy(
-                            buttons = updatedTargetParams.toImmutableList()
+                            targetParamsList = updatedTargetParams.toImmutableList()
                         )
+                        gameRepository.updateTargetParams(updatedTargetParams[action.id - 1])
+                        updateLevelIfNecessary()
                     }
                     is Action.SaveTargetPosition -> {
                         val updatedTargetParams = updateTargetPositionState(action)
-                        gameRepository.updateTargetParams(updatedTargetParams[action.id - 1])
                         _state.value = state.value.copy(
                             isGamePaused = true,
                             isGameStarted = false
                         )
+                        gameRepository.updateTargetParams(updatedTargetParams[action.id - 1])
                     }
                     is Action.FireButtonClicked -> {
+                        val (nextOperationSign, nextOperationDigit) = gameRepository.getNextSignAndDigit(state.value.gameField.level)
+                        val currentOperationSign = state.value.gameField.nextOperationSign
+                        val currentOperationDigit = state.value.gameField.nextOperationDigit
                         _state.value = state.value.copy(
-                            buttons = state.value.buttons.map { tp ->
-                                state.value.gameSession.gameField.let { session ->
-                                    val nextValue =
-                                        if (session.currentOperationSign == OperationSign.DIVISION) {
-                                            tp.value / session.currentOperationDigit
-                                        } else {
-                                            tp.value - session.currentOperationDigit
-                                        }
-                                    tp.copy(
-                                        value = nextValue,
-                                        isAlive = nextValue > 0
-                                    )
-                                }
-                            }.toImmutableList()
+                            targetParamsList = state.value.targetParamsList
+                                .performOperation()
+                                .toImmutableList(),
+                            gameField = state.value.gameField.copy(
+                                currentOperationSign = currentOperationSign,
+                                currentOperationDigit = currentOperationDigit,
+                                nextOperationSign = nextOperationSign,
+                                nextOperationDigit = nextOperationDigit
+                            )
                         )
+                        gameRepository.updateTargetParamsList(state.value.targetParamsList)
+                        gameRepository.updateSignAndDigit(nextOperationSign, nextOperationDigit)
+                        updateLevelIfNecessary()
                     }
                 }
             }
         }
+    }
+
+    private suspend fun updateLevelIfNecessary() {
+        if (state.value.targetParamsList.map { it.isAlive }.none { it }) {
+            updateLevelUseCase.execute(UpdateLevelUseCaseParam(state.value.gameField.level + 1)).fold(
+                onSuccess = {
+                    val targetParamsList = gameRepository.getTargetParams(state.value.gameField.id)
+                    _state.value = state.value.copy(
+                        targetParamsList = targetParamsList.toImmutableList(),
+                        gameField = state.value.gameField.let {
+                            it.copy(level = it.level + 1)
+                        }
+                    )
+                },
+                onFailure = {}
+            )
+        }
+    }
+
+    private fun List<TargetParams>.performOperation(): List<TargetParams> {
+        var multiplier = 0
+        var totalScore = 0
+        val resultList = this.map { tp ->
+            if (tp.isAlive && tp.isVisible) {
+                state.value.gameField.let { session ->
+                    val nextValue = if (session.currentOperationSign == OperationSign.DIVISION) {
+                        val remainder = tp.value % session.currentOperationDigit
+                        if (remainder == 0) {
+                            val result = tp.value / session.currentOperationDigit
+                            totalScore += result * session.currentOperationDigit
+                            multiplier++
+                            result
+                        } else tp.value * session.currentOperationDigit
+                    } else {
+                        val result = tp.value - session.currentOperationDigit
+                        if (result >= 0) {
+                            totalScore += session.currentOperationDigit
+                            multiplier = 1
+                        }
+                        if (result >= 0) result else tp.value + session.currentOperationDigit
+                    }
+                    tp.copy(
+                        value = nextValue,
+                        isAlive = nextValue > 0
+                    )
+                }
+            } else tp
+        }
+        updateScore(totalScore * multiplier)
+        return resultList
     }
 
     private fun initSession() {
@@ -117,14 +181,30 @@ class GameViewModel @Inject constructor(
                 }
             }
             _state.value = state.value.copy(
-                gameSession = gameSession,
-                buttons = gameSession.targetParams.toImmutableList()
+                gameField = gameSession.gameField,
+                targetParamsList = gameSession.targetParamsList.toImmutableList()
             )
         }
     }
 
-    private fun updateTargetValueState(action: Action.TargetClicked) =
-        state.value.buttons.map {
+    private fun updateScore(scoreToAdd: Int) {
+        _state.value = state.value.copy(
+            gameField = state.value.gameField.copy(score = state.value.gameField.score + scoreToAdd)
+        )
+    }
+
+    private fun updateTargetVisibilityState(action: Action.TargetRevealed) =
+        state.value.targetParamsList.map {
+            if (action.id == it.id) {
+                it.copy(
+                    isVisible = true
+                )
+            } else it
+        }
+
+    private fun updateTargetValueState(action: Action.TargetClicked): List<TargetParams> {
+        updateScore(1)
+        return _state.value.targetParamsList.map {
             if (action.id == it.id) {
                 it.copy(
                     value = it.value - 1,
@@ -132,9 +212,10 @@ class GameViewModel @Inject constructor(
                 )
             } else it
         }
+    }
 
     private fun updateTargetAliveState(action: Action.TargetBreakout) =
-        state.value.buttons.map {
+        state.value.targetParamsList.map {
             if (action.id == it.id) {
                 it.copy(
                     isAlive = false
@@ -143,11 +224,11 @@ class GameViewModel @Inject constructor(
         }
 
     private fun updateTargetPositionState(action: Action.SaveTargetPosition) =
-        state.value.buttons.map {
+        state.value.targetParamsList.map {
             if (action.id == it.id) {
                 it.copy(
                     position = action.position,
-                    animationDurationMs = it.animationDurationMs * action.position / 495,
+                    animationDurationMs = it.animationDurationMs * action.position / 495, // Todo("pass screen height")
                     animationDelayMs = if (action.position > 0) 0 else it.animationDelayMs
                 )
             } else it
@@ -158,6 +239,7 @@ class GameViewModel @Inject constructor(
         object ShowCountDown : Action()
         object StartGame : Action()
         object PauseGame : Action()
+        data class TargetRevealed(val id: Int) : Action()
         data class TargetClicked(val id: Int) : Action()
         data class TargetBreakout(val id: Int) : Action()
         data class SaveTargetPosition(val id: Int, val position: Int) : Action()
@@ -165,8 +247,8 @@ class GameViewModel @Inject constructor(
     }
 
     data class State(
-        val buttons: ImmutableList<TargetParams> = persistentListOf(),
-        val gameSession: GameSession = GameSession(GameField(), listOf()),
+        val targetParamsList: ImmutableList<TargetParams> = persistentListOf(),
+        val gameField: GameField = GameField(),
         val isGamePaused: Boolean = true,
         val isGameStarted: Boolean = false
     )

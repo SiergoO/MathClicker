@@ -40,6 +40,16 @@ class GameRepositoryImpl(
         gameSessionDao.updateGameField(gameField.toDataModel())
     }
 
+    override suspend fun getNextSignAndDigit(level: Int): Pair<OperationSign, Int> {
+        val nextOperationSign = OperationSign.values().random()
+        val nextOperationDigit = difficultyHelper.getOperationValueByLevel(nextOperationSign, level)
+        return Pair(nextOperationSign, nextOperationDigit)
+    }
+
+    override suspend fun updateSignAndDigit(nextOperationSign: OperationSign, nextOperationDigit: Int) {
+        gameSessionDao.updateSignAndDigit(nextOperationSign.toSymbol(), nextOperationDigit)
+    }
+
     override suspend fun updateLevel(level: Int) {
         gameSessionDao.updateLevel(level)
     }
@@ -64,15 +74,24 @@ class GameRepositoryImpl(
         }
     }
 
+    override suspend fun refreshTargetParams(gameField: GameField) {
+        targetParamsDao.deleteTargetParams()
+        initTargetParams(gameField)
+    }
+
     override suspend fun updateTargetParams(targetParams: TargetParams) {
         targetParamsDao.updateTargetParams(targetParams.toDataModel())
+    }
+
+    override suspend fun updateTargetParamsList(targetParamsList: List<TargetParams>) {
+        targetParamsDao.updateTargetParamsList(targetParamsList.map { it.toDataModel() })
     }
 
     override suspend fun deleteTargetParams() {
         targetParamsDao.deleteTargetParams()
     }
 
-    override suspend fun getTargetParams(level: Int): List<TargetParams> {
+    override suspend fun getTargetParams(gameFieldId: Int): List<TargetParams> {
         return targetParamsDao.getTargetParams().map { it.toDomainModel() }
     }
 
@@ -84,3 +103,4 @@ class GameRepositoryImpl(
         return gameSessionDao.getUnfinishedSession()?.toDomainModel()
     }
 }
+

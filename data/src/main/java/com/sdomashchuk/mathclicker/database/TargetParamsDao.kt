@@ -1,15 +1,10 @@
 package com.sdomashchuk.mathclicker.database
 
 import androidx.room.Dao
-import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
-import androidx.room.Transaction
 import androidx.room.Update
-import com.sdomashchuk.mathclicker.domain.model.game.session.TargetParams
-import com.sdomashchuk.mathclicker.model.database.GameFieldDataModel
-import com.sdomashchuk.mathclicker.model.database.GameSessionDataModel
 import com.sdomashchuk.mathclicker.model.database.TargetParamsDataModel
 
 @Dao
@@ -20,6 +15,9 @@ interface TargetParamsDao {
 
     @Update(onConflict = OnConflictStrategy.REPLACE)
     suspend fun updateTargetParams(targetParams: TargetParamsDataModel)
+
+    @Update(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun updateTargetParamsList(targetParamsList: List<TargetParamsDataModel>)
 
     @Query("DELETE FROM targetParams")
     suspend fun deleteTargetParams()

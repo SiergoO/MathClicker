@@ -10,10 +10,10 @@ data class GameSessionDataModel(
         parentColumn = "id",
         entityColumn = "relatedGameFieldId"
     )
-    val targetParams: List<TargetParamsDataModel>
+    val targetParams: List<TargetParamsDataModel>?
 )
 
 fun GameSessionDataModel.toDomainModel() = GameSession(
     gameField = gameField.toDomainModel(),
-    targetParams = targetParams.map { it.toDomainModel() }
+    targetParamsList = targetParams?.map { it.toDomainModel() }?: listOf()
 )

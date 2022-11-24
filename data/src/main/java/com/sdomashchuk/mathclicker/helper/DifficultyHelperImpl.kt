@@ -8,7 +8,7 @@ class DifficultyHelperImpl: DifficultyHelper {
     override val sessionLevelRange = IntRange(1, 1000)
     override val initialTargetValueRange = IntRange(1, 20)
     override val initialTargetAnimationDurationMsRange = IntRange(27000, 54000)
-    override val initialTargetAnimationDelayMsRange = IntRange(13500, 27000)
+    override val initialTargetAnimationDelayMsRange = IntRange(10000, 20000)
     override val initialTargetAmountRange = IntRange(4, 6)
     override val initialDivisionValueRange = IntRange(2, 5)
     override val initialSubtractionValueRange = IntRange(1, 3)

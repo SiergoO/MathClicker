@@ -14,6 +14,7 @@ class TargetParamsDataModel(
     @ColumnInfo(name = "position") var position: Int = 0,
     @ColumnInfo(name = "animationDelayMs") var animationDelayMs: Int = 0,
     @ColumnInfo(name = "animationDurationMs") var animationDurationMs: Int = 0,
+    @ColumnInfo(name = "isVisible") var isVisible: Boolean = false,
     @ColumnInfo(name = "isAlive") var isAlive: Boolean = false
 )
 
@@ -25,6 +26,7 @@ fun TargetParamsDataModel.toDomainModel() = TargetParams(
     position = position,
     animationDelayMs = animationDelayMs,
     animationDurationMs = animationDurationMs,
+    isVisible = isVisible,
     isAlive = isAlive
 )
 
@@ -36,5 +38,6 @@ fun TargetParams.toDataModel() = TargetParamsDataModel(
     position = position,
     animationDelayMs = animationDelayMs,
     animationDurationMs = animationDurationMs,
+    isVisible = isVisible,
     isAlive = isAlive
 )

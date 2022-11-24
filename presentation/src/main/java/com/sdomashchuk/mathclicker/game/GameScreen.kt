@@ -1,8 +1,12 @@
 package com.sdomashchuk.mathclicker.game
 
+import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateOffsetAsState
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -40,7 +44,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
@@ -87,6 +90,7 @@ fun GameScreen(
                 !gameState.value.isGameStarted -> CountdownOverlay { gameViewModel.sendAction(GameViewModel.Action.StartGame) }
                 else -> GameField(
                     gameState,
+                    onTargetRevealed = { id -> gameViewModel.sendAction(GameViewModel.Action.TargetRevealed(id)) },
                     onTargetClicked = { id -> gameViewModel.sendAction(GameViewModel.Action.TargetClicked(id)) },
                     onTargetBreakout = { id -> gameViewModel.sendAction(GameViewModel.Action.TargetBreakout(id)) },
                     onTargetPositionSave = { id, position ->
@@ -110,6 +114,7 @@ fun GameScreen(
 @Composable
 fun GameField(
     gameState: State<GameViewModel.State>,
+    onTargetRevealed: (Int) -> Unit,
     onTargetClicked: (Int) -> Unit,
     onTargetBreakout: (Int) -> Unit,
     onTargetPositionSave: (Int, Int) -> Unit,
@@ -132,7 +137,7 @@ fun GameField(
             textAlign = TextAlign.Center,
             text = stringResource(
                 id = R.string.game_session_level,
-                gameState.value.gameSession.gameField.level
+                gameState.value.gameField.level
             ).toUpperCase(Locale.current),
             style = Typography.body1,
         )
@@ -143,7 +148,7 @@ fun GameField(
             textAlign = TextAlign.Center,
             text = stringResource(
                 id = R.string.game_session_score,
-                gameState.value.gameSession.gameField.score
+                gameState.value.gameField.score
             ).toUpperCase(Locale.current),
             style = Typography.body1,
         )
@@ -155,24 +160,22 @@ fun GameField(
             .fillMaxHeight(0.75f)
             .onGloballyPositioned { coordinates ->
                 gameColumnWidth = with(localDensity) { (coordinates.size.width.toDp().value.toInt() - 3) / 4 }
+                gameColumnHeight = with(localDensity) { coordinates.size.height.toDp().value.toInt() - (gameColumnWidth * 0.8).toInt() }
             }
     ) {
         repeat(4) { columnId ->
             Box(
                 Modifier
                     .fillMaxHeight()
-                    .width(gameColumnWidth.dp)
-                    .onGloballyPositioned { coordinates ->
-                        gameColumnHeight =
-                            with(localDensity) { coordinates.size.height.toDp().value.toInt() - (gameColumnWidth * 0.8).toInt() }
-                    },
+                    .width(gameColumnWidth.dp),
                 contentAlignment = Alignment.TopCenter
             ) {
-                gameState.value.buttons.filter { target -> target.columnId == columnId }.forEach {
+                gameState.value.targetParamsList.filter { target -> target.columnId == columnId }.forEach {
                     TargetButton(
                         it,
                         gameColumnWidth,
                         gameColumnHeight,
+                        onTargetRevealed = onTargetRevealed,
                         onTargetClicked = onTargetClicked,
                         onTargetBreakout = onTargetBreakout,
                         onTargetPositionSave = onTargetPositionSave
@@ -196,7 +199,7 @@ fun GameField(
             textAlign = TextAlign.Center,
             text = stringResource(
                 id = R.string.game_session_combo,
-                gameState.value.gameSession.gameField.bonusMultiplier,
+                gameState.value.gameField.bonusMultiplier,
             ).toUpperCase(Locale.current),
             style = Typography.h1,
         )
@@ -210,7 +213,7 @@ fun GameField(
                 .height(100.dp),
         ) {
             Text(
-                text = gameState.value.gameSession.gameField.let { "${it.currentOperationSign.toSymbol()}${it.currentOperationDigit}" },
+                text = gameState.value.gameField.let { "${it.currentOperationSign.toSymbol()}${it.currentOperationDigit}" },
                 fontSize = 36.sp,
                 color = White
             )
@@ -227,7 +230,7 @@ fun GameField(
                 .alpha(0.8f)
         ) {
             Text(
-                text = gameState.value.gameSession.gameField.let { "${it.nextOperationSign.toSymbol()}${it.nextOperationDigit}" },
+                text = gameState.value.gameField.let { "${it.nextOperationSign.toSymbol()}${it.nextOperationDigit}" },
                 fontSize = 12.sp,
                 color = White
             )
@@ -290,27 +293,45 @@ fun TargetButton(
     targetParams: TargetParams,
     parentWidth: Int,
     parentHeight: Int,
+    onTargetRevealed: (Int) -> Unit,
     onTargetClicked: (Int) -> Unit,
     onTargetBreakout: (Int) -> Unit,
     onTargetPositionSave: (Int, Int) -> Unit
 ) {
+    val infiniteTransition = if (targetParams.isAlive) { rememberInfiniteTransition()} else null
+    val targetButtonYOffset = if (infiniteTransition != null) {
+        val yOffset by infiniteTransition.animateFloat(
+            initialValue = targetParams.position.toFloat() - 56f,
+            targetValue = parentHeight.toFloat(),
+            animationSpec = infiniteRepeatable(
+                animation = tween(
+                    targetParams.animationDurationMs,
+                    easing = LinearEasing,
+                    delayMillis = targetParams.animationDelayMs
+                ),
+                repeatMode = RepeatMode.Restart
+            )
+        )
+        yOffset
+    } else 0f
 
-    val targetButtonOffset by animateOffsetAsState(
-        targetValue = Offset(0f, parentHeight.toFloat() - targetParams.position.toFloat()),
-        animationSpec = tween(
-            targetParams.animationDurationMs,
-            easing = LinearEasing,
-            delayMillis = targetParams.animationDelayMs
-        ),
-        finishedListener = { onTargetBreakout.invoke(targetParams.id) }
-    )
-    if (targetParams.isAlive && targetButtonOffset.y.dp + targetParams.position.dp > 0.dp) {
+//    val targetButtonOffset by animateOffsetAsState(
+//        targetValue = Offset(0f, parentHeight.toFloat() - targetParams.position.toFloat()),
+//        animationSpec = ,
+//        finishedListener = {
+//            startTransition = false
+//            onTargetBreakout.invoke(targetParams.id)
+//        }
+//    )
+    if (targetButtonYOffset > 0) { onTargetRevealed.invoke(targetParams.id) }
+    if (parentHeight != 0 && targetButtonYOffset == parentHeight.toFloat()) { onTargetBreakout.invoke(targetParams.id) }
+    if (targetParams.isAlive && targetButtonYOffset.dp + targetParams.position.dp > 0.dp) {
         Button(
             onClick = { onTargetClicked.invoke(targetParams.id) },
             modifier = Modifier
                 .width((parentWidth * 0.8).dp)
                 .height((parentWidth * 0.8).dp)
-                .offset(targetButtonOffset.x.dp, targetButtonOffset.y.dp + targetParams.position.dp)
+                .offset(0.dp, targetButtonYOffset.dp + targetParams.position.dp)
                 .clip(CircleShape)
         ) {
             Text(text = targetParams.value.toString(), fontSize = 20.sp, color = Color.White)
@@ -319,7 +340,7 @@ fun TargetButton(
     OnLifecycleEvent { _, event ->
         when (event) {
             Lifecycle.Event.ON_PAUSE, Lifecycle.Event.ON_STOP, Lifecycle.Event.ON_DESTROY -> {
-                onTargetPositionSave.invoke(targetParams.id, targetButtonOffset.y.toInt())
+                onTargetPositionSave.invoke(targetParams.id, targetButtonYOffset.toInt())
             }
             else -> { /* do nothing */
             }
