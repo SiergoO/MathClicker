@@ -1,6 +1,5 @@
 package com.sdomashchuk.mathclicker.game
 
-import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -90,6 +89,7 @@ fun GameScreen(
                 !gameState.value.isGameStarted -> CountdownOverlay { gameViewModel.sendAction(GameViewModel.Action.StartGame) }
                 else -> GameField(
                     gameState,
+                    onGameColumnSizeMeasured = { width, height -> gameViewModel.sendAction(GameViewModel.Action.GameColumnSizeMeasured(width, height))},
                     onTargetRevealed = { id -> gameViewModel.sendAction(GameViewModel.Action.TargetRevealed(id)) },
                     onTargetClicked = { id -> gameViewModel.sendAction(GameViewModel.Action.TargetClicked(id)) },
                     onTargetBreakout = { id -> gameViewModel.sendAction(GameViewModel.Action.TargetBreakout(id)) },
@@ -114,6 +114,7 @@ fun GameScreen(
 @Composable
 fun GameField(
     gameState: State<GameViewModel.State>,
+    onGameColumnSizeMeasured: (width: Int, height: Int) -> Unit,
     onTargetRevealed: (Int) -> Unit,
     onTargetClicked: (Int) -> Unit,
     onTargetBreakout: (Int) -> Unit,
@@ -161,6 +162,7 @@ fun GameField(
             .onGloballyPositioned { coordinates ->
                 gameColumnWidth = with(localDensity) { (coordinates.size.width.toDp().value.toInt() - 3) / 4 }
                 gameColumnHeight = with(localDensity) { coordinates.size.height.toDp().value.toInt() - (gameColumnWidth * 0.8).toInt() }
+                onGameColumnSizeMeasured.invoke(gameColumnWidth, gameColumnHeight)
             }
     ) {
         repeat(4) { columnId ->
@@ -315,14 +317,6 @@ fun TargetButton(
         yOffset
     } else 0f
 
-//    val targetButtonOffset by animateOffsetAsState(
-//        targetValue = Offset(0f, parentHeight.toFloat() - targetParams.position.toFloat()),
-//        animationSpec = ,
-//        finishedListener = {
-//            startTransition = false
-//            onTargetBreakout.invoke(targetParams.id)
-//        }
-//    )
     if (targetButtonYOffset > 0) { onTargetRevealed.invoke(targetParams.id) }
     if (parentHeight != 0 && targetButtonYOffset == parentHeight.toFloat()) { onTargetBreakout.invoke(targetParams.id) }
     if (targetParams.isAlive && targetButtonYOffset.dp + targetParams.position.dp > 0.dp) {

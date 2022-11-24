@@ -66,6 +66,12 @@ class GameViewModel @Inject constructor(
                             isGameStarted = false
                         )
                     }
+                    is Action.GameColumnSizeMeasured -> {
+                        _state.value = state.value.copy(
+                            gameColumnWidth = action.width,
+                            gameColumnHeight = action.height
+                        )
+                    }
                     is Action.TargetRevealed -> {
                         val updatedTargetParams = updateTargetVisibilityState(action)
                         _state.value = state.value.copy(
@@ -228,7 +234,7 @@ class GameViewModel @Inject constructor(
             if (action.id == it.id) {
                 it.copy(
                     position = action.position,
-                    animationDurationMs = it.animationDurationMs * action.position / 495, // Todo("pass screen height")
+                    animationDurationMs = it.animationDurationMs * action.position / state.value.gameColumnHeight,
                     animationDelayMs = if (action.position > 0) 0 else it.animationDelayMs
                 )
             } else it
@@ -239,6 +245,7 @@ class GameViewModel @Inject constructor(
         object ShowCountDown : Action()
         object StartGame : Action()
         object PauseGame : Action()
+        data class GameColumnSizeMeasured(val width: Int, val height: Int) : Action()
         data class TargetRevealed(val id: Int) : Action()
         data class TargetClicked(val id: Int) : Action()
         data class TargetBreakout(val id: Int) : Action()
@@ -249,6 +256,8 @@ class GameViewModel @Inject constructor(
     data class State(
         val targetParamsList: ImmutableList<TargetParams> = persistentListOf(),
         val gameField: GameField = GameField(),
+        val gameColumnWidth: Int = 0,
+        val gameColumnHeight: Int = 0,
         val isGamePaused: Boolean = true,
         val isGameStarted: Boolean = false
     )
