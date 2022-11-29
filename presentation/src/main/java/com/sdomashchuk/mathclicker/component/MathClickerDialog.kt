@@ -102,7 +102,7 @@ private fun Header(title: String) {
                 .fillMaxWidth()
                 .padding(20.dp)
         ) {
-            Text(text = title, style = Typography.h1)
+            Text(text = title, style = Typography.h2)
         }
         Divider(color = Color.DarkGray, thickness = 1.dp)
     }

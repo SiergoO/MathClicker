@@ -12,6 +12,7 @@ class GameFieldDataModel(
     @PrimaryKey(autoGenerate = true) var id: Int = 1,
     @ColumnInfo(name = "level") var level: Int = 1,
     @ColumnInfo(name = "score") var score: Int = 0,
+    @ColumnInfo(name = "lifeCount") var lifeCount: Int = 3,
     @ColumnInfo(name = "bonusMultiplier") var bonusMultiplier: Int = 0,
     @ColumnInfo(name = "currentOperationSign") var currentOperationSign: String = "",
     @ColumnInfo(name = "currentOperationDigit") var currentOperationDigit: Int = 0,
@@ -24,20 +25,24 @@ fun GameFieldDataModel.toDomainModel() = GameField(
     id = id,
     level = level,
     score = score,
+    lifeCount = lifeCount,
     bonusMultiplier = bonusMultiplier,
     currentOperationSign = currentOperationSign.toOperationSign(),
     currentOperationDigit = currentOperationDigit,
     nextOperationSign = nextOperationSign.toOperationSign(),
-    nextOperationDigit = nextOperationDigit
+    nextOperationDigit = nextOperationDigit,
+    isClosed = isClosed
 )
 
 fun GameField.toDataModel() = GameFieldDataModel(
     id = id,
     level = level,
     score = score,
+    lifeCount = lifeCount,
     bonusMultiplier = bonusMultiplier,
     currentOperationSign = currentOperationSign.toSymbol(),
     currentOperationDigit = currentOperationDigit,
     nextOperationSign = nextOperationSign.toSymbol(),
-    nextOperationDigit = nextOperationDigit
+    nextOperationDigit = nextOperationDigit,
+    isClosed = isClosed
 )

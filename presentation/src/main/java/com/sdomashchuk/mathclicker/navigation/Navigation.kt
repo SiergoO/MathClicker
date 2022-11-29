@@ -12,12 +12,15 @@ import com.sdomashchuk.mathclicker.game.GameScreen
 import com.sdomashchuk.mathclicker.menu.MenuScreen
 import com.sdomashchuk.mathclicker.splash.SplashScreen
 
-const val MENU_SCREEN_FADE_IN_DURATION = 2000
+const val MENU_SCREEN_FADE_IN_DURATION = 500
+const val MENU_SCREEN_FADE_OUT_DURATION = 200
+const val GAME_SCREEN_FADE_IN_DURATION = 500
+const val GAME_SCREEN_FADE_OUT_DURATION = 0
 
 @OptIn(ExperimentalAnimationApi::class)
 @Composable
 fun SetupNavGraph(navController: NavHostController) {
-    AnimatedNavHost(navController = navController, startDestination = Screen.Splash.route) {
+    AnimatedNavHost(navController = navController, startDestination = Screen.Menu.route) {
 
         composable(
             route = Screen.Splash.route,
@@ -30,12 +33,16 @@ fun SetupNavGraph(navController: NavHostController) {
         composable(
             route = Screen.Menu.route,
             enterTransition = { fadeIn(animationSpec = keyframes { this.durationMillis = MENU_SCREEN_FADE_IN_DURATION }) },
-            exitTransition = { fadeOut() }
+            exitTransition = { fadeOut(animationSpec = keyframes { this.durationMillis = MENU_SCREEN_FADE_OUT_DURATION }) }
         ) {
             MenuScreen(navController = navController)
         }
 
-        composable(route = Screen.Main.route) {
+        composable(
+            route = Screen.Game.route,
+            enterTransition = { fadeIn(animationSpec = keyframes { this.durationMillis = GAME_SCREEN_FADE_IN_DURATION }) },
+            exitTransition = { fadeOut(animationSpec = keyframes { this.durationMillis = GAME_SCREEN_FADE_OUT_DURATION }) }
+        ) {
             GameScreen(navController = navController)
         }
     }

@@ -44,7 +44,7 @@ fun MenuScreen(
     val menuViewModel: MenuViewModel = hiltViewModel()
     val state = menuViewModel.state.collectAsState()
 
-    CollectEventsUI(
+    CollectUiEvents(
         viewModel = menuViewModel,
         navController = navController
     )
@@ -119,34 +119,38 @@ fun MenuScreen(
 }
 
 @Composable
-fun MenuButton(text: String, onClick: () -> Unit) {
+fun MenuButton(
+    modifier: Modifier = Modifier,
+    text: String,
+    onClick: () -> Unit
+) {
     Button(
         onClick = onClick,
         colors = ButtonDefaults.buttonColors(backgroundColor = Red500),
-        modifier = Modifier
+        modifier = modifier
             .width(200.dp)
             .height(60.dp)
             .clip(Shapes.large)
     ) {
         Text(
             text = text,
-            style = Typography.h1
+            style = Typography.h2
         )
     }
 }
 
 @Composable
-fun CollectEventsUI(
+fun CollectUiEvents(
     viewModel: MenuViewModel,
     navController: NavController
 ) {
     LaunchedEffect(
         key1 = null,
         block = {
-            viewModel.eventsUi.receiveAsFlow().collect {
+            viewModel.uiEvents.receiveAsFlow().collect {
                 when (it) {
-                    is MenuViewModel.EventUi.NavigateToGameScreen -> {
-                        navController.navigate(Screen.Main.route)
+                    is MenuViewModel.UiEvent.NavigateToGameScreen -> {
+                        navController.navigate(Screen.Game.route)
                     }
                 }
             }

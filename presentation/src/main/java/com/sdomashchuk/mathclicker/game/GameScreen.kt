@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -64,13 +65,18 @@ import com.airbnb.lottie.compose.LottieConstants
 import com.airbnb.lottie.compose.animateLottieCompositionAsState
 import com.airbnb.lottie.compose.rememberLottieComposition
 import com.sdomashchuk.mathclicker.R
+import com.sdomashchuk.mathclicker.component.GameMenuDialog
 import com.sdomashchuk.mathclicker.domain.model.game.session.TargetParams
+import com.sdomashchuk.mathclicker.navigation.Screen
 import com.sdomashchuk.mathclicker.ui.theme.MathClickerTheme
 import com.sdomashchuk.mathclicker.ui.theme.Red200
+import com.sdomashchuk.mathclicker.ui.theme.Red500
 import com.sdomashchuk.mathclicker.ui.theme.Translucent
 import com.sdomashchuk.mathclicker.ui.theme.Typography
 import com.sdomashchuk.mathclicker.ui.theme.White
 import com.sdomashchuk.mathclicker.util.toSymbol
+import kotlinx.coroutines.flow.receiveAsFlow
+import kotlin.math.roundToInt
 
 @Composable
 fun GameScreen(
@@ -80,11 +86,22 @@ fun GameScreen(
     val gameViewModel: GameViewModel = hiltViewModel()
     val gameState = gameViewModel.state.collectAsState()
 
+    CollectUiEvents(
+        viewModel = gameViewModel,
+        navController = navController
+    )
+
     MathClickerTheme {
         Column(
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
             when {
+                gameState.value.isGameFinished -> GameMenuDialog(
+                    headerText = stringResource(id = R.string.game_over),
+                    onRestartClick = { gameViewModel.sendAction(GameViewModel.Action.RestartGame) },
+                    onBackToMainMenuClick = { gameViewModel.sendAction(GameViewModel.Action.BackToMainMenuClicked) }
+                )
                 gameState.value.isGamePaused -> GamePausedOverlay { gameViewModel.sendAction(GameViewModel.Action.ReadyToPlayButtonClicked) }
                 !gameState.value.isGameStarted -> CountdownOverlay { gameViewModel.sendAction(GameViewModel.Action.StartGame) }
                 else -> GameField(
@@ -161,7 +178,8 @@ fun GameField(
             .fillMaxHeight(0.75f)
             .onGloballyPositioned { coordinates ->
                 gameColumnWidth = with(localDensity) { (coordinates.size.width.toDp().value.toInt() - 3) / 4 }
-                gameColumnHeight = with(localDensity) { coordinates.size.height.toDp().value.toInt() - (gameColumnWidth * 0.8).toInt() }
+                gameColumnHeight =
+                    with(localDensity) { coordinates.size.height.toDp().value.toInt() - (gameColumnWidth * 0.8).toInt() }
                 onGameColumnSizeMeasured.invoke(gameColumnWidth, gameColumnHeight)
             }
     ) {
@@ -189,53 +207,69 @@ fun GameField(
             }
         }
     }
-    Divider()
-    Row(
+
+    Box(
         modifier = Modifier
             .navigationBarsPadding()
-            .fillMaxSize(),
-        verticalAlignment = Alignment.CenterVertically
+            .fillMaxSize()
     ) {
-        Text(
-            modifier = Modifier.weight(1f),
-            textAlign = TextAlign.Center,
-            text = stringResource(
-                id = R.string.game_session_combo,
-                gameState.value.gameField.bonusMultiplier,
-            ).toUpperCase(Locale.current),
-            style = Typography.h1,
-        )
-        Button(
-            onClick = onFireClicked,
+        Column(
             modifier = Modifier
-                .weight(1f)
-                .wrapContentSize()
-                .clip(CircleShape)
-                .width(100.dp)
-                .height(100.dp),
+                .fillMaxWidth(),
+            verticalArrangement = Arrangement.Top
         ) {
-            Text(
-                text = gameState.value.gameField.let { "${it.currentOperationSign.toSymbol()}${it.currentOperationDigit}" },
-                fontSize = 36.sp,
-                color = White
-            )
+            repeat(3) {
+                Divider(color = if (it < gameState.value.gameField.lifeCount) Red500 else Color.LightGray, thickness = 3.dp)
+                Spacer(modifier = Modifier.padding(bottom = 2.dp))
+            }
         }
-        Button(
-            onClick = {},
-            colors = ButtonDefaults.buttonColors(backgroundColor = Red200),
+        Row(
             modifier = Modifier
-                .weight(1f)
-                .wrapContentSize()
-                .clip(CircleShape)
-                .width(48.dp)
-                .height(48.dp)
-                .alpha(0.8f)
+                .navigationBarsPadding()
+                .fillMaxSize(),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = gameState.value.gameField.let { "${it.nextOperationSign.toSymbol()}${it.nextOperationDigit}" },
-                fontSize = 12.sp,
-                color = White
+                modifier = Modifier.weight(1f),
+                textAlign = TextAlign.Center,
+                text = stringResource(
+                    id = R.string.game_session_combo,
+                    gameState.value.gameField.bonusMultiplier,
+                ).toUpperCase(Locale.current),
+                style = Typography.h2,
             )
+            Button(
+                onClick = onFireClicked,
+                modifier = Modifier
+                    .weight(1f)
+                    .wrapContentSize()
+                    .clip(CircleShape)
+                    .width(100.dp)
+                    .height(100.dp),
+            ) {
+                Text(
+                    text = gameState.value.gameField.let { "${it.currentOperationSign.toSymbol()}${it.currentOperationDigit}" },
+                    fontSize = 36.sp,
+                    color = White
+                )
+            }
+            Button(
+                onClick = {},
+                colors = ButtonDefaults.buttonColors(backgroundColor = Red200),
+                modifier = Modifier
+                    .weight(1f)
+                    .wrapContentSize()
+                    .clip(CircleShape)
+                    .width(48.dp)
+                    .height(48.dp)
+                    .alpha(0.8f)
+            ) {
+                Text(
+                    text = gameState.value.gameField.let { "${it.nextOperationSign.toSymbol()}${it.nextOperationDigit}" },
+                    fontSize = 12.sp,
+                    color = White
+                )
+            }
         }
     }
 }
@@ -264,7 +298,7 @@ fun GamePausedOverlay(onClick: () -> Unit) {
         }
         Text(
             text = stringResource(id = R.string.ready_to_pay_overlay_hint).toUpperCase(Locale.current),
-            style = Typography.h1,
+            style = Typography.h2,
             color = Red200
         )
     }
@@ -303,7 +337,7 @@ fun TargetButton(
     val infiniteTransition = if (targetParams.isAlive) { rememberInfiniteTransition()} else null
     val targetButtonYOffset = if (infiniteTransition != null) {
         val yOffset by infiniteTransition.animateFloat(
-            initialValue = targetParams.position.toFloat() - 56f,
+            initialValue = targetParams.position.toFloat(),
             targetValue = parentHeight.toFloat(),
             animationSpec = infiniteRepeatable(
                 animation = tween(
@@ -317,16 +351,17 @@ fun TargetButton(
         yOffset
     } else 0f
 
-    if (targetButtonYOffset > 0) { onTargetRevealed.invoke(targetParams.id) }
-    if (parentHeight != 0 && targetButtonYOffset == parentHeight.toFloat()) { onTargetBreakout.invoke(targetParams.id) }
+    if (targetButtonYOffset > 0 && !targetParams.isVisible) { onTargetRevealed.invoke(targetParams.id) }
+    if (parentHeight != 0 && targetButtonYOffset.roundToInt() >= parentHeight) { onTargetBreakout.invoke(targetParams.id) }
     if (targetParams.isAlive && targetButtonYOffset.dp + targetParams.position.dp > 0.dp) {
         Button(
-            onClick = { onTargetClicked.invoke(targetParams.id) },
             modifier = Modifier
                 .width((parentWidth * 0.8).dp)
                 .height((parentWidth * 0.8).dp)
                 .offset(0.dp, targetButtonYOffset.dp + targetParams.position.dp)
-                .clip(CircleShape)
+                .clip(CircleShape),
+            colors = ButtonDefaults.buttonColors(backgroundColor = if (targetParams.isProfitable) Red200 else Color.LightGray),
+            onClick = { onTargetClicked.invoke(targetParams.id) }
         ) {
             Text(text = targetParams.value.toString(), fontSize = 20.sp, color = Color.White)
         }
@@ -368,4 +403,23 @@ fun OnLifecycleEvent(onEvent: (owner: LifecycleOwner, event: Lifecycle.Event) ->
             lifecycle.removeObserver(observer)
         }
     }
+}
+
+@Composable
+fun CollectUiEvents(
+    viewModel: GameViewModel,
+    navController: NavController
+) {
+    LaunchedEffect(
+        key1 = null,
+        block = {
+            viewModel.uiEvents.receiveAsFlow().collect {
+                when (it) {
+                    is GameViewModel.UiEvent.NavigateToMainMenuScreen -> {
+                        navController.navigate(Screen.Menu.route)
+                    }
+                }
+            }
+        }
+    )
 }

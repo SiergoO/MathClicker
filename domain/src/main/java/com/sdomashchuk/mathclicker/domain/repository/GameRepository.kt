@@ -6,7 +6,7 @@ import com.sdomashchuk.mathclicker.domain.model.game.session.GameSession
 import com.sdomashchuk.mathclicker.domain.model.game.session.TargetParams
 
 interface GameRepository {
-    suspend fun initGameField(): GameField
+    suspend fun initGameField(id: Int): GameField
     suspend fun updateGameField(gameField: GameField)
     suspend fun getNextSignAndDigit(level: Int): Pair<OperationSign, Int>
     suspend fun updateSignAndDigit(nextOperationSign: OperationSign, nextOperationDigit: Int)
@@ -22,4 +22,5 @@ interface GameRepository {
 
     suspend fun getSessionById(id: Int): GameSession
     suspend fun getUnfinishedSession(): GameSession?
+    suspend fun getSessionCount(): Int
 }

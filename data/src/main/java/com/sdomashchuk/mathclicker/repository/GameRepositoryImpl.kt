@@ -21,19 +21,20 @@ class GameRepositoryImpl(
     private val difficultyHelper: DifficultyHelper
 ) : GameRepository {
 
-    override suspend fun initGameField(): GameField {
+    override suspend fun initGameField(id: Int): GameField {
         val currentOperationSign = OperationSign.values().random()
         val currentOperationDigit = difficultyHelper.getOperationValueByLevel(currentOperationSign, 1)
         val nextOperationSign = OperationSign.values().random()
         val nextOperationDigit = difficultyHelper.getOperationValueByLevel(nextOperationSign, 1)
-        val gameField = GameFieldDataModel(
-            currentOperationSign = currentOperationSign.toSymbol(),
+        val gameField = GameField(
+            id = id,
+            currentOperationSign = currentOperationSign,
             currentOperationDigit = currentOperationDigit,
-            nextOperationSign = nextOperationSign.toSymbol(),
+            nextOperationSign = nextOperationSign,
             nextOperationDigit = nextOperationDigit
         )
-        gameSessionDao.insertGameField(gameField)
-        return gameField.toDomainModel()
+        gameSessionDao.insertGameField(gameField.toDataModel())
+        return gameField
     }
 
     override suspend fun updateGameField(gameField: GameField) {
@@ -101,6 +102,10 @@ class GameRepositoryImpl(
 
     override suspend fun getUnfinishedSession(): GameSession? {
         return gameSessionDao.getUnfinishedSession()?.toDomainModel()
+    }
+
+    override suspend fun getSessionCount(): Int {
+        return gameSessionDao.getSessionCount()
     }
 }
 

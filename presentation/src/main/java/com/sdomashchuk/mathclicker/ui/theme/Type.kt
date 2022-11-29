@@ -19,6 +19,12 @@ val Typography = Typography(
     h1 = TextStyle(
         fontFamily = QuickSand,
         fontWeight = FontWeight.Bold,
+        fontSize = 48.sp
+
+    ),
+    h2 = TextStyle(
+        fontFamily = QuickSand,
+        fontWeight = FontWeight.Bold,
         fontSize = 22.sp
 
     ),

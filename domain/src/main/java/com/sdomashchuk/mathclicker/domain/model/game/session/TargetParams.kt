@@ -8,6 +8,7 @@ data class TargetParams(
     val position: Int,
     val animationDelayMs: Int,
     val animationDurationMs: Int,
+    val isProfitable: Boolean = true,
     val isVisible: Boolean = false,
     val isAlive: Boolean = true
 )

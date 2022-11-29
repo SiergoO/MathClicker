@@ -19,8 +19,8 @@ class MenuViewModel @Inject constructor(): ViewModel() {
     private val _state = MutableStateFlow(State())
     val state: StateFlow<State> = _state
 
-    private val _eventsUi = Channel<EventUi>(capacity = Channel.UNLIMITED)
-    val eventsUi: ReceiveChannel<EventUi> = _eventsUi
+    private val _uiEvents = Channel<UiEvent>(capacity = Channel.UNLIMITED)
+    val uiEvents: ReceiveChannel<UiEvent> = _uiEvents
 
     init {
         handleAction()
@@ -35,7 +35,7 @@ class MenuViewModel @Inject constructor(): ViewModel() {
             action.consumeAsFlow().collect() { action ->
                 when (action) {
                     Action.ButtonPlayClicked -> {
-                        _eventsUi.trySend(EventUi.NavigateToGameScreen)
+                        _uiEvents.trySend(UiEvent.NavigateToGameScreen)
                     }
                     Action.OpenDialog -> {
                         _state.value = state.value.copy(
@@ -53,8 +53,8 @@ class MenuViewModel @Inject constructor(): ViewModel() {
         }
     }
 
-    sealed class EventUi {
-        object NavigateToGameScreen : EventUi()
+    sealed class UiEvent {
+        object NavigateToGameScreen : UiEvent()
     }
 
     sealed class Action {

@@ -2,6 +2,9 @@
     <string name="app_name">MathClicker</string>
     <string name="logo">Logo</string>
     <string name="pause">Paused</string>
+    <string name="restart">Restart</string>
+    <string name="main_menu">Main Menu</string>
+    <string name="game_over">Game\nOver</string>
 
     <!-- Menu screen -->
     <string name="menu_button_play">PLAY</string>
