@@ -1,11 +1,14 @@
+import org.jetbrains.kotlin.kapt3.base.Kapt.kapt
+
 plugins {
     id("com.android.library")
-    kotlin("android")
+    id("org.jetbrains.kotlin.android")
     kotlin("kapt")
+    // If there will be problems with that plugin delete it + sync + rebuild
 }
 
 android {
-    namespace = "com.sdomashchuk.mathclicker"
+    namespace = "com.sdomashchuk.mathclicker.game"
     compileSdk = 33
 
     defaultConfig {
@@ -23,29 +26,23 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
     }
     kotlinOptions {
-        jvmTarget = "11"
+        jvmTarget = "1.8"
     }
-    buildToolsVersion = "33.0.0"
 }
 
 dependencies {
-    val roomVersion = "2.4.3"
 
-    implementation(project(":domain"))
     implementation("androidx.core:core-ktx:1.9.0")
     implementation("androidx.appcompat:appcompat:1.5.1")
+    implementation("com.google.android.material:material:1.7.0")
 
-    //Coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.6.4")
-
-    //Room
-    kapt("androidx.room:room-compiler:$roomVersion")
-    implementation("androidx.room:room-common:$roomVersion")
-    implementation("androidx.room:room-ktx:$roomVersion")
-    implementation("androidx.room:room-runtime:$roomVersion")
-
+    //Hilt
+    implementation("com.google.dagger:hilt-android-gradle-plugin:2.44.2")
+    implementation("com.google.dagger:hilt-android:2.44.2")
+    kapt("com.google.dagger:hilt-android-compiler:2.44.2")
+    kapt("androidx.hilt:hilt-compiler:1.0.0")
 }

@@ -1,0 +1,22 @@
+<resources>
+    <string name="app_name">MathClicker</string>
+    <string name="logo">Logo</string>
+    <string name="pause">Paused</string>
+    <string name="restart">Restart</string>
+    <string name="main_menu">Main Menu</string>
+    <string name="game_over">Game\nOver</string>
+
+    <!-- Menu screen -->
+    <string name="menu_button_play">PLAY</string>
+    <string name="how_to_play_dialog_header">How to play?</string>
+    <string name="how_to_play_icon_content_description">How to play?</string>
+    <string name="how_to_play_dialog_body">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Suspendisse sit amet nisi lorem. Donec a ipsum semper, porttitor sapien a, pharetra dui. Mauris accumsan, tellus volutpat rhoncus tempus, dolor nulla mollis nisi, ut placerat nibh risus eget tellus. Phasellus fermentum posuere augue. Nullam scelerisque scelerisque augue, quis suscipit lacus iaculis maximus. Nulla sagittis magna ex, nec mollis lorem molestie ac. Nam aliquam diam nulla, id pellentesque metus vestibulum faucibus. Curabitur ex elit, semper et consequat a, malesuada at tortor. Suspendisse lobortis cursus ex, in fermentum nunc dapibus sit amet. Vivamus eget lobortis orci. Nullam egestas, mauris vitae ornare semper, libero urna maximus ipsum, eu efficitur metus erat ac nulla.</string>
+    <string name="how_to_play_dialog_button_positive">Got it</string>
+
+    <!-- Game screen -->
+    <string name="ready_to_pay_overlay_hint">Touch screen to start</string>
+    <string name="game_session_level">Level: %d</string>
+    <string name="game_session_score">Score: %d</string>
+    <string name="game_session_combo">Combo\n x%d</string>
+
+</resources>
