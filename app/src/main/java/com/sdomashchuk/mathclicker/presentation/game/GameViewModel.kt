@@ -16,6 +16,7 @@ import com.sdomashchuk.mathclicker.game.Game
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,7 +24,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.consumeAsFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
-import kotlin.system.measureTimeMillis
 
 @HiltViewModel
 class GameViewModel @Inject constructor(
@@ -46,18 +46,24 @@ class GameViewModel @Inject constructor(
         }
         viewModelScope.launch {
             game.targetsFlow.collect { targets ->
-                _state.value = state.value.copy(
-                    targetList = targets.toImmutableDomainList()
-                )
-                gameRepository.updateTargets(targets.toDomainList())
+                if (targets.isNotEmpty()) {
+                    val updatedTargets = targets.toDomainList()
+                    _state.value = state.value.copy(
+                        targetList = updatedTargets.toImmutableList()
+                    )
+                    gameRepository.updateTargets(updatedTargets)
+                }
             }
         }
         viewModelScope.launch {
             game.fieldFlow.collect { field ->
-                _state.value = state.value.copy(
-                    field = field.toDomainModel()
-                )
-                gameRepository.updateField(field.toDomainModel())
+                if (field.id != 0) {
+                    val updatedField = field.toDomainModel()
+                    _state.value = state.value.copy(
+                        field = updatedField
+                    )
+                    gameRepository.updateField(updatedField)
+                }
             }
         }
     }

@@ -11,10 +11,10 @@ import com.sdomashchuk.mathclicker.data.database.entity.FieldDataModel
 @Dao
 interface FieldDao {
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertField(field: FieldDataModel)
 
-    @Update(onConflict = OnConflictStrategy.REPLACE)
+    @Update(onConflict = OnConflictStrategy.IGNORE)
     suspend fun updateField(field: FieldDataModel)
 
     @Transaction

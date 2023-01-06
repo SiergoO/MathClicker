@@ -1,7 +1,7 @@
 package com.sdomashchuk.mathclicker.model
 
 data class Field(
-    val id: Int = 1,
+    val id: Int = 0,
     val level: Int = 1,
     val score: Int = 0,
     val lifeCount: Int = 3,
