@@ -1,6 +1,5 @@
 package com.sdomashchuk.mathclicker.game.objectmapper
 
-import android.util.Log
 import com.sdomashchuk.mathclicker.model.OperationSign
 import com.sdomashchuk.mathclicker.model.Target
 
@@ -70,6 +69,23 @@ internal fun List<Target>.updateTargetPositioning(id: Int, position: Int, gameCo
             )
         } else it
     }
+
+internal fun List<Target>.shortenAppearanceDelay(): List<Target> {
+    val nonVisibleAliveTargets =
+        this.filter { it.isActive && !it.isVisible }.sortedBy { it.appearanceDelayMs }
+    return if (nonVisibleAliveTargets.isNotEmpty()) {
+        val closestTargetsToReveal = nonVisibleAliveTargets.take((1..4).random())
+        this.map { target ->
+            if (closestTargetsToReveal.contains(target)) {
+                target.copy(appearanceDelayMs = 0)
+            } else if (nonVisibleAliveTargets.contains(target)) {
+                target.copy(appearanceDelayMs = target.appearanceDelayMs - closestTargetsToReveal.last().appearanceDelayMs)
+            } else {
+                target
+            }
+        }
+    } else this
+}
 
 internal fun List<Target>.performOperation(
     currentOperationSign: OperationSign,

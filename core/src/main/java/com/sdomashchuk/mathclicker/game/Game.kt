@@ -41,7 +41,7 @@ class Game @Inject constructor(
 
     init {
         gameScope.launch {
-            targetsFlow.collect { targets ->
+            _targetsFlow.collect { targets ->
                 if (targets.isNotEmpty() && targets.none { it.isVisible }) {
                     visibleTargetsAbsent()
                 }
