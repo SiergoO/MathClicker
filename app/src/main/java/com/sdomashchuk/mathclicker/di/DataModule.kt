@@ -24,7 +24,7 @@ object DataModule {
         return Room.databaseBuilder(
             context,
             MathClickerDatabase::class.java,
-            context.applicationInfo.name
+            "Database"
         ).build()
     }
 
