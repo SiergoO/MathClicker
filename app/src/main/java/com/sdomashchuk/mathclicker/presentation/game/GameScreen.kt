@@ -66,7 +66,7 @@ import com.airbnb.lottie.compose.LottieConstants
 import com.airbnb.lottie.compose.animateLottieCompositionAsState
 import com.airbnb.lottie.compose.rememberLottieComposition
 import com.sdomashchuk.mathclicker.R
-import com.sdomashchuk.mathclicker.domain.model.game.session.Target
+import com.sdomashchuk.mathclicker.model.Target
 import com.sdomashchuk.mathclicker.presentation.component.GameMenuDialog
 import com.sdomashchuk.mathclicker.presentation.navigation.Screen
 import com.sdomashchuk.mathclicker.presentation.ui.theme.MathClickerTheme

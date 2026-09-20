@@ -1,7 +1,7 @@
 package com.sdomashchuk.mathclicker.domain.repository
 
-import com.sdomashchuk.mathclicker.domain.model.game.session.Field
-import com.sdomashchuk.mathclicker.domain.model.game.session.Target
+import com.sdomashchuk.mathclicker.model.Field
+import com.sdomashchuk.mathclicker.model.Target
 
 interface GameRepository {
     suspend fun insertField(field: Field)

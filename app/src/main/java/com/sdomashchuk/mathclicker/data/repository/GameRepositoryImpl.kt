@@ -4,9 +4,9 @@ import com.sdomashchuk.mathclicker.data.database.dao.FieldDao
 import com.sdomashchuk.mathclicker.data.database.dao.TargetsDao
 import com.sdomashchuk.mathclicker.data.database.entity.toDataModel
 import com.sdomashchuk.mathclicker.data.database.entity.toDomainModel
-import com.sdomashchuk.mathclicker.domain.model.game.session.Field
-import com.sdomashchuk.mathclicker.domain.model.game.session.Target
 import com.sdomashchuk.mathclicker.domain.repository.GameRepository
+import com.sdomashchuk.mathclicker.model.Field
+import com.sdomashchuk.mathclicker.model.Target
 
 class GameRepositoryImpl(
     private val fieldDao: FieldDao,
