@@ -6,6 +6,7 @@ import dev.detekt.gradle.extensions.FailOnSeverity
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.kotlin.dsl.configure
+import org.jetbrains.kotlin.gradle.dsl.KotlinProjectExtension
 
 /**
  * `mathclicker.quality` — applied by every library and application convention, so no module
@@ -17,15 +18,19 @@ class QualityConventionPlugin : Plugin<Project> {
         pluginManager.apply("com.diffplug.spotless")
 
         extensions.configure<DetektExtension> {
+            // Ask Kotlin which directories it compiles instead of listing them here. A hardcoded
+            // list has gone stale twice: once when :core moved to commonMain, and again when
+            // androidMain appeared and detekt reported UP-TO-DATE over unanalysed code. Deriving
+            // it means a new source set — iosMain at MC-6.5, feature modules at MC-9 — is covered
+            // the day it exists.
             source.setFrom(
-                files(
-                    "src/main/java",
-                    "src/main/kotlin",
-                    "src/test/java",
-                    "src/test/kotlin",
-                    "src/commonMain/kotlin",
-                    "src/commonTest/kotlin",
-                ),
+                provider {
+                    extensions.findByType(KotlinProjectExtension::class.java)
+                        ?.sourceSets
+                        ?.flatMap { it.kotlin.srcDirs }
+                        ?.filter { it.isDirectory }
+                        ?: emptyList()
+                },
             )
             config.setFrom(rootProject.file("config/detekt/detekt.yml"))
             buildUponDefaultConfig.set(true)

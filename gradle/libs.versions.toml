@@ -29,7 +29,7 @@ kotlinxCollectionsImmutable = "0.3.5"
 hilt = "2.60.1"
 room = "2.8.5"
 googleMaterial = "1.7.0"
-kotlinxCoroutines = "1.10.2"
+kotlinxCoroutines = "1.8.1"
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

@@ -34,6 +34,11 @@ class KmpLibraryConventionPlugin : Plugin<Project> {
                 compilerOptions {
                     jvmTarget.set(JvmTarget.JVM_17)
                 }
+                // No lint block on purpose. AGP 9.2.1's KMP library plugin creates only
+                // lintAnalyzeAndroidHostTest for this module — no production analysis task and no
+                // report — so a lint { } here is accepted, configures nothing that runs, and reads
+                // as coverage that does not exist. :core therefore has no Android lint; detekt and
+                // spotless do cover it. MC-6.6 re-checks whether a later AGP creates the tasks.
             }
 
             iosArm64()
