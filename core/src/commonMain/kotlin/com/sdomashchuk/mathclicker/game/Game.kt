@@ -20,36 +20,43 @@ import com.sdomashchuk.mathclicker.model.OperationSign
 import com.sdomashchuk.mathclicker.model.Target
 import com.sdomashchuk.mathclicker.toGameColumnId
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlin.random.Random
 
 class Game(
     private val sessionHelper: SessionHelper,
+    private val scope: CoroutineScope,
+    private val random: Random = Random.Default,
 ) {
-    // Dispatchers.IO is JVM-only; Dispatchers.Default is the commonMain-available equivalent for
-    // this non-blocking flow collector. MC-6.2 replaces the whole scope with an injected one.
-    private val gameScope = CoroutineScope(Dispatchers.Default)
-
     private val _targetsFlow: MutableStateFlow<List<Target>> = MutableStateFlow(listOf())
     val targetsFlow: StateFlow<List<Target>> = _targetsFlow.asStateFlow()
 
     private val _fieldFlow: MutableStateFlow<Field> = MutableStateFlow(Field())
     val fieldFlow: StateFlow<Field> = _fieldFlow.asStateFlow()
 
-    init {
-        gameScope.launch {
-            _targetsFlow.collect { targets ->
-                if (targets.isNotEmpty() && targets.none { it.isVisible }) {
-                    visibleTargetsAbsent()
-                }
-                if (targets.isNotEmpty() && targets.none { it.isActive }) {
-                    activeTargetsAbsent()
+    private var collectorJob: Job? = null
+
+    fun start() {
+        collectorJob =
+            scope.launch {
+                _targetsFlow.collect { targets ->
+                    if (targets.isNotEmpty() && targets.none { it.isVisible }) {
+                        visibleTargetsAbsent()
+                    }
+                    if (targets.isNotEmpty() && targets.none { it.isActive }) {
+                        activeTargetsAbsent()
+                    }
                 }
             }
-        }
+    }
+
+    fun stop() {
+        collectorJob?.cancel()
+        collectorJob = null
     }
 
     fun createField(id: Int) {
@@ -149,9 +156,9 @@ class Game(
     }
 
     private fun recreateField(id: Int): Field {
-        val currentOperationSign = OperationSign.values().random()
+        val currentOperationSign = OperationSign.values().random(random)
         val currentOperationDigit = sessionHelper.getOperationDigitByLevel(currentOperationSign, 1)
-        val nextOperationSign = OperationSign.values().random()
+        val nextOperationSign = OperationSign.values().random(random)
         val nextOperationDigit = sessionHelper.getOperationDigitByLevel(nextOperationSign, 1)
         return Field(
             id = id,
@@ -176,7 +183,7 @@ class Game(
         }
 
     private fun getNextSignAndDigit(): Pair<OperationSign, Int> {
-        val nextOperationSign = OperationSign.values().random()
+        val nextOperationSign = OperationSign.values().random(random)
         val nextOperationDigit = sessionHelper.getOperationDigitByLevel(nextOperationSign, fieldFlow.value.level)
         return Pair(nextOperationSign, nextOperationDigit)
     }
