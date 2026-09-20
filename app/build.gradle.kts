@@ -1,20 +1,23 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
     kotlin("android")
     kotlin("kapt")
     id("com.android.application")
     // If there will be problems with that plugin delete it + sync + rebuild
-    id("dagger.hilt.android.plugin")
+    alias(libs.plugins.hilt.android)
     id("kotlinx-serialization")
     id("kotlin-parcelize")
+    alias(libs.plugins.kotlin.compose)
 }
 
 android {
     namespace = "com.sdomashchuk.mathclicker"
-    compileSdk = 33
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.sdomashchuk.mathclicker"
-        minSdk = 21
+        minSdk = 24
         targetSdk = 33
         versionCode = 1
         versionName = "1.0"
@@ -35,27 +38,23 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
-
-        kotlinOptions {
-            freeCompilerArgs = listOf("-Xopt-in=kotlin.RequiresOptIn")
-        }
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions {
-        jvmTarget = "11"
-    }
-    buildToolsVersion = "33.0.0"
     buildFeatures {
         compose = true
     }
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.4.0-alpha02"
-    }
-    packagingOptions {
+    packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_17)
+        freeCompilerArgs.add("-opt-in=kotlin.RequiresOptIn")
     }
 }
 
@@ -67,48 +66,46 @@ dependencies {
 
     implementation(project(":core"))
 
-    implementation("androidx.core:core-ktx:1.9.0")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.5.1")
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.lifecycle.runtime.ktx)
 
     //Navigation
-    implementation("com.google.accompanist:accompanist-navigation-animation:0.27.0")
+    implementation(libs.accompanist.navigation.animation)
 
     //Splash screen
-    implementation("androidx.core:core-splashscreen:1.0.0")
+    implementation(libs.androidx.core.splashscreen)
 
     //Lottie
-    implementation("com.airbnb.android:lottie-compose:5.2.0")
+    implementation(libs.lottie.compose)
 
     //Lifecycle
-    implementation("androidx.lifecycle:lifecycle-service:2.5.1")
-    implementation("androidx.lifecycle:lifecycle-extensions:2.2.0")
+    implementation(libs.androidx.lifecycle.service)
+    implementation(libs.androidx.lifecycle.extensions)
 
     //Serialization
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.3.3")
+    implementation(libs.kotlinx.serialization.json)
 
     //ViewModel
-    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.5.1")
+    implementation(libs.androidx.lifecycle.viewmodel.ktx)
 
     //Compose
-    implementation("androidx.compose.ui:ui:1.3.2")
-    implementation("androidx.compose.ui:ui-tooling-preview:1.3.2")
-    implementation("androidx.compose.material:material:1.3.1")
-    implementation("androidx.constraintlayout:constraintlayout-compose:1.0.1")
-    implementation("androidx.activity:activity-compose:1.7.0-alpha02")
+    implementation(libs.compose.ui)
+    implementation(libs.compose.ui.tooling.preview)
+    implementation(libs.compose.material)
+    implementation(libs.androidx.constraintlayout.compose)
+    implementation(libs.androidx.activity.compose)
 
     //Immutable collections
-    implementation("org.jetbrains.kotlinx:kotlinx-collections-immutable:0.3.5")
+    implementation(libs.kotlinx.collections.immutable)
 
     //Hilt
-    implementation("com.google.dagger:hilt-android-gradle-plugin:2.44.2")
-    implementation("com.google.dagger:hilt-android:2.44.2")
-    implementation("androidx.hilt:hilt-navigation-compose:1.0.0")
-    kapt("com.google.dagger:hilt-android-compiler:2.44.2")
-    kapt("androidx.hilt:hilt-compiler:1.0.0")
+    implementation(libs.hilt.android)
+    implementation(libs.androidx.hilt.navigation.compose)
+    kapt(libs.hilt.android.compiler)
+    kapt(libs.androidx.hilt.compiler)
 
     //Room
-    val roomVersion = "2.4.3"
-    implementation("androidx.room:room-ktx:$roomVersion")
-    implementation("androidx.room:room-runtime:$roomVersion")
-    kapt("androidx.room:room-compiler:$roomVersion")
+    implementation(libs.room.ktx)
+    implementation(libs.room.runtime)
+    kapt(libs.room.compiler)
 }
