@@ -25,7 +25,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.constraintlayout.compose.ChainStyle
 import androidx.constraintlayout.compose.ConstraintLayout
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.sdomashchuk.mathclicker.R
 import com.sdomashchuk.mathclicker.presentation.component.MathClickerDialog
@@ -35,10 +34,11 @@ import com.sdomashchuk.mathclicker.presentation.ui.theme.Red500
 import com.sdomashchuk.mathclicker.presentation.ui.theme.Shapes
 import com.sdomashchuk.mathclicker.presentation.ui.theme.Typography
 import kotlinx.coroutines.flow.receiveAsFlow
+import org.koin.androidx.compose.koinViewModel
 
 @Composable
 fun MenuScreen(navController: NavController) {
-    val menuViewModel: MenuViewModel = hiltViewModel()
+    val menuViewModel: MenuViewModel = koinViewModel()
     val state = menuViewModel.state.collectAsState()
 
     CollectUiEvents(

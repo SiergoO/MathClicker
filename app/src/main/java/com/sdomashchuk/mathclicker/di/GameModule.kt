@@ -3,23 +3,15 @@ package com.sdomashchuk.mathclicker.di
 import com.sdomashchuk.mathclicker.game.Game
 import com.sdomashchuk.mathclicker.game.helper.SessionHelper
 import com.sdomashchuk.mathclicker.game.helper.SessionHelperImpl
-import dagger.Module
-import dagger.Provides
-import dagger.hilt.InstallIn
-import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import javax.inject.Singleton
+import org.koin.dsl.bind
+import org.koin.dsl.module
 
-@InstallIn(SingletonComponent::class)
-@Module
-object GameModule {
-    @Provides
-    @Singleton
-    fun provideGame(sessionHelper: SessionHelper): Game =
-        Game(sessionHelper, CoroutineScope(Dispatchers.Default)).apply { start() }
-
-    @Provides
-    @Singleton
-    fun provideSessionHelper(): SessionHelper = SessionHelperImpl()
-}
+val gameModule =
+    module {
+        single { SessionHelperImpl() } bind SessionHelper::class
+        // Game owns a flow collector that only runs once start() is called; a factory would hand
+        // out un-started instances, so this must stay a single.
+        single { Game(get(), CoroutineScope(Dispatchers.Default)).apply { start() } }
+    }

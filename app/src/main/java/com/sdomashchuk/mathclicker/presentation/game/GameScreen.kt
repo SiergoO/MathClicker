@@ -55,7 +55,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.toUpperCase
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
@@ -76,11 +75,12 @@ import com.sdomashchuk.mathclicker.presentation.ui.theme.Translucent
 import com.sdomashchuk.mathclicker.presentation.ui.theme.Typography
 import com.sdomashchuk.mathclicker.presentation.ui.theme.White
 import kotlinx.coroutines.flow.receiveAsFlow
+import org.koin.androidx.compose.koinViewModel
 import kotlin.math.roundToInt
 
 @Composable
 fun GameScreen(navController: NavController) {
-    val gameViewModel: GameViewModel = hiltViewModel()
+    val gameViewModel: GameViewModel = koinViewModel()
     val gameState = gameViewModel.state.collectAsState()
 
     CollectUiEvents(

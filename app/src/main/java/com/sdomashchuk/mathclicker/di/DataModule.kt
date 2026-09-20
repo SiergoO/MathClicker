@@ -7,44 +7,20 @@ import com.sdomashchuk.mathclicker.data.database.dao.FieldDao
 import com.sdomashchuk.mathclicker.data.database.dao.TargetsDao
 import com.sdomashchuk.mathclicker.data.repository.GameRepositoryImpl
 import com.sdomashchuk.mathclicker.domain.repository.GameRepository
-import dagger.Module
-import dagger.Provides
-import dagger.hilt.InstallIn
-import dagger.hilt.android.qualifiers.ApplicationContext
-import dagger.hilt.components.SingletonComponent
-import javax.inject.Singleton
+import org.koin.dsl.bind
+import org.koin.dsl.module
 
-@InstallIn(SingletonComponent::class)
-@Module
-object DataModule {
-    @Provides
-    @Singleton
-    fun provideMathClickerDatabase(
-        @ApplicationContext context: Context,
-    ): MathClickerDatabase =
-        Room
-            .databaseBuilder(
-                context,
-                MathClickerDatabase::class.java,
-                "Database",
-            ).build()
-
-    @Provides
-    @Singleton
-    fun provideFieldDao(database: MathClickerDatabase): FieldDao = database.fieldDao()
-
-    @Provides
-    @Singleton
-    fun provideTargetsDao(database: MathClickerDatabase): TargetsDao = database.targetsDao()
-
-    @Provides
-    @Singleton
-    fun provideGameRepository(
-        FieldDao: FieldDao,
-        targetsDao: TargetsDao,
-    ): GameRepository =
-        GameRepositoryImpl(
-            FieldDao,
-            targetsDao,
-        )
-}
+val dataModule =
+    module {
+        single {
+            Room
+                .databaseBuilder(
+                    get<Context>(),
+                    MathClickerDatabase::class.java,
+                    "Database",
+                ).build()
+        }
+        single<FieldDao> { get<MathClickerDatabase>().fieldDao() }
+        single<TargetsDao> { get<MathClickerDatabase>().targetsDao() }
+        single { GameRepositoryImpl(get(), get()) } bind GameRepository::class
+    }
