@@ -10,7 +10,7 @@ import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
 @InstallIn(SingletonComponent::class)
-@Module(includes = [UseCaseModule::class])
+@Module
 object GameModule {
     @Provides
     @Singleton
