@@ -20,32 +20,33 @@ import com.sdomashchuk.mathclicker.presentation.ui.theme.Typography
 fun GameMenuDialog(
     headerText: String,
     onRestartClicked: () -> Unit,
-    onBackToMainMenuClicked: () -> Unit
+    onBackToMainMenuClicked: () -> Unit,
 ) {
     Column(
         modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
-            modifier = Modifier
-                .weight(1f)
-                .wrapContentSize(),
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .wrapContentSize(),
             text = headerText,
             textAlign = TextAlign.Center,
-            style = Typography.h1
+            style = Typography.h1,
         )
         Column(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.Center
+            verticalArrangement = Arrangement.Center,
         ) {
             MenuButton(
                 modifier = Modifier.padding(bottom = 20.dp),
                 text = stringResource(id = R.string.restart),
-                onClick = onRestartClicked
+                onClick = onRestartClicked,
             )
             MenuButton(
                 text = stringResource(id = R.string.main_menu),
-                onClick = onBackToMainMenuClicked
+                onClick = onBackToMainMenuClicked,
             )
         }
     }

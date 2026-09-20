@@ -16,31 +16,33 @@ class TargetsDataModel(
     @ColumnInfo(name = "lifetimeMs") var lifetimeMs: Int = 0,
     @ColumnInfo(name = "isProfitable") var isProfitable: Boolean = true,
     @ColumnInfo(name = "isVisible") var isVisible: Boolean = false,
-    @ColumnInfo(name = "isActive") var isActive: Boolean = false
+    @ColumnInfo(name = "isActive") var isActive: Boolean = false,
 )
 
-fun TargetsDataModel.toDomainModel() = Target(
-    id = id,
-    relatedFieldId = relatedFieldId,
-    columnId = columnId,
-    value = value,
-    position = position,
-    appearanceDelayMs = appearanceDelayMs,
-    lifetimeMs = lifetimeMs,
-    isProfitable = isProfitable,
-    isVisible = isVisible,
-    isActive = isActive
-)
+fun TargetsDataModel.toDomainModel() =
+    Target(
+        id = id,
+        relatedFieldId = relatedFieldId,
+        columnId = columnId,
+        value = value,
+        position = position,
+        appearanceDelayMs = appearanceDelayMs,
+        lifetimeMs = lifetimeMs,
+        isProfitable = isProfitable,
+        isVisible = isVisible,
+        isActive = isActive,
+    )
 
-fun Target.toDataModel() = TargetsDataModel(
-    id = id,
-    relatedFieldId = relatedFieldId,
-    columnId = columnId,
-    value = value,
-    position = position,
-    appearanceDelayMs = appearanceDelayMs,
-    lifetimeMs = lifetimeMs,
-    isProfitable = isProfitable,
-    isVisible = isVisible,
-    isActive = isActive
-)
+fun Target.toDataModel() =
+    TargetsDataModel(
+        id = id,
+        relatedFieldId = relatedFieldId,
+        columnId = columnId,
+        value = value,
+        position = position,
+        appearanceDelayMs = appearanceDelayMs,
+        lifetimeMs = lifetimeMs,
+        isProfitable = isProfitable,
+        isVisible = isVisible,
+        isActive = isActive,
+    )

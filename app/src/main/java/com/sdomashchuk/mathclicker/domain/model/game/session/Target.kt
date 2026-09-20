@@ -15,34 +15,36 @@ data class Target(
     val lifetimeMs: Int,
     val isProfitable: Boolean = true,
     val isVisible: Boolean = false,
-    val isActive: Boolean = true
+    val isActive: Boolean = true,
 )
 
-fun DomainTarget.toGameModel() = GameTarget(
-    id,
-    relatedFieldId,
-    columnId,
-    value,
-    position,
-    appearanceDelayMs,
-    lifetimeMs,
-    isProfitable,
-    isVisible,
-    isActive
-)
+fun DomainTarget.toGameModel() =
+    GameTarget(
+        id,
+        relatedFieldId,
+        columnId,
+        value,
+        position,
+        appearanceDelayMs,
+        lifetimeMs,
+        isProfitable,
+        isVisible,
+        isActive,
+    )
 
-fun GameTarget.toDomainModel() = DomainTarget(
-    id,
-    relatedFieldId,
-    columnId,
-    value,
-    position,
-    appearanceDelayMs,
-    lifetimeMs,
-    isProfitable,
-    isVisible,
-    isActive
-)
+fun GameTarget.toDomainModel() =
+    DomainTarget(
+        id,
+        relatedFieldId,
+        columnId,
+        value,
+        position,
+        appearanceDelayMs,
+        lifetimeMs,
+        isProfitable,
+        isVisible,
+        isActive,
+    )
 
 fun List<DomainTarget>.toGameList() = this.map { it.toGameModel() }
 

@@ -9,7 +9,6 @@ import com.sdomashchuk.mathclicker.data.database.entity.TargetsDataModel
 
 @Dao
 interface TargetsDao {
-    
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTarget(target: TargetsDataModel)
 

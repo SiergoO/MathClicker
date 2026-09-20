@@ -10,5 +10,5 @@ data class Target(
     val lifetimeMs: Int,
     val isProfitable: Boolean = true,
     val isVisible: Boolean = false,
-    val isActive: Boolean = true
+    val isActive: Boolean = true,
 )

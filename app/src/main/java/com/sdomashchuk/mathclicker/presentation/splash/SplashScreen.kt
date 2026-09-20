@@ -19,15 +19,16 @@ import com.sdomashchuk.mathclicker.presentation.navigation.Screen
 @Composable
 fun SplashScreen(navController: NavHostController) {
     Row(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colors.background)
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colors.background),
     ) {
         val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.logo))
         val progress by animateLottieCompositionAsState(
             composition,
             iterations = 1,
-            speed = 1f
+            speed = 1f,
         )
         LottieAnimation(composition)
         LaunchedEffect(progress) {

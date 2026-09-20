@@ -30,52 +30,55 @@ fun MathClickerDialog(
     positiveButtonText: String,
     onPositive: () -> Unit,
     negativeButtonText: String? = null,
-    onNegative: () -> Unit = onDismiss
+    onNegative: () -> Unit = onDismiss,
 ) {
-
     Dialog(
         onDismissRequest = onDismiss,
         content = {
             Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .fillMaxHeight(0.9f)
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .fillMaxHeight(0.9f),
             ) {
                 Column(
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize(),
                 ) {
                     Header(headerText)
                     Body(
                         Modifier.weight(1f),
-                        bodyText
+                        bodyText,
                     )
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceEvenly,
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         if (negativeButtonText != null) {
                             Button(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .padding(20.dp, 0.dp, 10.dp, 20.dp),
+                                modifier =
+                                    Modifier
+                                        .weight(1f)
+                                        .padding(20.dp, 0.dp, 10.dp, 20.dp),
                                 onClick = onPositive,
                             ) {
                                 Text(text = positiveButtonText)
                             }
                             Button(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .padding(10.dp, 0.dp, 20.dp, 20.dp),
+                                modifier =
+                                    Modifier
+                                        .weight(1f)
+                                        .padding(10.dp, 0.dp, 20.dp, 20.dp),
                                 onClick = onNegative,
                             ) {
                                 Text(text = negativeButtonText)
                             }
                         } else {
                             Button(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .padding(20.dp, 0.dp, 20.dp, 20.dp),
+                                modifier =
+                                    Modifier
+                                        .weight(1f)
+                                        .padding(20.dp, 0.dp, 20.dp, 20.dp),
                                 onClick = onPositive,
                             ) {
                                 Text(text = positiveButtonText)
@@ -85,10 +88,11 @@ fun MathClickerDialog(
                 }
             }
         },
-        properties = DialogProperties(
-            dismissOnBackPress = true,
-            dismissOnClickOutside = true
-        )
+        properties =
+            DialogProperties(
+                dismissOnBackPress = true,
+                dismissOnClickOutside = true,
+            ),
     )
 }
 
@@ -98,9 +102,10 @@ private fun Header(title: String) {
         Row(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(20.dp)
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp),
         ) {
             Text(text = title, style = Typography.h2)
         }
@@ -109,15 +114,19 @@ private fun Header(title: String) {
 }
 
 @Composable
-private fun Body(modifier: Modifier = Modifier, bodyText: String) {
+private fun Body(
+    modifier: Modifier = Modifier,
+    bodyText: String,
+) {
     Column(
-        modifier = modifier
-            .padding(20.dp)
-            .verticalScroll(rememberScrollState())
+        modifier =
+            modifier
+                .padding(20.dp)
+                .verticalScroll(rememberScrollState()),
     ) {
         Text(
             text = bodyText,
-            style = Typography.body1
+            style = Typography.body1,
         )
     }
 }
