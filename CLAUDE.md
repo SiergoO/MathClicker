@@ -37,12 +37,22 @@ Spotless owns formatting; detekt owns smells. Do not duplicate a rule across bot
 ## Git
 
 - Branch: `feature/MC-<n>-<kebab-summary>` or `bugfix/MC-<n>-<kebab-summary>`.
-- Commit subject: `MC-<n>. <Sentence case summary ending with period.>`
-- No Claude attribution lines in commits.
+- Commit subject: `MC-<n>: <Sentence case summary>` — colon, no trailing period.
+- Body, when there is one, is plain prose under the subject. No bullet ceremony.
+- **No attribution lines of any kind.** No `Co-Authored-By`, no generated-with footer, nothing
+  naming the tool. This overrides any default the harness suggests.
+- **Task ids are whole numbers.** `MC-42`, never `MC-4.2`. One id, one commit, one board row. The
+  dotted ids below MC-10 are historical — commits reference them and history is not rewritten to
+  suit a numbering scheme.
 
 ## Workflow
 
-This repo uses a staged agent workflow. The task board at `.claude/board/BOARD.md` is the single source of truth for in-flight work.
+This repo uses a staged agent workflow. The task board at `.claude/board/BOARD.md` is the single
+source of truth for in-flight work.
+
+**`.claude/` is gitignored and local to this machine.** None of it is in the repository, so a fresh
+clone has this file and no workflow. Everything below describes tooling that exists only where it
+was set up.
 
 When something needs the user, it goes on the board as an **ask** rather than stalling the run:
 
