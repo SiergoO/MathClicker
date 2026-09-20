@@ -72,6 +72,13 @@ dependencies {
     implementation(libs.compose.ui)
     implementation(libs.compose.ui.tooling.preview)
     implementation(libs.compose.material)
+    // Declared explicitly: transitive resolution only exposes this on the runtime classpath
+    // (via other libraries' implementation-scoped edges), never on the compile classpath,
+    // so statusBarsPadding/navigationBarsPadding are unresolved without it.
+    implementation(libs.compose.foundation)
+    implementation(libs.compose.foundation.layout)
+    implementation(libs.compose.animation)
+    implementation(libs.compose.animation.core)
     implementation(libs.androidx.constraintlayout.compose)
     implementation(libs.androidx.activity.compose)
 
@@ -88,4 +95,6 @@ dependencies {
     implementation(libs.room.ktx)
     implementation(libs.room.runtime)
     kapt(libs.room.compiler)
+    // Room's kapt stub reads Kotlin metadata with an older reader than the 2.4.0 compiler emits.
+    kapt(libs.kotlin.metadata.jvm)
 }

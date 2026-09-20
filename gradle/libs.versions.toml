@@ -17,11 +17,16 @@ androidxActivityCompose = "1.7.0-alpha02"
 androidxHilt = "1.0.0"
 composeUi = "1.3.2"
 composeMaterial = "1.3.1"
+# AGP 9 emits far fewer compile/runtime alignment constraints than AGP 7 did, so these four
+# modules resolved to old versions on the compile classpath while runtime kept 1.3.0. Declaring
+# them directly makes the compiler see what the APK actually ships. Not an upgrade: 1.3.0 is the
+# version that already resolved at runtime, and still does.
+composeFoundation = "1.3.0"
 accompanistNavigationAnimation = "0.27.0"
 lottieCompose = "5.2.0"
 kotlinxSerializationJson = "1.3.3"
 kotlinxCollectionsImmutable = "0.3.5"
-hilt = "2.44.2"
+hilt = "2.60.1"
 room = "2.8.5"
 googleMaterial = "1.7.0"
 
@@ -39,6 +44,7 @@ spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
 [libraries]
 android-gradlePlugin = { module = "com.android.tools.build:gradle-api", version.ref = "agp" }
 kotlin-gradlePlugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
+kotlin-metadata-jvm = { module = "org.jetbrains.kotlin:kotlin-metadata-jvm", version.ref = "kotlin" }
 detekt-gradlePlugin = { module = "dev.detekt:detekt-gradle-plugin", version.ref = "detekt" }
 spotless-gradlePlugin = { module = "com.diffplug.spotless:spotless-plugin-gradle", version.ref = "spotless" }
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "androidxCoreKtx" }
@@ -56,6 +62,10 @@ androidx-hilt-compiler = { module = "androidx.hilt:hilt-compiler", version.ref =
 compose-ui = { module = "androidx.compose.ui:ui", version.ref = "composeUi" }
 compose-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview", version.ref = "composeUi" }
 compose-material = { module = "androidx.compose.material:material", version.ref = "composeMaterial" }
+compose-foundation = { module = "androidx.compose.foundation:foundation", version.ref = "composeFoundation" }
+compose-foundation-layout = { module = "androidx.compose.foundation:foundation-layout", version.ref = "composeFoundation" }
+compose-animation = { module = "androidx.compose.animation:animation", version.ref = "composeFoundation" }
+compose-animation-core = { module = "androidx.compose.animation:animation-core", version.ref = "composeFoundation" }
 accompanist-navigation-animation = { module = "com.google.accompanist:accompanist-navigation-animation", version.ref = "accompanistNavigationAnimation" }
 lottie-compose = { module = "com.airbnb.android:lottie-compose", version.ref = "lottieCompose" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
