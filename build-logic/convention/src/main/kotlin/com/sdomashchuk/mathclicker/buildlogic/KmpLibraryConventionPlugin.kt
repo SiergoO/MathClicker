@@ -13,7 +13,7 @@ import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
  * Android library plugin (`com.android.kotlin.multiplatform.library`, not the
  * `com.android.library` + `org.jetbrains.kotlin.multiplatform` pairing AGP 9 forbids), an Android
  * host-test target plus `iosArm64`/`iosSimulatorArm64`, and `kotlinx-coroutines-core`/`kotlin.test`
- * wired into `commonMain`/`commonTest`.
+ * wired into `commonMain`/`commonTest`, plus `kotlinx-coroutines-test` in `commonTest` only.
  *
  * `KotlinMultiplatformAndroidLibraryTarget` is configured via `extensions.configure`, not the
  * `kotlin { android { ... } }` sugar: that sugar is a Gradle Kotlin DSL type-safe accessor
@@ -49,6 +49,7 @@ class KmpLibraryConventionPlugin : Plugin<Project> {
             }
             sourceSets.commonTest.dependencies {
                 implementation(kotlin("test"))
+                implementation(libs.library("kotlinx-coroutines-test"))
             }
         }
     }

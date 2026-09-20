@@ -7,6 +7,8 @@ import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import javax.inject.Singleton
 
 @InstallIn(SingletonComponent::class)
@@ -14,7 +16,8 @@ import javax.inject.Singleton
 object GameModule {
     @Provides
     @Singleton
-    fun provideGame(sessionHelper: SessionHelper): Game = Game(sessionHelper)
+    fun provideGame(sessionHelper: SessionHelper): Game =
+        Game(sessionHelper, CoroutineScope(Dispatchers.Default)).apply { start() }
 
     @Provides
     @Singleton
