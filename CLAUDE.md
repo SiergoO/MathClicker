@@ -1,0 +1,70 @@
+# MathClicker
+
+Android Compose game. Modules: `:app` (UI, data, domain, DI), `:core` (pure game logic).
+`data/` and `domain/` directories exist on disk but are **not** in `settings.gradle` — they are orphaned, ignore them.
+
+## Toolchain constraints
+
+- **Currently** Gradle 7.5.1, AGP 7.3.1, Kotlin 1.7.21. **Migrating** to Gradle 9.4.1 / AGP 9.2.1 / Kotlin 2.4.0 to match OpenCEX-Android — see `.claude/specs/MC-4-align-toolchain.md`. Until MC-4 lands, check which toolchain a file is on before editing its build config.
+- JDK 17 is the only JDK installed.
+- `local.properties` is gitignored and required. Without it every Gradle task fails with "SDK location not found":
+  `printf 'sdk.dir=%s/Library/Android/sdk\n' "$HOME" > local.properties`
+- `:core` is a pure-Kotlin-logic Android library with **zero Android imports** — put game rules there and unit-test them on the JVM. It is being moved to KMP `commonMain` (MC-6); do not add an Android or `javax.*` import to it.
+- **Direction:** Android-only today → KMP (Koin, SQLDelight, Compose Multiplatform), following EyeXP's stack. See `.claude/specs/MC-6-kmp-migration.md`.
+
+## Commands
+
+```bash
+./gradlew :core:testDebugUnitTest      # fast: core logic only
+./gradlew testDebugUnitTest            # all unit tests
+./gradlew check                        # tests + detekt + spotless — the gate before any task is Done
+./gradlew detekt                       # smells, complexity, exception handling
+./gradlew spotlessApply                # fix formatting (ktlint)
+./gradlew assembleDebug                # APK at app/build/outputs/apk/debug/app-debug.apk
+```
+
+Prefer module-scoped tasks over whole-project ones; a full build here is slow.
+
+Detekt and spotless are applied by a convention plugin in `build-logic`, so no module can opt out.
+Spotless owns formatting; detekt owns smells. Do not duplicate a rule across both.
+
+## Code style
+
+- One declaration per file, named after it. One `@Composable` per file. Models live in a sibling `model/` package, never inside the interface file that uses them.
+- Comments only for non-obvious *why*. No section banners, no KDoc on trivially-named members. KDoc, when justified, is always the three-line form.
+- No emojis in code.
+
+## Git
+
+- Branch: `feature/MC-<n>-<kebab-summary>` or `bugfix/MC-<n>-<kebab-summary>`.
+- Commit subject: `MC-<n>. <Sentence case summary ending with period.>`
+- No Claude attribution lines in commits.
+
+## Workflow
+
+This repo uses a staged agent workflow. The task board at `.claude/board/BOARD.md` is the single source of truth for in-flight work.
+
+When something needs the user, it goes on the board as an **ask** rather than stalling the run:
+
+```bash
+python3 .claude/scripts/ask.py add --kind approval --text "…" --why "…" --option "A" --option "B"
+```
+
+They answer on the board in one click, or in chat. Never report work as blocked without a matching
+open ask — check `ask.py list --open` first. A board click settles a scoped decision whose options
+you wrote; it cannot approve a whole plan or authorise something irreversible.
+
+| Command | Phase |
+| --- | --- |
+| `/flow-intake` | Interview the user, write a spec to `.claude/specs/` |
+| `/flow-plan` | Turn a spec into dependency-ordered tasks on the board |
+| `/flow-run` | Execute the board: delegate, parallelize, verify |
+| `/flow-verify` | Tests + visual + adversarial review for one task |
+| `/flow-land` | Commit, merge worktree branches, remove worktrees, reconcile the board |
+| `/flow-board` | Render the board to HTML and open it |
+
+Read `.claude/board/BOARD.md` before starting work. **Only the orchestrating session writes to it** — a subagent in a worktree has its own checkout, so its board edits are lost or conflict on merge. Never mark a task `Done` without a green `./gradlew check` and a filled Evidence cell.
+
+**IMPORTANT:** The gate commands above are the pre-KMP ones. MC-6 renames them — `:core:testDebugUnitTest` becomes `:core:allTests`. Whoever lands MC-6.1 updates this section and every `Gate` cell on the board in the same commit.
+
+**IMPORTANT:** Never run `git worktree add` directly. Use `.claude/scripts/worktree.sh` — it enforces the 2-worktree cap that keeps this machine from filling its disk.
