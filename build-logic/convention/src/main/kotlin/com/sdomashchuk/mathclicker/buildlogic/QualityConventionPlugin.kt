@@ -25,11 +25,22 @@ class QualityConventionPlugin : Plugin<Project> {
             // the day it exists.
             source.setFrom(
                 provider {
-                    extensions.findByType(KotlinProjectExtension::class.java)
-                        ?.sourceSets
-                        ?.flatMap { it.kotlin.srcDirs }
-                        ?.filter { it.isDirectory }
-                        ?: emptyList()
+                    val fromKotlin =
+                        extensions.findByType(KotlinProjectExtension::class.java)
+                            ?.sourceSets
+                            ?.flatMap { it.kotlin.srcDirs }
+                            ?.filter { it.isDirectory }
+                            .orEmpty()
+                    // AGP 9's built-in Kotlin registers no KotlinProjectExtension, so a module that
+                    // drops org.jetbrains.kotlin.android derives nothing and detekt goes NO-SOURCE:
+                    // a green gate over code nobody read. That is how :app lost its analysis at
+                    // MC-10. src/ is the fallback, and an empty result is now a hard failure rather
+                    // than a silent pass, so the next way this goes stale cannot be quiet.
+                    val sources = fromKotlin.ifEmpty { listOf(file("src")).filter { it.isDirectory } }
+                    check(sources.isNotEmpty()) {
+                        "detekt found no source directories for $path: no Kotlin source set and no src/"
+                    }
+                    sources
                 },
             )
             config.setFrom(rootProject.file("config/detekt/detekt.yml"))

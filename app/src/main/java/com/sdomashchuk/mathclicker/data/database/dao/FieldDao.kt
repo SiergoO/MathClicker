@@ -1,33 +1,75 @@
 package com.sdomashchuk.mathclicker.data.database.dao
 
-import androidx.room.Dao
-import androidx.room.Insert
-import androidx.room.OnConflictStrategy
-import androidx.room.Query
-import androidx.room.Transaction
-import androidx.room.Update
-import com.sdomashchuk.mathclicker.data.database.entity.FieldDataModel
+import com.sdomashchuk.mathclicker.data.database.local.FieldQueries
+import com.sdomashchuk.mathclicker.model.Field
+import com.sdomashchuk.mathclicker.model.OperationSign
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import com.sdomashchuk.mathclicker.data.database.local.Field_ as LocalField
 
-@Dao
-interface FieldDao {
-    @Insert(onConflict = OnConflictStrategy.IGNORE)
-    suspend fun insertField(field: FieldDataModel)
+class FieldDao(
+    private val queries: FieldQueries,
+) {
+    // id == 0 is the domain model's "not yet persisted" default. Room bound NULL for it on an
+    // autoGenerate primary key so SQLite would assign the next rowid; the generated insertField
+    // takes a nullable id for the same reason, so the mapping here is a direct translation.
+    suspend fun insertField(field: Field) =
+        withContext(Dispatchers.IO) {
+            queries.insertField(
+                id = field.id.takeIf { it != 0 }?.toLong(),
+                level = field.level.toLong(),
+                score = field.score.toLong(),
+                lifeCount = field.lifeCount.toLong(),
+                bonusMultiplier = field.bonusMultiplier.toLong(),
+                currentOperationSign = field.currentOperationSign.sign,
+                currentOperationDigit = field.currentOperationDigit.toLong(),
+                nextOperationSign = field.nextOperationSign.sign,
+                nextOperationDigit = field.nextOperationDigit.toLong(),
+                gameColumnWidthPx = field.gameColumnWidthPx.toLong(),
+                gameColumnHeightPx = field.gameColumnHeightPx.toLong(),
+                isClosed = field.isClosed,
+            )
+        }
 
-    @Update(onConflict = OnConflictStrategy.IGNORE)
-    suspend fun updateField(field: FieldDataModel)
+    suspend fun updateField(field: Field) =
+        withContext(Dispatchers.IO) {
+            queries.updateField(
+                level = field.level.toLong(),
+                score = field.score.toLong(),
+                lifeCount = field.lifeCount.toLong(),
+                bonusMultiplier = field.bonusMultiplier.toLong(),
+                currentOperationSign = field.currentOperationSign.sign,
+                currentOperationDigit = field.currentOperationDigit.toLong(),
+                nextOperationSign = field.nextOperationSign.sign,
+                nextOperationDigit = field.nextOperationDigit.toLong(),
+                gameColumnWidthPx = field.gameColumnWidthPx.toLong(),
+                gameColumnHeightPx = field.gameColumnHeightPx.toLong(),
+                isClosed = field.isClosed,
+                id = field.id.toLong(),
+            )
+        }
 
-    @Transaction
-    @Query("SELECT * FROM field ORDER BY id DESC")
-    suspend fun getAllFields(): List<FieldDataModel>
+    suspend fun getFieldById(id: Int): Field =
+        withContext(Dispatchers.IO) { queries.getFieldById(id.toLong()).executeAsOne().toDomainModel() }
 
-    @Transaction
-    @Query("SELECT * FROM field WHERE isClosed=0")
-    suspend fun getUnfinishedField(): FieldDataModel?
+    suspend fun getUnfinishedField(): Field? =
+        withContext(Dispatchers.IO) { queries.getUnfinishedField().executeAsOneOrNull()?.toDomainModel() }
 
-    @Transaction
-    @Query("SELECT * FROM field WHERE id=:sessionId")
-    suspend fun getFieldById(sessionId: Int): FieldDataModel
-
-    @Query("SELECT COUNT(id) FROM field")
-    suspend fun getFieldCount(): Int
+    suspend fun getFieldCount(): Int = withContext(Dispatchers.IO) { queries.getFieldCount().executeAsOne().toInt() }
 }
+
+private fun LocalField.toDomainModel() =
+    Field(
+        id = id.toInt(),
+        level = level.toInt(),
+        score = score.toInt(),
+        lifeCount = lifeCount.toInt(),
+        bonusMultiplier = bonusMultiplier.toInt(),
+        currentOperationSign = OperationSign.values().first { it.sign == currentOperationSign },
+        currentOperationDigit = currentOperationDigit.toInt(),
+        nextOperationSign = OperationSign.values().first { it.sign == nextOperationSign },
+        nextOperationDigit = nextOperationDigit.toInt(),
+        gameColumnWidthPx = gameColumnWidthPx.toInt(),
+        gameColumnHeightPx = gameColumnHeightPx.toInt(),
+        isClosed = isClosed,
+    )

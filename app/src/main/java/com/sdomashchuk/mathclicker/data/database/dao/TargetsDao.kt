@@ -1,29 +1,72 @@
 package com.sdomashchuk.mathclicker.data.database.dao
 
-import androidx.room.Dao
-import androidx.room.Insert
-import androidx.room.OnConflictStrategy
-import androidx.room.Query
-import androidx.room.Update
-import com.sdomashchuk.mathclicker.data.database.entity.TargetsDataModel
+import com.sdomashchuk.mathclicker.data.database.local.TargetsQueries
+import com.sdomashchuk.mathclicker.model.Target
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import com.sdomashchuk.mathclicker.data.database.local.Targets as LocalTargets
 
-@Dao
-interface TargetsDao {
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertTarget(target: TargetsDataModel)
+class TargetsDao(
+    private val queries: TargetsQueries,
+) {
+    suspend fun insertTarget(target: Target) = withContext(Dispatchers.IO) { queries.insert(target) }
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertTargets(targets: List<TargetsDataModel>)
+    suspend fun insertTargets(targets: List<Target>) =
+        withContext(Dispatchers.IO) {
+            queries.transaction { targets.forEach { queries.insert(it) } }
+        }
 
-    @Update(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun updateTarget(target: TargetsDataModel)
+    suspend fun updateTarget(target: Target) = withContext(Dispatchers.IO) { queries.update(target) }
 
-    @Update(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun updateTargets(targets: List<TargetsDataModel>)
+    suspend fun updateTargets(targets: List<Target>) =
+        withContext(Dispatchers.IO) {
+            queries.transaction { targets.forEach { queries.update(it) } }
+        }
 
-    @Query("DELETE FROM targets")
-    suspend fun deleteTargets()
+    suspend fun deleteTargets() = withContext(Dispatchers.IO) { queries.deleteTargets() }
 
-    @Query("SELECT * FROM targets ORDER BY id DESC")
-    suspend fun getTargets(): List<TargetsDataModel>
+    suspend fun getTargets(): List<Target> =
+        withContext(Dispatchers.IO) { queries.getTargets().executeAsList().map { it.toDomainModel() } }
 }
+
+private fun TargetsQueries.insert(target: Target) =
+    insertTarget(
+        id = target.id.toLong(),
+        relatedFieldId = target.relatedFieldId.toLong(),
+        columnId = target.columnId.toLong(),
+        value_ = target.value.toLong(),
+        position = target.position.toLong(),
+        appearanceDelayMs = target.appearanceDelayMs.toLong(),
+        lifetimeMs = target.lifetimeMs.toLong(),
+        isProfitable = target.isProfitable,
+        isVisible = target.isVisible,
+        isActive = target.isActive,
+    )
+
+private fun TargetsQueries.update(target: Target) =
+    updateTarget(
+        relatedFieldId = target.relatedFieldId.toLong(),
+        columnId = target.columnId.toLong(),
+        value_ = target.value.toLong(),
+        position = target.position.toLong(),
+        appearanceDelayMs = target.appearanceDelayMs.toLong(),
+        lifetimeMs = target.lifetimeMs.toLong(),
+        isProfitable = target.isProfitable,
+        isVisible = target.isVisible,
+        isActive = target.isActive,
+        id = target.id.toLong(),
+    )
+
+private fun LocalTargets.toDomainModel() =
+    Target(
+        id = id.toInt(),
+        relatedFieldId = relatedFieldId.toInt(),
+        columnId = columnId.toInt(),
+        value = value_.toInt(),
+        position = position.toInt(),
+        appearanceDelayMs = appearanceDelayMs.toInt(),
+        lifetimeMs = lifetimeMs.toInt(),
+        isProfitable = isProfitable,
+        isVisible = isVisible,
+        isActive = isActive,
+    )

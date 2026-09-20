@@ -1,9 +1,7 @@
 plugins {
     id("mathclicker.android.application")
     id("mathclicker.android.compose")
-    kotlin("kapt")
-    id("kotlinx-serialization")
-    id("kotlin-parcelize")
+    alias(libs.plugins.sqldelight)
 }
 
 android {
@@ -36,8 +34,12 @@ android {
     }
 }
 
-kapt {
-    correctErrorTypes = true
+sqldelight {
+    databases {
+        create("MathClickerDatabase") {
+            packageName.set("com.sdomashchuk.mathclicker.data.database.local")
+        }
+    }
 }
 
 dependencies {
@@ -59,9 +61,6 @@ dependencies {
     // Lifecycle
     implementation(libs.androidx.lifecycle.service)
     implementation(libs.androidx.lifecycle.extensions)
-
-    // Serialization
-    implementation(libs.kotlinx.serialization.json)
 
     // ViewModel
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
@@ -88,12 +87,10 @@ dependencies {
     implementation(libs.koin.androidx.compose)
     testImplementation(libs.koin.test)
 
-    // Room
-    implementation(libs.room.ktx)
-    implementation(libs.room.runtime)
-    kapt(libs.room.compiler)
-    // Room's kapt stub reads Kotlin metadata with an older reader than the 2.4.0 compiler emits.
-    kapt(libs.kotlin.metadata.jvm)
+    // SQLDelight
+    implementation(libs.sqldelight.android.driver)
+    testImplementation(libs.sqldelight.sqlite.driver)
 
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
 }

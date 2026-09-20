@@ -1,0 +1,16 @@
+CREATE TABLE IF NOT EXISTS `targets` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `relatedFieldId` INTEGER NOT NULL, `columnId` INTEGER NOT NULL, `value` INTEGER NOT NULL, `position` INTEGER NOT NULL, `appearanceDelayMs` INTEGER NOT NULL, `lifetimeMs` INTEGER NOT NULL, `isProfitable` INTEGER AS kotlin.Boolean NOT NULL, `isVisible` INTEGER AS kotlin.Boolean NOT NULL, `isActive` INTEGER AS kotlin.Boolean NOT NULL);
+
+insertTarget:
+INSERT OR REPLACE INTO targets (id, relatedFieldId, columnId, value, position, appearanceDelayMs, lifetimeMs, isProfitable, isVisible, isActive)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+updateTarget:
+UPDATE OR REPLACE targets
+SET relatedFieldId = ?, columnId = ?, value = ?, position = ?, appearanceDelayMs = ?, lifetimeMs = ?, isProfitable = ?, isVisible = ?, isActive = ?
+WHERE id = ?;
+
+deleteTargets:
+DELETE FROM targets;
+
+getTargets:
+SELECT * FROM targets ORDER BY id DESC;

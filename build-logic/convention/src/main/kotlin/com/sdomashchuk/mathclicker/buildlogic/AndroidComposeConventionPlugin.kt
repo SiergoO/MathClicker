@@ -21,7 +21,7 @@ class AndroidComposeConventionPlugin : Plugin<Project> {
             // runs and still fails the build. It lives here rather than in the shared Android
             // config because a module without Compose reports the id as unknown. Remove at MC-6.5,
             // which bumps Compose.
-            lintOptions.disable("MutableCollectionMutableState")
+            lint.disable.add("MutableCollectionMutableState")
         }
     }
 }

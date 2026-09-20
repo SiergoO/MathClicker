@@ -17,6 +17,6 @@ internal val Project.libs: VersionCatalog
 internal fun VersionCatalog.version(alias: String): String =
     findVersion(alias).get().requiredVersion
 
-/** Dependency provider for a catalog library alias (e.g. "room-ktx"). */
+/** Dependency provider for a catalog library alias (e.g. "kotlinx-coroutines-core"). */
 internal fun VersionCatalog.library(alias: String): Provider<MinimalExternalModuleDependency> =
     findLibrary(alias).get()
