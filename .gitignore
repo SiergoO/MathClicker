@@ -59,12 +59,8 @@ lint/outputs/
 lint/tmp/
 # lint/reports/
 
-# Claude workflow — generated output
-.claude/board/board.html
-.claude/scripts/__pycache__/
-.claude/settings.local.json
-.claude/.gate-state.json
+# The agent workflow — board state, specs, subagents, skills, hooks and scripts.
+# Local to this machine on purpose: the board is a live working surface, not a
+# record, and its churn was interleaving with the commits it exists to describe.
+.claude/
 queue.log
-.claude/board/queue.log
-.claude/board/approved.txt
-.claude/board/asks.json
