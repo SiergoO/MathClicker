@@ -58,3 +58,13 @@ lint/generated/
 lint/outputs/
 lint/tmp/
 # lint/reports/
+
+# Claude workflow — generated output
+.claude/board/board.html
+.claude/scripts/__pycache__/
+.claude/settings.local.json
+.claude/.gate-state.json
+queue.log
+.claude/board/queue.log
+.claude/board/approved.txt
+.claude/board/asks.json
