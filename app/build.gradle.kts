@@ -1,24 +1,18 @@
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-
 plugins {
-    kotlin("android")
+    id("mathclicker.android.application")
+    id("mathclicker.android.compose")
     kotlin("kapt")
-    id("com.android.application")
     // If there will be problems with that plugin delete it + sync + rebuild
     alias(libs.plugins.hilt.android)
     id("kotlinx-serialization")
     id("kotlin-parcelize")
-    alias(libs.plugins.kotlin.compose)
 }
 
 android {
     namespace = "com.sdomashchuk.mathclicker"
-    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.sdomashchuk.mathclicker"
-        minSdk = 24
-        targetSdk = 33
         versionCode = 1
         versionName = "1.0"
 
@@ -37,24 +31,10 @@ android {
             isMinifyEnabled = false
         }
     }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
-    buildFeatures {
-        compose = true
-    }
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
-    }
-}
-
-kotlin {
-    compilerOptions {
-        jvmTarget.set(JvmTarget.JVM_17)
-        freeCompilerArgs.add("-opt-in=kotlin.RequiresOptIn")
     }
 }
 
