@@ -1,0 +1,11 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>MagicNumber:Util.kt:3</ID>
+    <ID>MagicNumber:Util.kt:4</ID>
+    <ID>MatchingDeclarationName:GameSessionHelper.kt:SessionHelper</ID>
+    <ID>MatchingDeclarationName:GameSessionHelperImpl.kt:SessionHelperImpl : SessionHelper</ID>
+    <ID>TooManyFunctions:Game.kt:Game</ID>
+  </CurrentIssues>
+</SmellBaseline>

@@ -66,8 +66,8 @@ import com.airbnb.lottie.compose.LottieConstants
 import com.airbnb.lottie.compose.animateLottieCompositionAsState
 import com.airbnb.lottie.compose.rememberLottieComposition
 import com.sdomashchuk.mathclicker.R
-import com.sdomashchuk.mathclicker.presentation.component.GameMenuDialog
 import com.sdomashchuk.mathclicker.domain.model.game.session.Target
+import com.sdomashchuk.mathclicker.presentation.component.GameMenuDialog
 import com.sdomashchuk.mathclicker.presentation.navigation.Screen
 import com.sdomashchuk.mathclicker.presentation.ui.theme.MathClickerTheme
 import com.sdomashchuk.mathclicker.presentation.ui.theme.Red200
@@ -79,48 +79,68 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlin.math.roundToInt
 
 @Composable
-fun GameScreen(
-    navController: NavController
-) {
-
+fun GameScreen(navController: NavController) {
     val gameViewModel: GameViewModel = hiltViewModel()
     val gameState = gameViewModel.state.collectAsState()
 
     CollectUiEvents(
         viewModel = gameViewModel,
-        navController = navController
+        navController = navController,
     )
 
     MathClickerTheme {
         Column(
             modifier = Modifier.fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             when {
-                gameState.value.field.isClosed -> GameMenuDialog(
-                    headerText = stringResource(id = R.string.game_over),
-                    onRestartClicked = { gameViewModel.sendAction(GameViewModel.Action.RestartGame) },
-                    onBackToMainMenuClicked = { gameViewModel.sendAction(GameViewModel.Action.BackToMainMenuClicked) }
-                )
-                gameState.value.isGamePaused -> GamePausedOverlay { gameViewModel.sendAction(GameViewModel.Action.ReadyToPlayButtonClicked) }
-                !gameState.value.isGameStarted -> CountdownOverlay { gameViewModel.sendAction(GameViewModel.Action.StartGame) }
-                else -> Field(
-                    gameState,
-                    onGameColumnSizeMeasured = { size -> gameViewModel.sendAction(GameViewModel.Action.GameColumnSizeMeasured(size))},
-                    onTargetRevealed = { id -> gameViewModel.sendAction(GameViewModel.Action.TargetRevealed(id)) },
-                    onTargetClicked = { id -> gameViewModel.sendAction(GameViewModel.Action.TargetClicked(id)) },
-                    onTargetDidBreakout = { id -> gameViewModel.sendAction(GameViewModel.Action.TargetDidBreakout(id)) },
-                    onTargetPositionSave = { id, position, gameColumnHeightPx ->
-                        gameViewModel.sendAction(
-                            GameViewModel.Action.SaveTargetPosition(
-                                id,
-                                position,
-                                gameColumnHeightPx
+                gameState.value.field.isClosed -> {
+                    GameMenuDialog(
+                        headerText = stringResource(id = R.string.game_over),
+                        onRestartClicked = { gameViewModel.sendAction(GameViewModel.Action.RestartGame) },
+                        onBackToMainMenuClicked = {
+                            gameViewModel.sendAction(
+                                GameViewModel.Action.BackToMainMenuClicked,
                             )
-                        )
-                    },
-                    onFireClicked = { gameViewModel.sendAction(GameViewModel.Action.FireButtonClicked) }
-                )
+                        },
+                    )
+                }
+
+                gameState.value.isGamePaused -> {
+                    GamePausedOverlay {
+                        gameViewModel.sendAction(GameViewModel.Action.ReadyToPlayButtonClicked)
+                    }
+                }
+
+                !gameState.value.isGameStarted -> {
+                    CountdownOverlay {
+                        gameViewModel.sendAction(GameViewModel.Action.StartGame)
+                    }
+                }
+
+                else -> {
+                    Field(
+                        gameState,
+                        onGameColumnSizeMeasured = { size ->
+                            gameViewModel.sendAction(GameViewModel.Action.GameColumnSizeMeasured(size))
+                        },
+                        onTargetRevealed = { id -> gameViewModel.sendAction(GameViewModel.Action.TargetRevealed(id)) },
+                        onTargetClicked = { id -> gameViewModel.sendAction(GameViewModel.Action.TargetClicked(id)) },
+                        onTargetDidBreakout = { id ->
+                            gameViewModel.sendAction(GameViewModel.Action.TargetDidBreakout(id))
+                        },
+                        onTargetPositionSave = { id, position, gameColumnHeightPx ->
+                            gameViewModel.sendAction(
+                                GameViewModel.Action.SaveTargetPosition(
+                                    id,
+                                    position,
+                                    gameColumnHeightPx,
+                                ),
+                            )
+                        },
+                        onFireClicked = { gameViewModel.sendAction(GameViewModel.Action.FireButtonClicked) },
+                    )
+                }
             }
         }
         BackHandler {
@@ -137,59 +157,78 @@ fun Field(
     onTargetClicked: (id: Int) -> Unit,
     onTargetDidBreakout: (id: Int) -> Unit,
     onTargetPositionSave: (id: Int, position: Int, gameColumnHeightPx: Int) -> Unit,
-    onFireClicked: () -> Unit
+    onFireClicked: () -> Unit,
 ) {
-    var gameColumnSize by remember { mutableStateOf(Size(0,0)) }
+    var gameColumnSize by remember { mutableStateOf(Size(0, 0)) }
     val localDensity = LocalDensity.current
 
     Row(
-        modifier = Modifier
-            .statusBarsPadding()
-            .fillMaxWidth()
-            .fillMaxHeight(0.05f)
+        modifier =
+            Modifier
+                .statusBarsPadding()
+                .fillMaxWidth()
+                .fillMaxHeight(0.05f),
     ) {
         Text(
-            modifier = Modifier
-                .weight(1f)
-                .align(Alignment.CenterVertically),
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .align(Alignment.CenterVertically),
             textAlign = TextAlign.Center,
-            text = stringResource(
-                id = R.string.game_session_level,
-                gameState.value.field.level
-            ).toUpperCase(Locale.current),
+            text =
+                stringResource(
+                    id = R.string.game_session_level,
+                    gameState.value.field.level,
+                ).toUpperCase(Locale.current),
             style = Typography.body1,
         )
         Text(
-            modifier = Modifier
-                .weight(1f)
-                .align(Alignment.CenterVertically),
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .align(Alignment.CenterVertically),
             textAlign = TextAlign.Center,
-            text = stringResource(
-                id = R.string.game_session_score,
-                gameState.value.field.score
-            ).toUpperCase(Locale.current),
+            text =
+                stringResource(
+                    id = R.string.game_session_score,
+                    gameState.value.field.score,
+                ).toUpperCase(Locale.current),
             style = Typography.body1,
         )
     }
     Divider()
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .fillMaxHeight(0.75f)
-            .onGloballyPositioned { coordinates ->
-                val gameColumnWidth = with(localDensity) { (coordinates.size.width.toDp().value.toInt() - 3) / 4 }
-                val gameColumnHeight =
-                    with(localDensity) { coordinates.size.height.toDp().value.toInt() - (gameColumnWidth * 0.8).toInt() }
-                gameColumnSize = Size(gameColumnWidth, gameColumnHeight)
-                onGameColumnSizeMeasured.invoke(gameColumnSize)
-            }
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.75f)
+                .onGloballyPositioned { coordinates ->
+                    val gameColumnWidth =
+                        with(localDensity) {
+                            (
+                                coordinates.size.width
+                                    .toDp()
+                                    .value
+                                    .toInt() - 3
+                            ) / 4
+                        }
+                    val gameColumnHeight =
+                        with(localDensity) {
+                            coordinates.size.height
+                                .toDp()
+                                .value
+                                .toInt() - (gameColumnWidth * 0.8).toInt()
+                        }
+                    gameColumnSize = Size(gameColumnWidth, gameColumnHeight)
+                    onGameColumnSizeMeasured.invoke(gameColumnSize)
+                },
     ) {
         repeat(4) { columnId ->
             Box(
                 Modifier
                     .fillMaxHeight()
                     .width(gameColumnSize.width.dp),
-                contentAlignment = Alignment.TopCenter
+                contentAlignment = Alignment.TopCenter,
             ) {
                 gameState.value.targetList.filter { target -> target.columnId == columnId }.forEach {
                     TargetButton(
@@ -198,7 +237,7 @@ fun Field(
                         onTargetRevealed = onTargetRevealed,
                         onTargetClicked = onTargetClicked,
                         onTargetDidBreakout = onTargetDidBreakout,
-                        onTargetPositionSave = onTargetPositionSave
+                        onTargetPositionSave = onTargetPositionSave,
                     )
                 }
             }
@@ -209,14 +248,16 @@ fun Field(
     }
 
     Box(
-        modifier = Modifier
-            .navigationBarsPadding()
-            .fillMaxSize()
+        modifier =
+            Modifier
+                .navigationBarsPadding()
+                .fillMaxSize(),
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth(),
-            verticalArrangement = Arrangement.Top
+            modifier =
+                Modifier
+                    .fillMaxWidth(),
+            verticalArrangement = Arrangement.Top,
         ) {
             repeat(3) {
                 Divider(color = if (it < gameState.value.field.lifeCount) Red500 else Color.LightGray, thickness = 3.dp)
@@ -224,50 +265,54 @@ fun Field(
             }
         }
         Row(
-            modifier = Modifier
-                .navigationBarsPadding()
-                .fillMaxSize(),
-            verticalAlignment = Alignment.CenterVertically
+            modifier =
+                Modifier
+                    .navigationBarsPadding()
+                    .fillMaxSize(),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
                 modifier = Modifier.weight(1f),
                 textAlign = TextAlign.Center,
-                text = stringResource(
-                    id = R.string.game_session_combo,
-                    gameState.value.field.bonusMultiplier,
-                ).toUpperCase(Locale.current),
+                text =
+                    stringResource(
+                        id = R.string.game_session_combo,
+                        gameState.value.field.bonusMultiplier,
+                    ).toUpperCase(Locale.current),
                 style = Typography.h2,
             )
             Button(
                 onClick = onFireClicked,
-                modifier = Modifier
-                    .weight(1f)
-                    .wrapContentSize()
-                    .clip(CircleShape)
-                    .width(100.dp)
-                    .height(100.dp),
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .wrapContentSize()
+                        .clip(CircleShape)
+                        .width(100.dp)
+                        .height(100.dp),
             ) {
                 Text(
                     text = gameState.value.field.let { "${it.currentOperationSign.sign}${it.currentOperationDigit}" },
                     fontSize = 36.sp,
-                    color = White
+                    color = White,
                 )
             }
             Button(
                 onClick = {},
                 colors = ButtonDefaults.buttonColors(backgroundColor = Red200),
-                modifier = Modifier
-                    .weight(1f)
-                    .wrapContentSize()
-                    .clip(CircleShape)
-                    .width(48.dp)
-                    .height(48.dp)
-                    .alpha(0.8f)
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .wrapContentSize()
+                        .clip(CircleShape)
+                        .width(48.dp)
+                        .height(48.dp)
+                        .alpha(0.8f),
             ) {
                 Text(
                     text = gameState.value.field.let { "${it.nextOperationSign.sign}${it.nextOperationDigit}" },
                     fontSize = 12.sp,
-                    color = White
+                    color = White,
                 )
             }
         }
@@ -277,29 +322,30 @@ fun Field(
 @Composable
 fun GamePausedOverlay(onClick: () -> Unit) {
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Translucent)
-            .clickable(onClick = onClick),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(Translucent)
+                .clickable(onClick = onClick),
         verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(
             modifier = Modifier.fillMaxHeight(0.5f),
-            contentAlignment = Alignment.Center
+            contentAlignment = Alignment.Center,
         ) {
             val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.tap_higlight))
             LottieAnimation(composition = composition, iterations = LottieConstants.IterateForever)
             Text(
                 text = stringResource(id = R.string.pause).toUpperCase(Locale.current),
                 style = Typography.body1,
-                color = White
+                color = White,
             )
         }
         Text(
             text = stringResource(id = R.string.ready_to_pay_overlay_hint).toUpperCase(Locale.current),
             style = Typography.h2,
-            color = Red200
+            color = Red200,
         )
     }
 }
@@ -308,10 +354,11 @@ fun GamePausedOverlay(onClick: () -> Unit) {
 fun CountdownOverlay(onFinish: () -> Unit) {
     Box(
         contentAlignment = Alignment.Center,
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Translucent)
-            .padding(40.dp)
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(Translucent)
+                .padding(40.dp),
     ) {
         val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.countdown))
         val progress by animateLottieCompositionAsState(composition)
@@ -331,42 +378,56 @@ fun TargetButton(
     onTargetRevealed: (id: Int) -> Unit,
     onTargetClicked: (id: Int) -> Unit,
     onTargetDidBreakout: (id: Int) -> Unit,
-    onTargetPositionSave: (id: Int, position: Int, gameColumnHeightPx: Int) -> Unit
+    onTargetPositionSave: (id: Int, position: Int, gameColumnHeightPx: Int) -> Unit,
 ) {
     var isNeedToRefreshAnimation by remember { mutableStateOf(true) }
     LaunchedEffect(key1 = target.appearanceDelayMs, key2 = target.isActive) {
         isNeedToRefreshAnimation = true
     }
-    val infiniteTransition = if (!isNeedToRefreshAnimation && target.isActive) rememberInfiniteTransition() else {
-        isNeedToRefreshAnimation = false
-        null
-    }
-    val targetButtonYOffset = if (infiniteTransition != null) {
-        val yOffset by infiniteTransition.animateFloat(
-            initialValue = target.position.toFloat(),
-            targetValue = gameColumnSize.height.toFloat(),
-            animationSpec = infiniteRepeatable(
-                animation = tween(
-                    target.lifetimeMs,
-                    easing = LinearEasing,
-                    delayMillis = target.appearanceDelayMs
-                ),
-                repeatMode = RepeatMode.Restart
+    val infiniteTransition =
+        if (!isNeedToRefreshAnimation && target.isActive) {
+            rememberInfiniteTransition()
+        } else {
+            isNeedToRefreshAnimation = false
+            null
+        }
+    val targetButtonYOffset =
+        if (infiniteTransition != null) {
+            val yOffset by infiniteTransition.animateFloat(
+                initialValue = target.position.toFloat(),
+                targetValue = gameColumnSize.height.toFloat(),
+                animationSpec =
+                    infiniteRepeatable(
+                        animation =
+                            tween(
+                                target.lifetimeMs,
+                                easing = LinearEasing,
+                                delayMillis = target.appearanceDelayMs,
+                            ),
+                        repeatMode = RepeatMode.Restart,
+                    ),
             )
-        )
-        yOffset
-    } else 0f
-    if (targetButtonYOffset > 0f && !target.isVisible) { onTargetRevealed.invoke(target.id) }
-    if (gameColumnSize.height != 0 && targetButtonYOffset.roundToInt() + 1 >= gameColumnSize.height) { onTargetDidBreakout.invoke(target.id) }
+            yOffset
+        } else {
+            0f
+        }
+    if (targetButtonYOffset > 0f && !target.isVisible) onTargetRevealed.invoke(target.id)
+    if (gameColumnSize.height != 0 && targetButtonYOffset.roundToInt() + 1 >= gameColumnSize.height) {
+        onTargetDidBreakout.invoke(target.id)
+    }
     if (target.isActive && targetButtonYOffset.dp > 0.dp) {
         Button(
-            modifier = Modifier
-                .width((gameColumnSize.width * 0.8).dp)
-                .height((gameColumnSize.width * 0.8).dp)
-                .offset(0.dp, targetButtonYOffset.dp)
-                .clip(CircleShape),
-            colors = ButtonDefaults.buttonColors(backgroundColor = if (target.isProfitable) Red200 else Color.LightGray),
-            onClick = { onTargetClicked.invoke(target.id) }
+            modifier =
+                Modifier
+                    .width((gameColumnSize.width * 0.8).dp)
+                    .height((gameColumnSize.width * 0.8).dp)
+                    .offset(0.dp, targetButtonYOffset.dp)
+                    .clip(CircleShape),
+            colors =
+                ButtonDefaults.buttonColors(
+                    backgroundColor = if (target.isProfitable) Red200 else Color.LightGray,
+                ),
+            onClick = { onTargetClicked.invoke(target.id) },
         ) {
             Text(text = target.value.toString(), fontSize = 20.sp, color = Color.White)
         }
@@ -376,6 +437,7 @@ fun TargetButton(
             Lifecycle.Event.ON_PAUSE, Lifecycle.Event.ON_STOP, Lifecycle.Event.ON_DESTROY -> {
                 onTargetPositionSave.invoke(target.id, targetButtonYOffset.toInt(), gameColumnSize.height)
             }
+
             else -> { /* do nothing */ }
         }
     }
@@ -384,10 +446,11 @@ fun TargetButton(
 @Composable
 fun VerticalDivider() {
     Box(
-        modifier = Modifier
-            .fillMaxHeight()
-            .width(1.dp)
-            .background(color = MaterialTheme.colors.onSurface.copy(alpha = 0.12f))
+        modifier =
+            Modifier
+                .fillMaxHeight()
+                .width(1.dp)
+                .background(color = MaterialTheme.colors.onSurface.copy(alpha = 0.12f)),
     )
 }
 
@@ -398,9 +461,10 @@ fun OnLifecycleEvent(onEvent: (owner: LifecycleOwner, event: Lifecycle.Event) ->
 
     DisposableEffect(lifecycleOwner.value) {
         val lifecycle = lifecycleOwner.value.lifecycle
-        val observer = LifecycleEventObserver { owner, event ->
-            eventHandler.value(owner, event)
-        }
+        val observer =
+            LifecycleEventObserver { owner, event ->
+                eventHandler.value(owner, event)
+            }
         lifecycle.addObserver(observer)
         onDispose {
             lifecycle.removeObserver(observer)
@@ -411,7 +475,7 @@ fun OnLifecycleEvent(onEvent: (owner: LifecycleOwner, event: Lifecycle.Event) ->
 @Composable
 fun CollectUiEvents(
     viewModel: GameViewModel,
-    navController: NavController
+    navController: NavController,
 ) {
     LaunchedEffect(
         key1 = null,
@@ -423,6 +487,6 @@ fun CollectUiEvents(
                     }
                 }
             }
-        }
+        },
     )
 }

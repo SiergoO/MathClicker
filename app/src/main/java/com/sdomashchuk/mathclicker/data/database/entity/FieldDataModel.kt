@@ -19,35 +19,37 @@ class FieldDataModel(
     @ColumnInfo(name = "nextOperationDigit") var nextOperationDigit: Int = 0,
     @ColumnInfo(name = "gameColumnWidthPx") var gameColumnWidthPx: Int = 0,
     @ColumnInfo(name = "gameColumnHeightPx") var gameColumnHeightPx: Int = 0,
-    @ColumnInfo(name = "isClosed") var isClosed: Boolean = false
+    @ColumnInfo(name = "isClosed") var isClosed: Boolean = false,
 )
 
-fun FieldDataModel.toDomainModel() = Field(
-    id = id,
-    level = level,
-    score = score,
-    lifeCount = lifeCount,
-    bonusMultiplier = bonusMultiplier,
-    currentOperationSign = OperationSign.values().first { it.sign == currentOperationSign },
-    currentOperationDigit = currentOperationDigit,
-    nextOperationSign = OperationSign.values().first { it.sign == nextOperationSign },
-    nextOperationDigit = nextOperationDigit,
-    gameColumnWidthPx = gameColumnWidthPx,
-    gameColumnHeightPx = gameColumnHeightPx,
-    isClosed = isClosed
-)
+fun FieldDataModel.toDomainModel() =
+    Field(
+        id = id,
+        level = level,
+        score = score,
+        lifeCount = lifeCount,
+        bonusMultiplier = bonusMultiplier,
+        currentOperationSign = OperationSign.values().first { it.sign == currentOperationSign },
+        currentOperationDigit = currentOperationDigit,
+        nextOperationSign = OperationSign.values().first { it.sign == nextOperationSign },
+        nextOperationDigit = nextOperationDigit,
+        gameColumnWidthPx = gameColumnWidthPx,
+        gameColumnHeightPx = gameColumnHeightPx,
+        isClosed = isClosed,
+    )
 
-fun Field.toDataModel() = FieldDataModel(
-    id = id,
-    level = level,
-    score = score,
-    lifeCount = lifeCount,
-    bonusMultiplier = bonusMultiplier,
-    currentOperationSign = currentOperationSign.sign,
-    currentOperationDigit = currentOperationDigit,
-    nextOperationSign = nextOperationSign.sign,
-    nextOperationDigit = nextOperationDigit,
-    gameColumnWidthPx = gameColumnWidthPx,
-    gameColumnHeightPx = gameColumnHeightPx,
-    isClosed = isClosed
-)
+fun Field.toDataModel() =
+    FieldDataModel(
+        id = id,
+        level = level,
+        score = score,
+        lifeCount = lifeCount,
+        bonusMultiplier = bonusMultiplier,
+        currentOperationSign = currentOperationSign.sign,
+        currentOperationDigit = currentOperationDigit,
+        nextOperationSign = nextOperationSign.sign,
+        nextOperationDigit = nextOperationDigit,
+        gameColumnWidthPx = gameColumnWidthPx,
+        gameColumnHeightPx = gameColumnHeightPx,
+        isClosed = isClosed,
+    )

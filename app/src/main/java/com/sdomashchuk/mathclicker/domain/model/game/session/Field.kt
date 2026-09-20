@@ -17,35 +17,37 @@ data class Field(
     val nextOperationDigit: Int = 0,
     val gameColumnWidthPx: Int = 0,
     val gameColumnHeightPx: Int = 0,
-    val isClosed: Boolean = false
+    val isClosed: Boolean = false,
 )
 
-fun DomainField.toGameModel() = GameField(
-    id,
-    level,
-    score,
-    lifeCount,
-    bonusMultiplier,
-    currentOperationSign,
-    currentOperationDigit,
-    nextOperationSign,
-    nextOperationDigit,
-    gameColumnWidthPx,
-    gameColumnHeightPx,
-    isClosed
-)
+fun DomainField.toGameModel() =
+    GameField(
+        id,
+        level,
+        score,
+        lifeCount,
+        bonusMultiplier,
+        currentOperationSign,
+        currentOperationDigit,
+        nextOperationSign,
+        nextOperationDigit,
+        gameColumnWidthPx,
+        gameColumnHeightPx,
+        isClosed,
+    )
 
-fun GameField.toDomainModel() = DomainField(
-    id,
-    level,
-    score,
-    lifeCount,
-    bonusMultiplier,
-    currentOperationSign,
-    currentOperationDigit,
-    nextOperationSign,
-    nextOperationDigit,
-    gameColumnWidthPx,
-    gameColumnHeightPx,
-    isClosed
-)
+fun GameField.toDomainModel() =
+    DomainField(
+        id,
+        level,
+        score,
+        lifeCount,
+        bonusMultiplier,
+        currentOperationSign,
+        currentOperationDigit,
+        nextOperationSign,
+        nextOperationDigit,
+        gameColumnWidthPx,
+        gameColumnHeightPx,
+        isClosed,
+    )

@@ -15,6 +15,8 @@ dependencies {
     // (declared `apply false` in the root build). We only need the DSL types to compile.
     compileOnly(libs.android.gradlePlugin)
     compileOnly(libs.kotlin.gradlePlugin)
+    compileOnly(libs.detekt.gradlePlugin)
+    compileOnly(libs.spotless.gradlePlugin)
 }
 
 gradlePlugin {

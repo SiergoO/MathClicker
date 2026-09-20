@@ -9,7 +9,7 @@ import com.sdomashchuk.mathclicker.data.database.entity.TargetsDataModel
 
 @Database(entities = [FieldDataModel::class, TargetsDataModel::class], version = 1, exportSchema = false)
 abstract class MathClickerDatabase : RoomDatabase() {
-
     abstract fun fieldDao(): FieldDao
+
     abstract fun targetsDao(): TargetsDao
 }

@@ -10,9 +10,8 @@ import com.sdomashchuk.mathclicker.domain.repository.GameRepository
 
 class GameRepositoryImpl(
     private val fieldDao: FieldDao,
-    private val targetsDao: TargetsDao
+    private val targetsDao: TargetsDao,
 ) : GameRepository {
-
     override suspend fun insertField(field: Field) {
         fieldDao.insertField(field.toDataModel())
     }
@@ -21,17 +20,11 @@ class GameRepositoryImpl(
         fieldDao.updateField(field.toDataModel())
     }
 
-    override suspend fun getFieldById(id: Int): Field {
-        return fieldDao.getFieldById(id).toDomainModel()
-    }
+    override suspend fun getFieldById(id: Int): Field = fieldDao.getFieldById(id).toDomainModel()
 
-    override suspend fun getUnfinishedField(): Field? {
-        return fieldDao.getUnfinishedField()?.toDomainModel()
-    }
+    override suspend fun getUnfinishedField(): Field? = fieldDao.getUnfinishedField()?.toDomainModel()
 
-    override suspend fun getFieldCount(): Int {
-        return fieldDao.getFieldCount()
-    }
+    override suspend fun getFieldCount(): Int = fieldDao.getFieldCount()
 
     override suspend fun insertTarget(target: Target) {
         targetsDao.insertTarget(target.toDataModel())
@@ -49,9 +42,7 @@ class GameRepositoryImpl(
         targetsDao.updateTargets(targets.map { it.toDataModel() })
     }
 
-    override suspend fun getTargets(): List<Target> {
-        return targetsDao.getTargets().map { it.toDomainModel() }
-    }
+    override suspend fun getTargets(): List<Target> = targetsDao.getTargets().map { it.toDomainModel() }
 
     override suspend fun refreshTargets(targets: List<Target>) {
         targetsDao.deleteTargets()
@@ -62,4 +53,3 @@ class GameRepositoryImpl(
         targetsDao.deleteTargets()
     }
 }
-

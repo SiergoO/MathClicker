@@ -49,42 +49,42 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
 
-    //Navigation
+    // Navigation
     implementation(libs.accompanist.navigation.animation)
 
-    //Splash screen
+    // Splash screen
     implementation(libs.androidx.core.splashscreen)
 
-    //Lottie
+    // Lottie
     implementation(libs.lottie.compose)
 
-    //Lifecycle
+    // Lifecycle
     implementation(libs.androidx.lifecycle.service)
     implementation(libs.androidx.lifecycle.extensions)
 
-    //Serialization
+    // Serialization
     implementation(libs.kotlinx.serialization.json)
 
-    //ViewModel
+    // ViewModel
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
 
-    //Compose
+    // Compose
     implementation(libs.compose.ui)
     implementation(libs.compose.ui.tooling.preview)
     implementation(libs.compose.material)
     implementation(libs.androidx.constraintlayout.compose)
     implementation(libs.androidx.activity.compose)
 
-    //Immutable collections
+    // Immutable collections
     implementation(libs.kotlinx.collections.immutable)
 
-    //Hilt
+    // Hilt
     implementation(libs.hilt.android)
     implementation(libs.androidx.hilt.navigation.compose)
     kapt(libs.hilt.android.compiler)
     kapt(libs.androidx.hilt.compiler)
 
-    //Room
+    // Room
     implementation(libs.room.ktx)
     implementation(libs.room.runtime)
     kapt(libs.room.compiler)

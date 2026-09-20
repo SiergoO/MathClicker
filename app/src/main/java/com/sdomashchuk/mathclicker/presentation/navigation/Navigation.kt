@@ -21,27 +21,42 @@ const val GAME_SCREEN_FADE_OUT_DURATION = 0
 @Composable
 fun SetupNavGraph(navController: NavHostController) {
     AnimatedNavHost(navController = navController, startDestination = Screen.Splash.route) {
-
         composable(
             route = Screen.Splash.route,
             enterTransition = { fadeIn() },
-            exitTransition = { fadeOut() }
+            exitTransition = { fadeOut() },
         ) {
             SplashScreen(navController = navController)
         }
 
         composable(
             route = Screen.Menu.route,
-            enterTransition = { fadeIn(animationSpec = keyframes { this.durationMillis = MENU_SCREEN_FADE_IN_DURATION }) },
-            exitTransition = { fadeOut(animationSpec = keyframes { this.durationMillis = MENU_SCREEN_FADE_OUT_DURATION }) }
+            enterTransition = {
+                fadeIn(
+                    animationSpec = keyframes { this.durationMillis = MENU_SCREEN_FADE_IN_DURATION },
+                )
+            },
+            exitTransition = {
+                fadeOut(
+                    animationSpec = keyframes { this.durationMillis = MENU_SCREEN_FADE_OUT_DURATION },
+                )
+            },
         ) {
             MenuScreen(navController = navController)
         }
 
         composable(
             route = Screen.Game.route,
-            enterTransition = { fadeIn(animationSpec = keyframes { this.durationMillis = GAME_SCREEN_FADE_IN_DURATION }) },
-            exitTransition = { fadeOut(animationSpec = keyframes { this.durationMillis = GAME_SCREEN_FADE_OUT_DURATION }) }
+            enterTransition = {
+                fadeIn(
+                    animationSpec = keyframes { this.durationMillis = GAME_SCREEN_FADE_IN_DURATION },
+                )
+            },
+            exitTransition = {
+                fadeOut(
+                    animationSpec = keyframes { this.durationMillis = GAME_SCREEN_FADE_OUT_DURATION },
+                )
+            },
         ) {
             GameScreen(navController = navController)
         }

@@ -2,8 +2,7 @@ package com.sdomashchuk.mathclicker.game.helper
 
 import com.sdomashchuk.mathclicker.model.OperationSign
 
-class SessionHelperImpl: SessionHelper {
-
+class SessionHelperImpl : SessionHelper {
     companion object {
         private const val LEVEL_MIN = 1
         private const val LEVEL_MAX = 999
@@ -32,7 +31,8 @@ class SessionHelperImpl: SessionHelper {
     override val levelRange = IntRange(LEVEL_MIN, LEVEL_MAX)
     override val initialTargetValueRange = IntRange(INITIAL_TARGET_VALUE_MIN, INITIAL_TARGET_VALUE_MAX)
     override val initialTargetLifetimeMsRange = IntRange(INITIAL_TARGET_LIFETIME_MS_MIN, INITIAL_TARGET_LIFETIME_MS_MAX)
-    override val initialTargetAppearanceDelayMsRange = IntRange(INITIAL_TARGET_APPEARANCE_DELAY_MS_MIN, INITIAL_TARGET_APPEARANCE_DELAY_MS_MAX)
+    override val initialTargetAppearanceDelayMsRange =
+        IntRange(INITIAL_TARGET_APPEARANCE_DELAY_MS_MIN, INITIAL_TARGET_APPEARANCE_DELAY_MS_MAX)
     override val initialTargetAmountRange = IntRange(INITIAL_TARGET_AMOUNT_MIN, INITIAL_TARGET_AMOUNT_MAX)
     override val initialDivisionValueRange = IntRange(INITIAL_DIVISION_VALUE_MIN, INITIAL_DIVISION_VALUE_MAX)
     override val initialSubtractionValueRange = IntRange(INITIAL_SUBTRACTION_VALUE_MIN, INITIAL_SUBTRACTION_VALUE_MAX)
@@ -91,8 +91,17 @@ class SessionHelperImpl: SessionHelper {
      * @param level
      * @return random division or subtraction digit in a certain range of values.
      */
-    override fun getOperationDigitByLevel(operationSign: OperationSign, level: Int): Int =
-        if (operationSign == OperationSign.DIVISION) getDivisionDigitByLevel(level) else getSubtractionDigitByLevel(level)
+    override fun getOperationDigitByLevel(
+        operationSign: OperationSign,
+        level: Int,
+    ): Int =
+        if (operationSign ==
+            OperationSign.DIVISION
+        ) {
+            getDivisionDigitByLevel(level)
+        } else {
+            getSubtractionDigitByLevel(level)
+        }
 
     /**
      * Calculates the division digit depending on the level.
