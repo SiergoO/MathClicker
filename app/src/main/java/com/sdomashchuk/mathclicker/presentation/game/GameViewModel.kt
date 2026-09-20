@@ -4,15 +4,10 @@ import android.util.Log
 import android.util.Size
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.sdomashchuk.mathclicker.domain.model.game.session.Field
-import com.sdomashchuk.mathclicker.domain.model.game.session.Target
-import com.sdomashchuk.mathclicker.domain.model.game.session.toDomainList
-import com.sdomashchuk.mathclicker.domain.model.game.session.toDomainModel
-import com.sdomashchuk.mathclicker.domain.model.game.session.toGameList
-import com.sdomashchuk.mathclicker.domain.model.game.session.toGameModel
-import com.sdomashchuk.mathclicker.domain.model.game.session.toImmutableDomainList
 import com.sdomashchuk.mathclicker.domain.repository.GameRepository
 import com.sdomashchuk.mathclicker.game.Game
+import com.sdomashchuk.mathclicker.model.Field
+import com.sdomashchuk.mathclicker.model.Target
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
@@ -48,24 +43,22 @@ class GameViewModel
             viewModelScope.launch {
                 game.targetsFlow.collect { targets ->
                     if (targets.isNotEmpty()) {
-                        val updatedTargets = targets.toDomainList()
                         _state.value =
                             state.value.copy(
-                                targetList = updatedTargets.toImmutableList(),
+                                targetList = targets.toImmutableList(),
                             )
-                        gameRepository.updateTargets(updatedTargets)
+                        gameRepository.updateTargets(targets)
                     }
                 }
             }
             viewModelScope.launch {
                 game.fieldFlow.collect { field ->
                     if (field.id != 0) {
-                        val updatedField = field.toDomainModel()
                         _state.value =
                             state.value.copy(
-                                field = updatedField,
+                                field = field,
                             )
-                        gameRepository.updateField(updatedField)
+                        gameRepository.updateField(field)
                     }
                 }
             }
@@ -167,11 +160,11 @@ class GameViewModel
                     val sessionCount = getFieldCount()
                     game.createField(sessionCount + 1)
                     game.createTargets()
-                    insertField(game.fieldFlow.value.toDomainModel())
-                    refreshTargets(game.targetsFlow.value.toDomainList())
+                    insertField(game.fieldFlow.value)
+                    refreshTargets(game.targetsFlow.value)
                 } else {
-                    game.fieldRestored(unfinishedField.toGameModel())
-                    game.targetsRestored(unfinishedTargets.toGameList())
+                    game.fieldRestored(unfinishedField)
+                    game.targetsRestored(unfinishedTargets)
                 }
             }
         }

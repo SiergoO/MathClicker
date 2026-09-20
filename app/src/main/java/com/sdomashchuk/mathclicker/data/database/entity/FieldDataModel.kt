@@ -3,7 +3,7 @@ package com.sdomashchuk.mathclicker.data.database.entity
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
-import com.sdomashchuk.mathclicker.domain.model.game.session.Field
+import com.sdomashchuk.mathclicker.model.Field
 import com.sdomashchuk.mathclicker.model.OperationSign
 
 @Entity(tableName = "field")
