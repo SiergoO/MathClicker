@@ -5,23 +5,30 @@ Android Compose game. Modules: `:app` (UI, data, domain, DI), `:core` (pure game
 
 ## Toolchain constraints
 
-- **Currently** Gradle 7.5.1, AGP 7.3.1, Kotlin 1.7.21. **Migrating** to Gradle 9.4.1 / AGP 9.2.1 / Kotlin 2.4.0 to match OpenCEX-Android — see `.claude/specs/MC-4-align-toolchain.md`. Until MC-4 lands, check which toolchain a file is on before editing its build config.
+- Gradle 9.4.1, AGP 9.2.1, Kotlin 2.4.0, JDK 17. compileSdk 36, minSdk 24, targetSdk 33.
+- **No KSP release exists for Kotlin 2.4.0** (newest is 2.3.12). Anything that needs KSP — Room KMP included — is off the table until one ships. Room stays on kapt in `:app` for now.
 - JDK 17 is the only JDK installed.
 - `local.properties` is gitignored and required. Without it every Gradle task fails with "SDK location not found":
   `printf 'sdk.dir=%s/Library/Android/sdk\n' "$HOME" > local.properties`
-- `:core` is a pure-Kotlin-logic Android library with **zero Android imports** — put game rules there and unit-test them on the JVM. It is being moved to KMP `commonMain` (MC-6); do not add an Android or `javax.*` import to it.
+- `:core` is a KMP module (`commonMain` / `androidMain` / `commonTest`, targets androidHostTest + iosArm64 + iosSimulatorArm64) with **zero Android imports in `commonMain`** — put game rules there. `Dispatchers.IO` does not exist in `commonMain`; use `Dispatchers.Default`. Never add an Android or `javax.*` import to `commonMain`.
+- `:core` has **no Android lint**: AGP 9.2.1's KMP library plugin creates only `lintAnalyzeAndroidHostTest` for it, no production analysis task and no report. detekt and spotless do cover it. Re-check on a later AGP.
 - **Direction:** Android-only today → KMP (Koin, SQLDelight, Compose Multiplatform), following EyeXP's stack. See `.claude/specs/MC-6-kmp-migration.md`.
 
 ## Commands
 
 ```bash
-./gradlew :core:testDebugUnitTest      # fast: core logic only
-./gradlew testDebugUnitTest            # all unit tests
-./gradlew check                        # tests + detekt + spotless — the gate before any task is Done
+./gradlew :core:allTests               # fast: core logic on every target (androidHostTest + iosSimulatorArm64)
+./gradlew :core:testAndroidHostTest    # faster still: JVM only, skips the Kotlin/Native link
+./gradlew :app:testDebugUnitTest       # :app unit tests
+./gradlew check                        # tests + detekt + spotless, every module
 ./gradlew detekt                       # smells, complexity, exception handling
 ./gradlew spotlessApply                # fix formatting (ktlint)
 ./gradlew assembleDebug                # APK at app/build/outputs/apk/debug/app-debug.apk
 ```
+
+`:core:testDebugUnitTest` no longer exists — the KMP migration replaced it. Do not run bare
+`./gradlew testDebugUnitTest` either: only `:app` still has that task, so it passes while running
+none of `:core`'s tests.
 
 Prefer module-scoped tasks over whole-project ones; a full build here is slow.
 
@@ -74,7 +81,5 @@ you wrote; it cannot approve a whole plan or authorise something irreversible.
 | `/flow-board` | Render the board to HTML and open it |
 
 Read `.claude/board/BOARD.md` before starting work. **Only the orchestrating session writes to it** — a subagent in a worktree has its own checkout, so its board edits are lost or conflict on merge. Never mark a task `Done` without a green `./gradlew check` and a filled Evidence cell.
-
-**IMPORTANT:** The gate commands above are the pre-KMP ones. MC-6 renames them — `:core:testDebugUnitTest` becomes `:core:allTests`. Whoever lands MC-6.1 updates this section and every `Gate` cell on the board in the same commit.
 
 **IMPORTANT:** Never run `git worktree add` directly. Use `.claude/scripts/worktree.sh` — it enforces the 2-worktree cap that keeps this machine from filling its disk.

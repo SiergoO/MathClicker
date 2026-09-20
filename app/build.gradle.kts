@@ -2,8 +2,6 @@ plugins {
     id("mathclicker.android.application")
     id("mathclicker.android.compose")
     kotlin("kapt")
-    // If there will be problems with that plugin delete it + sync + rebuild
-    alias(libs.plugins.hilt.android)
     id("kotlinx-serialization")
     id("kotlin-parcelize")
 }
@@ -85,11 +83,10 @@ dependencies {
     // Immutable collections
     implementation(libs.kotlinx.collections.immutable)
 
-    // Hilt
-    implementation(libs.hilt.android)
-    implementation(libs.androidx.hilt.navigation.compose)
-    kapt(libs.hilt.android.compiler)
-    kapt(libs.androidx.hilt.compiler)
+    // Koin
+    implementation(libs.koin.android)
+    implementation(libs.koin.androidx.compose)
+    testImplementation(libs.koin.test)
 
     // Room
     implementation(libs.room.ktx)
@@ -97,4 +94,6 @@ dependencies {
     kapt(libs.room.compiler)
     // Room's kapt stub reads Kotlin metadata with an older reader than the 2.4.0 compiler emits.
     kapt(libs.kotlin.metadata.jvm)
+
+    testImplementation(libs.junit)
 }
