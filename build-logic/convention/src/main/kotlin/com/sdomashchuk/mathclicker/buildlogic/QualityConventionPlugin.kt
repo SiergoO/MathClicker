@@ -17,7 +17,16 @@ class QualityConventionPlugin : Plugin<Project> {
         pluginManager.apply("com.diffplug.spotless")
 
         extensions.configure<DetektExtension> {
-            source.setFrom(files("src/main/java", "src/main/kotlin", "src/test/java", "src/test/kotlin"))
+            source.setFrom(
+                files(
+                    "src/main/java",
+                    "src/main/kotlin",
+                    "src/test/java",
+                    "src/test/kotlin",
+                    "src/commonMain/kotlin",
+                    "src/commonTest/kotlin",
+                ),
+            )
             config.setFrom(rootProject.file("config/detekt/detekt.yml"))
             buildUponDefaultConfig.set(true)
             parallel.set(true)

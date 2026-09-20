@@ -26,7 +26,7 @@ class SessionHelperImplTest {
     }
 
     @Test
-    fun `the narrow level-one ranges are produced in full, not merely stayed within`() {
+    fun `the narrow level-one ranges are produced in full - not merely stayed within`() {
         // Asserting membership cannot catch a range that gets narrower. Where the range is small
         // enough to be sampled exhaustively, assert the whole set instead. The wide ranges
         // (lifetime, appearance delay) cannot be pinned this way while the helper returns a random
@@ -41,7 +41,7 @@ class SessionHelperImplTest {
     private fun sampled(draw: () -> Int): Set<Int> = buildSet { repeat(SAMPLE_ITERATIONS) { add(draw()) } }
 
     @Test
-    fun `lifetime, target value and target amount all scale with level per the difficulty curve`() {
+    fun `lifetime and target value and target amount all scale with level per the difficulty curve`() {
         val lifetimeRange =
             IntRange(
                 helper.initialTargetLifetimeMsRange.first - SAMPLE_LEVEL * 15,
@@ -85,7 +85,7 @@ class SessionHelperImplTest {
     }
 
     @Test
-    fun `operation digit delegates to the range matching its sign, not the other one`() {
+    fun `operation digit delegates to the range matching its sign - not the other one`() {
         val level = 0
         val divisionOnly =
             IntRange(helper.initialDivisionValueRange.first, helper.initialDivisionValueRange.last)

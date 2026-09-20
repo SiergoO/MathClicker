@@ -83,7 +83,7 @@ class TargetsMapperTest {
     }
 
     @Test
-    fun `two exact splits earn the sum of what was removed, multiplied by the batch multiplier`() {
+    fun `two exact splits earn the sum of what was removed - multiplied by the batch multiplier`() {
         val targets = listOf(target(id = 1, value = 10), target(id = 2, value = 4))
 
         val (_, score) = targets.performOperation(OperationSign.DIVISION, currentOperationDigit = 2)

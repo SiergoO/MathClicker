@@ -37,5 +37,9 @@ gradlePlugin {
             id = "mathclicker.quality"
             implementationClass = "com.sdomashchuk.mathclicker.buildlogic.QualityConventionPlugin"
         }
+        register("kmpLibrary") {
+            id = "mathclicker.kmp.library"
+            implementationClass = "com.sdomashchuk.mathclicker.buildlogic.KmpLibraryConventionPlugin"
+        }
     }
 }
