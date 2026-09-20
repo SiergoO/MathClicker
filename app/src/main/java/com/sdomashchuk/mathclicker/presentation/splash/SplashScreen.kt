@@ -1,5 +1,6 @@
 package com.sdomashchuk.mathclicker.presentation.splash
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -8,13 +9,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalResources
 import androidx.navigation.NavHostController
-import com.airbnb.lottie.compose.LottieAnimation
-import com.airbnb.lottie.compose.LottieCompositionSpec
-import com.airbnb.lottie.compose.animateLottieCompositionAsState
-import com.airbnb.lottie.compose.rememberLottieComposition
 import com.sdomashchuk.mathclicker.R
 import com.sdomashchuk.mathclicker.presentation.navigation.Screen
+import io.github.alexzhirkevich.compottie.DotLottie
+import io.github.alexzhirkevich.compottie.LottieCompositionSpec
+import io.github.alexzhirkevich.compottie.animateLottieCompositionAsState
+import io.github.alexzhirkevich.compottie.rememberLottieComposition
+import io.github.alexzhirkevich.compottie.rememberLottiePainter
 
 @Composable
 fun SplashScreen(navController: NavHostController) {
@@ -24,13 +27,19 @@ fun SplashScreen(navController: NavHostController) {
                 .fillMaxSize()
                 .background(MaterialTheme.colors.background),
     ) {
-        val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.logo))
+        val resources = LocalResources.current
+        val composition by rememberLottieComposition {
+            LottieCompositionSpec.DotLottie(resources.openRawResource(R.raw.logo).readBytes())
+        }
         val progress by animateLottieCompositionAsState(
             composition,
             iterations = 1,
             speed = 1f,
         )
-        LottieAnimation(composition)
+        Image(
+            painter = rememberLottiePainter(composition = composition, progress = { progress }),
+            contentDescription = null,
+        )
         LaunchedEffect(progress) {
             if (progress >= 1f) {
                 navController.navigate(Screen.Menu.route)

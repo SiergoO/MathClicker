@@ -55,8 +55,9 @@ dependencies {
     // Splash screen
     implementation(libs.androidx.core.splashscreen)
 
-    // Lottie
-    implementation(libs.lottie.compose)
+    // Compottie
+    implementation(libs.compottie)
+    implementation(libs.compottie.dot)
 
     // Lifecycle
     implementation(libs.androidx.lifecycle.service)

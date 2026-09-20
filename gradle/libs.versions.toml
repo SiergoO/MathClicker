@@ -14,15 +14,9 @@ androidxLifecycleViewmodelKtx = "2.5.1"
 androidxCoreSplashscreen = "1.0.0"
 androidxConstraintlayoutCompose = "1.0.1"
 androidxActivityCompose = "1.7.0-alpha02"
-composeUi = "1.3.2"
-composeMaterial = "1.3.1"
-# AGP 9 emits far fewer compile/runtime alignment constraints than AGP 7 did, so these four
-# modules resolved to old versions on the compile classpath while runtime kept 1.3.0. Declaring
-# them directly makes the compiler see what the APK actually ships. Not an upgrade: 1.3.0 is the
-# version that already resolved at runtime, and still does.
-composeFoundation = "1.3.0"
+composeMultiplatform = "1.12.0"
 accompanistNavigationAnimation = "0.27.0"
-lottieCompose = "5.2.0"
+compottie = "2.3.1"
 kotlinxCollectionsImmutable = "0.3.5"
 sqldelight = "2.4.0"
 googleMaterial = "1.7.0"
@@ -38,6 +32,7 @@ kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+compose-multiplatform = { id = "org.jetbrains.compose", version.ref = "composeMultiplatform" }
 detekt = { id = "dev.detekt", version.ref = "detekt" }
 spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
 sqldelight = { id = "app.cash.sqldelight", version.ref = "sqldelight" }
@@ -57,15 +52,16 @@ androidx-lifecycle-viewmodel-ktx = { module = "androidx.lifecycle:lifecycle-view
 androidx-core-splashscreen = { module = "androidx.core:core-splashscreen", version.ref = "androidxCoreSplashscreen" }
 androidx-constraintlayout-compose = { module = "androidx.constraintlayout:constraintlayout-compose", version.ref = "androidxConstraintlayoutCompose" }
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidxActivityCompose" }
-compose-ui = { module = "androidx.compose.ui:ui", version.ref = "composeUi" }
-compose-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview", version.ref = "composeUi" }
-compose-material = { module = "androidx.compose.material:material", version.ref = "composeMaterial" }
-compose-foundation = { module = "androidx.compose.foundation:foundation", version.ref = "composeFoundation" }
-compose-foundation-layout = { module = "androidx.compose.foundation:foundation-layout", version.ref = "composeFoundation" }
-compose-animation = { module = "androidx.compose.animation:animation", version.ref = "composeFoundation" }
-compose-animation-core = { module = "androidx.compose.animation:animation-core", version.ref = "composeFoundation" }
+compose-ui = { module = "org.jetbrains.compose.ui:ui", version.ref = "composeMultiplatform" }
+compose-ui-tooling-preview = { module = "org.jetbrains.compose.ui:ui-tooling-preview", version.ref = "composeMultiplatform" }
+compose-material = { module = "org.jetbrains.compose.material:material", version.ref = "composeMultiplatform" }
+compose-foundation = { module = "org.jetbrains.compose.foundation:foundation", version.ref = "composeMultiplatform" }
+compose-foundation-layout = { module = "org.jetbrains.compose.foundation:foundation-layout", version.ref = "composeMultiplatform" }
+compose-animation = { module = "org.jetbrains.compose.animation:animation", version.ref = "composeMultiplatform" }
+compose-animation-core = { module = "org.jetbrains.compose.animation:animation-core", version.ref = "composeMultiplatform" }
 accompanist-navigation-animation = { module = "com.google.accompanist:accompanist-navigation-animation", version.ref = "accompanistNavigationAnimation" }
-lottie-compose = { module = "com.airbnb.android:lottie-compose", version.ref = "lottieCompose" }
+compottie = { module = "io.github.alexzhirkevich:compottie", version.ref = "compottie" }
+compottie-dot = { module = "io.github.alexzhirkevich:compottie-dot", version.ref = "compottie" }
 kotlinx-collections-immutable = { module = "org.jetbrains.kotlinx:kotlinx-collections-immutable", version.ref = "kotlinxCollectionsImmutable" }
 sqldelight-android-driver = { module = "app.cash.sqldelight:android-driver", version.ref = "sqldelight" }
 sqldelight-sqlite-driver = { module = "app.cash.sqldelight:sqlite-driver", version.ref = "sqldelight" }

@@ -8,6 +8,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -49,6 +50,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.intl.Locale
 import androidx.compose.ui.text.style.TextAlign
@@ -59,11 +61,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.navigation.NavController
-import com.airbnb.lottie.compose.LottieAnimation
-import com.airbnb.lottie.compose.LottieCompositionSpec
-import com.airbnb.lottie.compose.LottieConstants
-import com.airbnb.lottie.compose.animateLottieCompositionAsState
-import com.airbnb.lottie.compose.rememberLottieComposition
 import com.sdomashchuk.mathclicker.R
 import com.sdomashchuk.mathclicker.model.Target
 import com.sdomashchuk.mathclicker.presentation.component.GameMenuDialog
@@ -74,6 +71,12 @@ import com.sdomashchuk.mathclicker.presentation.ui.theme.Red500
 import com.sdomashchuk.mathclicker.presentation.ui.theme.Translucent
 import com.sdomashchuk.mathclicker.presentation.ui.theme.Typography
 import com.sdomashchuk.mathclicker.presentation.ui.theme.White
+import io.github.alexzhirkevich.compottie.Compottie
+import io.github.alexzhirkevich.compottie.DotLottie
+import io.github.alexzhirkevich.compottie.LottieCompositionSpec
+import io.github.alexzhirkevich.compottie.animateLottieCompositionAsState
+import io.github.alexzhirkevich.compottie.rememberLottieComposition
+import io.github.alexzhirkevich.compottie.rememberLottiePainter
 import kotlinx.coroutines.flow.receiveAsFlow
 import org.koin.androidx.compose.koinViewModel
 import kotlin.math.roundToInt
@@ -334,8 +337,14 @@ fun GamePausedOverlay(onClick: () -> Unit) {
             modifier = Modifier.fillMaxHeight(0.5f),
             contentAlignment = Alignment.Center,
         ) {
-            val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.tap_higlight))
-            LottieAnimation(composition = composition, iterations = LottieConstants.IterateForever)
+            val resources = LocalResources.current
+            val composition by rememberLottieComposition {
+                LottieCompositionSpec.DotLottie(resources.openRawResource(R.raw.tap_higlight).readBytes())
+            }
+            Image(
+                painter = rememberLottiePainter(composition = composition, iterations = Compottie.IterateForever),
+                contentDescription = null,
+            )
             Text(
                 text = stringResource(id = R.string.pause).toUpperCase(Locale.current),
                 style = Typography.body1,
@@ -360,9 +369,15 @@ fun CountdownOverlay(onFinish: () -> Unit) {
                 .background(Translucent)
                 .padding(40.dp),
     ) {
-        val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.countdown))
+        val resources = LocalResources.current
+        val composition by rememberLottieComposition {
+            LottieCompositionSpec.DotLottie(resources.openRawResource(R.raw.countdown).readBytes())
+        }
         val progress by animateLottieCompositionAsState(composition)
-        LottieAnimation(composition)
+        Image(
+            painter = rememberLottiePainter(composition = composition, progress = { progress }),
+            contentDescription = null,
+        )
         LaunchedEffect(progress) {
             if (progress >= 1f) {
                 onFinish.invoke()
