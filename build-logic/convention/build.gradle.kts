@@ -41,5 +41,9 @@ gradlePlugin {
             id = "mathclicker.kmp.library"
             implementationClass = "com.sdomashchuk.mathclicker.buildlogic.KmpLibraryConventionPlugin"
         }
+        register("kmpFeature") {
+            id = "mathclicker.kmp.feature"
+            implementationClass = "com.sdomashchuk.mathclicker.buildlogic.KmpFeatureConventionPlugin"
+        }
     }
 }

@@ -27,7 +27,7 @@ class KmpLibraryConventionPlugin : Plugin<Project> {
 
         extensions.configure<KotlinMultiplatformExtension> {
             extensions.configure(KotlinMultiplatformAndroidLibraryTarget::class.java) {
-                namespace = "com.sdomashchuk.mathclicker.game"
+                namespace = namespaceFromPath
                 compileSdk = 37
                 minSdk = 24
                 withHostTest {}
