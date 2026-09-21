@@ -18,4 +18,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "MathClicker"
-include(":app", ":core:model", ":core:game")
+include(":app", ":core:model", ":core:game", ":core:database")

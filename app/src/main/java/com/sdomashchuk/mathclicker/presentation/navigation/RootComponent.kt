@@ -9,8 +9,8 @@ import com.arkivanov.decompose.router.stack.pop
 import com.arkivanov.decompose.router.stack.push
 import com.arkivanov.decompose.router.stack.replaceAll
 import com.arkivanov.decompose.value.Value
+import com.sdomashchuk.mathclicker.core.database.repository.GameRepository
 import com.sdomashchuk.mathclicker.core.game.Game
-import com.sdomashchuk.mathclicker.domain.repository.GameRepository
 import com.sdomashchuk.mathclicker.presentation.game.GameComponent
 import com.sdomashchuk.mathclicker.presentation.menu.MenuComponent
 import com.sdomashchuk.mathclicker.presentation.splash.SplashComponent

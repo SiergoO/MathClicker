@@ -25,11 +25,14 @@ class QualityConventionPlugin : Plugin<Project> {
             // the day it exists.
             source.setFrom(
                 provider {
+                    val buildDir = layout.buildDirectory.get().asFile
                     val fromKotlin =
                         extensions.findByType(KotlinProjectExtension::class.java)
                             ?.sourceSets
                             ?.flatMap { it.kotlin.srcDirs }
-                            ?.filter { it.isDirectory }
+                            // SQLDelight (and any future generator) registers its output as a Kotlin
+                            // source dir under build/; that is generated code, never ours to lint.
+                            ?.filter { it.isDirectory && !it.toPath().startsWith(buildDir.toPath()) }
                             .orEmpty()
                     // AGP 9's built-in Kotlin registers no KotlinProjectExtension, so a module that
                     // drops org.jetbrains.kotlin.android derives nothing and detekt goes NO-SOURCE:

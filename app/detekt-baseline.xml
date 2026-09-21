@@ -2,7 +2,6 @@
 <SmellBaseline>
   <ManuallySuppressedIssues/>
   <CurrentIssues>
-    <ID>FunctionParameterNaming:DataModule.kt:DataModule$FieldDao: FieldDao</ID>
     <ID>MagicNumber:GameScreen.kt:0.05f</ID>
     <ID>MagicNumber:GameScreen.kt:0.5f</ID>
     <ID>MagicNumber:GameScreen.kt:0.75f</ID>
@@ -11,7 +10,5 @@
     <ID>MagicNumber:GameScreen.kt:3</ID>
     <ID>MagicNumber:GameScreen.kt:4</ID>
     <ID>MagicNumber:MathClickerDialog.kt:0.9f</ID>
-    <ID>TooManyFunctions:GameRepository.kt:GameRepository</ID>
-    <ID>TooManyFunctions:GameRepositoryImpl.kt:GameRepositoryImpl : GameRepository</ID>
   </CurrentIssues>
 </SmellBaseline>

@@ -1,10 +1,10 @@
 package com.sdomashchuk.mathclicker.presentation.game
 
 import android.util.Size
+import com.sdomashchuk.mathclicker.core.database.repository.GameRepository
 import com.sdomashchuk.mathclicker.core.game.Game
 import com.sdomashchuk.mathclicker.core.model.Field
 import com.sdomashchuk.mathclicker.core.model.Target
-import com.sdomashchuk.mathclicker.domain.repository.GameRepository
 import com.sdomashchuk.mathclicker.presentation.viewmodel.ComponentViewModel
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf

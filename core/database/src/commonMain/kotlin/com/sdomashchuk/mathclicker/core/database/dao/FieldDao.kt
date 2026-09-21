@@ -1,20 +1,21 @@
-package com.sdomashchuk.mathclicker.data.database.dao
+package com.sdomashchuk.mathclicker.core.database.dao
 
+import com.sdomashchuk.mathclicker.core.database.local.FieldQueries
 import com.sdomashchuk.mathclicker.core.model.Field
 import com.sdomashchuk.mathclicker.core.model.OperationSign
-import com.sdomashchuk.mathclicker.data.database.local.FieldQueries
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
-import com.sdomashchuk.mathclicker.data.database.local.Field_ as LocalField
+import com.sdomashchuk.mathclicker.core.database.local.Field_ as LocalField
 
 class FieldDao(
     private val queries: FieldQueries,
+    private val dispatcher: CoroutineDispatcher,
 ) {
     // id == 0 is the domain model's "not yet persisted" default. Room bound NULL for it on an
     // autoGenerate primary key so SQLite would assign the next rowid; the generated insertField
     // takes a nullable id for the same reason, so the mapping here is a direct translation.
     suspend fun insertField(field: Field) =
-        withContext(Dispatchers.IO) {
+        withContext(dispatcher) {
             queries.insertField(
                 id = field.id.takeIf { it != 0 }?.toLong(),
                 level = field.level.toLong(),
@@ -32,7 +33,7 @@ class FieldDao(
         }
 
     suspend fun updateField(field: Field) =
-        withContext(Dispatchers.IO) {
+        withContext(dispatcher) {
             queries.updateField(
                 level = field.level.toLong(),
                 score = field.score.toLong(),
@@ -50,12 +51,12 @@ class FieldDao(
         }
 
     suspend fun getFieldById(id: Int): Field =
-        withContext(Dispatchers.IO) { queries.getFieldById(id.toLong()).executeAsOne().toDomainModel() }
+        withContext(dispatcher) { queries.getFieldById(id.toLong()).executeAsOne().toDomainModel() }
 
     suspend fun getUnfinishedField(): Field? =
-        withContext(Dispatchers.IO) { queries.getUnfinishedField().executeAsOneOrNull()?.toDomainModel() }
+        withContext(dispatcher) { queries.getUnfinishedField().executeAsOneOrNull()?.toDomainModel() }
 
-    suspend fun getFieldCount(): Int = withContext(Dispatchers.IO) { queries.getFieldCount().executeAsOne().toInt() }
+    suspend fun getFieldCount(): Int = withContext(dispatcher) { queries.getFieldCount().executeAsOne().toInt() }
 }
 
 private fun LocalField.toDomainModel() =

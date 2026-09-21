@@ -1,32 +1,33 @@
-package com.sdomashchuk.mathclicker.data.database.dao
+package com.sdomashchuk.mathclicker.core.database.dao
 
+import com.sdomashchuk.mathclicker.core.database.local.TargetsQueries
 import com.sdomashchuk.mathclicker.core.model.Target
-import com.sdomashchuk.mathclicker.data.database.local.TargetsQueries
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
-import com.sdomashchuk.mathclicker.data.database.local.Targets as LocalTargets
+import com.sdomashchuk.mathclicker.core.database.local.Targets as LocalTargets
 
 class TargetsDao(
     private val queries: TargetsQueries,
+    private val dispatcher: CoroutineDispatcher,
 ) {
-    suspend fun insertTarget(target: Target) = withContext(Dispatchers.IO) { queries.insert(target) }
+    suspend fun insertTarget(target: Target) = withContext(dispatcher) { queries.insert(target) }
 
     suspend fun insertTargets(targets: List<Target>) =
-        withContext(Dispatchers.IO) {
+        withContext(dispatcher) {
             queries.transaction { targets.forEach { queries.insert(it) } }
         }
 
-    suspend fun updateTarget(target: Target) = withContext(Dispatchers.IO) { queries.update(target) }
+    suspend fun updateTarget(target: Target) = withContext(dispatcher) { queries.update(target) }
 
     suspend fun updateTargets(targets: List<Target>) =
-        withContext(Dispatchers.IO) {
+        withContext(dispatcher) {
             queries.transaction { targets.forEach { queries.update(it) } }
         }
 
-    suspend fun deleteTargets() = withContext(Dispatchers.IO) { queries.deleteTargets() }
+    suspend fun deleteTargets() = withContext(dispatcher) { queries.deleteTargets() }
 
     suspend fun getTargets(): List<Target> =
-        withContext(Dispatchers.IO) { queries.getTargets().executeAsList().map { it.toDomainModel() } }
+        withContext(dispatcher) { queries.getTargets().executeAsList().map { it.toDomainModel() } }
 }
 
 private fun TargetsQueries.insert(target: Target) =

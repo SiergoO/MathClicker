@@ -1,12 +1,13 @@
-package com.sdomashchuk.mathclicker.data.repository
+package com.sdomashchuk.mathclicker.core.database.repository
 
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
+import com.sdomashchuk.mathclicker.core.database.dao.FieldDao
+import com.sdomashchuk.mathclicker.core.database.dao.TargetsDao
+import com.sdomashchuk.mathclicker.core.database.local.MathClickerDatabase
 import com.sdomashchuk.mathclicker.core.model.Field
 import com.sdomashchuk.mathclicker.core.model.OperationSign
 import com.sdomashchuk.mathclicker.core.model.Target
-import com.sdomashchuk.mathclicker.data.database.dao.FieldDao
-import com.sdomashchuk.mathclicker.data.database.dao.TargetsDao
-import com.sdomashchuk.mathclicker.data.database.local.MathClickerDatabase
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -21,7 +22,11 @@ class GameRepositoryImplTest {
         val driver = JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY)
         MathClickerDatabase.Schema.create(driver)
         val database = MathClickerDatabase(driver)
-        repository = GameRepositoryImpl(FieldDao(database.fieldQueries), TargetsDao(database.targetsQueries))
+        repository =
+            GameRepositoryImpl(
+                FieldDao(database.fieldQueries, Dispatchers.Unconfined),
+                TargetsDao(database.targetsQueries, Dispatchers.Unconfined),
+            )
     }
 
     @Test

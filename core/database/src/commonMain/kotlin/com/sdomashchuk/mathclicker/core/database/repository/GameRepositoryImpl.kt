@@ -1,10 +1,9 @@
-package com.sdomashchuk.mathclicker.data.repository
+package com.sdomashchuk.mathclicker.core.database.repository
 
+import com.sdomashchuk.mathclicker.core.database.dao.FieldDao
+import com.sdomashchuk.mathclicker.core.database.dao.TargetsDao
 import com.sdomashchuk.mathclicker.core.model.Field
 import com.sdomashchuk.mathclicker.core.model.Target
-import com.sdomashchuk.mathclicker.data.database.dao.FieldDao
-import com.sdomashchuk.mathclicker.data.database.dao.TargetsDao
-import com.sdomashchuk.mathclicker.domain.repository.GameRepository
 
 class GameRepositoryImpl(
     private val fieldDao: FieldDao,

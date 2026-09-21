@@ -1,7 +1,6 @@
 plugins {
     id("mathclicker.android.application")
     id("mathclicker.android.compose")
-    alias(libs.plugins.sqldelight)
     alias(libs.plugins.kotlin.serialization)
 }
 
@@ -35,18 +34,11 @@ android {
     }
 }
 
-sqldelight {
-    databases {
-        create("MathClickerDatabase") {
-            packageName.set("com.sdomashchuk.mathclicker.data.database.local")
-        }
-    }
-}
-
 dependencies {
 
     implementation(project(":core:model"))
     implementation(project(":core:game"))
+    implementation(project(":core:database"))
 
     implementation(libs.androidx.lifecycle.runtime.ktx)
 
@@ -81,10 +73,8 @@ dependencies {
     implementation(libs.koin.android)
     testImplementation(libs.koin.test)
 
-    // SQLDelight
+    // SQLDelight — only the driver: the database, DAOs and GameRepository live in :core:database
     implementation(libs.sqldelight.android.driver)
-    testImplementation(libs.sqldelight.sqlite.driver)
 
     testImplementation(libs.junit)
-    testImplementation(libs.kotlinx.coroutines.test)
 }

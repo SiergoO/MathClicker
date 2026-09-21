@@ -1,0 +1,8 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>TooManyFunctions:GameRepository.kt:GameRepository</ID>
+    <ID>TooManyFunctions:GameRepositoryImpl.kt:GameRepositoryImpl : GameRepository</ID>
+  </CurrentIssues>
+</SmellBaseline>

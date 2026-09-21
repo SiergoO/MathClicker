@@ -1,7 +1,7 @@
 package com.sdomashchuk.mathclicker.di
 
+import com.sdomashchuk.mathclicker.core.database.repository.GameRepository
 import com.sdomashchuk.mathclicker.core.game.Game
-import com.sdomashchuk.mathclicker.domain.repository.GameRepository
 import kotlinx.coroutines.CoroutineScope
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
@@ -15,8 +15,8 @@ import java.io.File
 class KoinModulesTest {
     // CoroutineScope is built inline in gameModule rather than declared, so verify() cannot resolve
     // it. Context is deliberately absent from this list: no definition's constructor takes one —
-    // androidContext() is only read inside dataModule's lambda, which verify() never executes — so
-    // whitelisting it would claim a check that does not happen.
+    // androidContext() is only read inside sqlDriverModule's lambda, which verify() never executes —
+    // so whitelisting it would claim a check that does not happen.
     @OptIn(KoinExperimentalAPI::class)
     @Test
     fun everyConstructorDependencyHasADefinition() {
@@ -45,7 +45,7 @@ class KoinModulesTest {
     // that binding by accident. RootComponentProbe exists only to give verify() a constructor
     // shaped like that factory's real dependency pull; verify() never runs a definition's lambda
     // body, so this stays JVM-safe even though GameRepository's real binding opens an
-    // AndroidSqliteDriver. Delete `bind GameRepository::class` from dataModule and this fails;
+    // AndroidSqliteDriver. Delete `bind GameRepository::class` from databaseModule and this fails;
     // today it would instead fail on first navigation to the game screen.
     @OptIn(KoinExperimentalAPI::class)
     @Test

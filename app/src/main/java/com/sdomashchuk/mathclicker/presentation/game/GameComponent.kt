@@ -2,8 +2,8 @@ package com.sdomashchuk.mathclicker.presentation.game
 
 import com.arkivanov.decompose.ComponentContext
 import com.arkivanov.essenty.lifecycle.doOnDestroy
+import com.sdomashchuk.mathclicker.core.database.repository.GameRepository
 import com.sdomashchuk.mathclicker.core.game.Game
-import com.sdomashchuk.mathclicker.domain.repository.GameRepository
 import com.sdomashchuk.mathclicker.presentation.navigation.viewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
