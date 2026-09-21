@@ -40,8 +40,8 @@ dependencies {
     implementation(project(":core:game"))
     implementation(project(":core:database"))
     implementation(project(":core:ui"))
-
-    implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(project(":core:component"))
+    implementation(project(":feature:game"))
 
     // Navigation
     implementation(libs.decompose)
@@ -66,9 +66,6 @@ dependencies {
     implementation(libs.compose.animation.core)
     implementation(libs.androidx.constraintlayout.compose)
     implementation(libs.androidx.activity.compose)
-
-    // Immutable collections
-    implementation(libs.kotlinx.collections.immutable)
 
     // Koin
     implementation(libs.koin.android)

@@ -1,6 +1,6 @@
 package com.sdomashchuk.mathclicker.presentation.menu
 
-import com.sdomashchuk.mathclicker.presentation.viewmodel.ComponentViewModel
+import com.sdomashchuk.mathclicker.core.component.ComponentViewModel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.flow.MutableStateFlow

@@ -1,10 +1,10 @@
-package com.sdomashchuk.mathclicker.presentation.game
+package com.sdomashchuk.mathclicker.feature.game
 
 import com.arkivanov.decompose.ComponentContext
 import com.arkivanov.essenty.lifecycle.doOnDestroy
+import com.sdomashchuk.mathclicker.core.component.viewModel
 import com.sdomashchuk.mathclicker.core.database.repository.GameRepository
 import com.sdomashchuk.mathclicker.core.game.Game
-import com.sdomashchuk.mathclicker.presentation.navigation.viewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob

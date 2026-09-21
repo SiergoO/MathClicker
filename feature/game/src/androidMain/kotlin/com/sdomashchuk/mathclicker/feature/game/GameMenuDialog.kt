@@ -1,4 +1,4 @@
-package com.sdomashchuk.mathclicker.presentation.component
+package com.sdomashchuk.mathclicker.feature.game
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -13,8 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.sdomashchuk.mathclicker.R
-import com.sdomashchuk.mathclicker.presentation.menu.MenuButton
+import com.sdomashchuk.mathclicker.core.ui.component.MenuButton
 
 @Composable
 fun GameMenuDialog(

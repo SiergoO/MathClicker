@@ -1,8 +1,7 @@
-package com.sdomashchuk.mathclicker.presentation.navigation
+package com.sdomashchuk.mathclicker.core.component
 
 import com.arkivanov.decompose.ComponentContext
 import com.arkivanov.essenty.instancekeeper.getOrCreate
-import com.sdomashchuk.mathclicker.presentation.viewmodel.ComponentViewModel
 
 /**
  * Get-or-create a [ComponentViewModel] from this component's instanceKeeper, keyed by its class

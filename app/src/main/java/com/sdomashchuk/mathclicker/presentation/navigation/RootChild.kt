@@ -1,6 +1,6 @@
 package com.sdomashchuk.mathclicker.presentation.navigation
 
-import com.sdomashchuk.mathclicker.presentation.game.GameComponent
+import com.sdomashchuk.mathclicker.feature.game.GameComponent
 import com.sdomashchuk.mathclicker.presentation.menu.MenuComponent
 import com.sdomashchuk.mathclicker.presentation.splash.SplashComponent
 

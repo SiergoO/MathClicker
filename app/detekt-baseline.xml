@@ -1,13 +1,5 @@
 <?xml version="1.0" ?>
 <SmellBaseline>
   <ManuallySuppressedIssues/>
-  <CurrentIssues>
-    <ID>MagicNumber:GameScreen.kt:0.05f</ID>
-    <ID>MagicNumber:GameScreen.kt:0.5f</ID>
-    <ID>MagicNumber:GameScreen.kt:0.75f</ID>
-    <ID>MagicNumber:GameScreen.kt:0.8</ID>
-    <ID>MagicNumber:GameScreen.kt:0.8f</ID>
-    <ID>MagicNumber:GameScreen.kt:3</ID>
-    <ID>MagicNumber:GameScreen.kt:4</ID>
-  </CurrentIssues>
+  <CurrentIssues/>
 </SmellBaseline>

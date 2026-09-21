@@ -1,4 +1,4 @@
-package com.sdomashchuk.mathclicker.presentation.viewmodel
+package com.sdomashchuk.mathclicker.core.component
 
 import com.arkivanov.essenty.instancekeeper.InstanceKeeper
 import kotlinx.coroutines.CoroutineScope
