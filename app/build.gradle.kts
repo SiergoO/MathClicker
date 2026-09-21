@@ -39,6 +39,7 @@ dependencies {
     implementation(project(":core:model"))
     implementation(project(":core:game"))
     implementation(project(":core:database"))
+    implementation(project(":core:ui"))
 
     implementation(libs.androidx.lifecycle.runtime.ktx)
 

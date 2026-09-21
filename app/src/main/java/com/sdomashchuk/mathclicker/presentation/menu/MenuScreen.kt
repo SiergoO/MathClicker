@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material.Button
 import androidx.compose.material.ButtonDefaults
 import androidx.compose.material.IconButton
+import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -25,11 +26,10 @@ import androidx.compose.ui.unit.dp
 import androidx.constraintlayout.compose.ChainStyle
 import androidx.constraintlayout.compose.ConstraintLayout
 import com.sdomashchuk.mathclicker.R
-import com.sdomashchuk.mathclicker.presentation.component.MathClickerDialog
-import com.sdomashchuk.mathclicker.presentation.ui.theme.MathClickerTheme
-import com.sdomashchuk.mathclicker.presentation.ui.theme.Red500
-import com.sdomashchuk.mathclicker.presentation.ui.theme.Shapes
-import com.sdomashchuk.mathclicker.presentation.ui.theme.Typography
+import com.sdomashchuk.mathclicker.core.ui.component.MathClickerDialog
+import com.sdomashchuk.mathclicker.core.ui.theme.MathClickerTheme
+import com.sdomashchuk.mathclicker.core.ui.theme.Red500
+import com.sdomashchuk.mathclicker.core.ui.theme.Shapes
 
 @Composable
 fun MenuScreen(component: MenuComponent) {
@@ -123,7 +123,7 @@ fun MenuButton(
     ) {
         Text(
             text = text,
-            style = Typography.h2,
+            style = MaterialTheme.typography.h2,
         )
     }
 }

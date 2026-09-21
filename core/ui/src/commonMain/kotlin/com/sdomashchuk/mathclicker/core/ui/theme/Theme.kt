@@ -1,4 +1,4 @@
-package com.sdomashchuk.mathclicker.presentation.ui.theme
+package com.sdomashchuk.mathclicker.core.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material.MaterialTheme
@@ -38,7 +38,9 @@ fun MathClickerTheme(
 
     MaterialTheme(
         colors = colors,
-        typography = Typography,
+        // Typography() rather than a val: loading the QuickSand family via CMP resources needs a
+        // composable context, so it can no longer be a top-level constant (see Typography.kt).
+        typography = Typography(),
         shapes = Shapes,
         content = content,
     )

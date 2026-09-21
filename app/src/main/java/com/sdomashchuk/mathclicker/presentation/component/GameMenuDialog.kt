@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -14,7 +15,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.sdomashchuk.mathclicker.R
 import com.sdomashchuk.mathclicker.presentation.menu.MenuButton
-import com.sdomashchuk.mathclicker.presentation.ui.theme.Typography
 
 @Composable
 fun GameMenuDialog(
@@ -33,7 +33,7 @@ fun GameMenuDialog(
                     .wrapContentSize(),
             text = headerText,
             textAlign = TextAlign.Center,
-            style = Typography.h1,
+            style = MaterialTheme.typography.h1,
         )
         Column(
             modifier = Modifier.weight(1f),

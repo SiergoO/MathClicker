@@ -1,4 +1,4 @@
-package com.sdomashchuk.mathclicker.presentation.component
+package com.sdomashchuk.mathclicker.core.ui.component
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -7,20 +7,15 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.Button
 import androidx.compose.material.Card
-import androidx.compose.material.Divider
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import com.sdomashchuk.mathclicker.presentation.ui.theme.Typography
 
 @Composable
 fun MathClickerDialog(
@@ -94,39 +89,4 @@ fun MathClickerDialog(
                 dismissOnClickOutside = true,
             ),
     )
-}
-
-@Composable
-private fun Header(title: String) {
-    Column {
-        Row(
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(20.dp),
-        ) {
-            Text(text = title, style = Typography.h2)
-        }
-        Divider(color = Color.DarkGray, thickness = 1.dp)
-    }
-}
-
-@Composable
-private fun Body(
-    modifier: Modifier = Modifier,
-    bodyText: String,
-) {
-    Column(
-        modifier =
-            modifier
-                .padding(20.dp)
-                .verticalScroll(rememberScrollState()),
-    ) {
-        Text(
-            text = bodyText,
-            style = Typography.body1,
-        )
-    }
 }

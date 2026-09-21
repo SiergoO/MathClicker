@@ -47,6 +47,7 @@ compose-foundation = { module = "org.jetbrains.compose.foundation:foundation", v
 compose-foundation-layout = { module = "org.jetbrains.compose.foundation:foundation-layout", version.ref = "composeMultiplatform" }
 compose-animation = { module = "org.jetbrains.compose.animation:animation", version.ref = "composeMultiplatform" }
 compose-animation-core = { module = "org.jetbrains.compose.animation:animation-core", version.ref = "composeMultiplatform" }
+compose-components-resources = { module = "org.jetbrains.compose.components:components-resources", version.ref = "composeMultiplatform" }
 decompose = { module = "com.arkivanov.decompose:decompose", version.ref = "decompose" }
 decompose-compose = { module = "com.arkivanov.decompose:extensions-compose", version.ref = "decompose" }
 essenty-lifecycle = { module = "com.arkivanov.essenty:lifecycle", version.ref = "essenty" }

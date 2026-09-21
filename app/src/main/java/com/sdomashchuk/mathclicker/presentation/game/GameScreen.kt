@@ -62,13 +62,12 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
 import com.sdomashchuk.mathclicker.R
 import com.sdomashchuk.mathclicker.core.model.Target
+import com.sdomashchuk.mathclicker.core.ui.theme.MathClickerTheme
+import com.sdomashchuk.mathclicker.core.ui.theme.Red200
+import com.sdomashchuk.mathclicker.core.ui.theme.Red500
+import com.sdomashchuk.mathclicker.core.ui.theme.Translucent
+import com.sdomashchuk.mathclicker.core.ui.theme.White
 import com.sdomashchuk.mathclicker.presentation.component.GameMenuDialog
-import com.sdomashchuk.mathclicker.presentation.ui.theme.MathClickerTheme
-import com.sdomashchuk.mathclicker.presentation.ui.theme.Red200
-import com.sdomashchuk.mathclicker.presentation.ui.theme.Red500
-import com.sdomashchuk.mathclicker.presentation.ui.theme.Translucent
-import com.sdomashchuk.mathclicker.presentation.ui.theme.Typography
-import com.sdomashchuk.mathclicker.presentation.ui.theme.White
 import io.github.alexzhirkevich.compottie.Compottie
 import io.github.alexzhirkevich.compottie.DotLottie
 import io.github.alexzhirkevich.compottie.LottieCompositionSpec
@@ -173,7 +172,7 @@ fun Field(
                     id = R.string.game_session_level,
                     gameState.value.field.level,
                 ).toUpperCase(Locale.current),
-            style = Typography.body1,
+            style = MaterialTheme.typography.body1,
         )
         Text(
             modifier =
@@ -186,7 +185,7 @@ fun Field(
                     id = R.string.game_session_score,
                     gameState.value.field.score,
                 ).toUpperCase(Locale.current),
-            style = Typography.body1,
+            style = MaterialTheme.typography.body1,
         )
     }
     Divider()
@@ -272,7 +271,7 @@ fun Field(
                         id = R.string.game_session_combo,
                         gameState.value.field.bonusMultiplier,
                     ).toUpperCase(Locale.current),
-                style = Typography.h2,
+                style = MaterialTheme.typography.h2,
             )
             Button(
                 onClick = onFireClicked,
@@ -337,13 +336,13 @@ fun GamePausedOverlay(onClick: () -> Unit) {
             )
             Text(
                 text = stringResource(id = R.string.pause).toUpperCase(Locale.current),
-                style = Typography.body1,
+                style = MaterialTheme.typography.body1,
                 color = White,
             )
         }
         Text(
             text = stringResource(id = R.string.ready_to_pay_overlay_hint).toUpperCase(Locale.current),
-            style = Typography.h2,
+            style = MaterialTheme.typography.h2,
             color = Red200,
         )
     }

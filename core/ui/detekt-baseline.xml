@@ -1,0 +1,7 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>MagicNumber:MathClickerDialog.kt:0.9f</ID>
+  </CurrentIssues>
+</SmellBaseline>
