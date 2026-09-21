@@ -47,7 +47,6 @@ dependencies {
 
     implementation(project(":core"))
 
-    implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
 
     // Navigation
@@ -57,20 +56,12 @@ dependencies {
     implementation(libs.essenty.instance.keeper)
     implementation(libs.kotlinx.serialization.core)
 
-    // Splash screen
-    implementation(libs.androidx.core.splashscreen)
-
     // Compottie
     implementation(libs.compottie)
     implementation(libs.compottie.dot)
 
-    // Lifecycle
-    implementation(libs.androidx.lifecycle.service)
-    implementation(libs.androidx.lifecycle.extensions)
-
     // Compose
     implementation(libs.compose.ui)
-    implementation(libs.compose.ui.tooling.preview)
     implementation(libs.compose.material)
     // Declared explicitly: transitive resolution only exposes this on the runtime classpath
     // (via other libraries' implementation-scoped edges), never on the compile classpath,

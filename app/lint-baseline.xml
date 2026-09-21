@@ -36,6 +36,17 @@
 
     <issue
         id="AndroidGradlePluginVersion"
+        message="A newer version of com.android.kotlin.multiplatform.library than 9.2.1 is available: 9.4.1"
+        errorLine1="agp = &quot;9.2.1&quot;"
+        errorLine2="      ~~~~~~~">
+        <location
+            file="$HOME/StudioProjects/MathClicker/gradle/libs.versions.toml"
+            line="2"
+            column="7"/>
+    </issue>
+
+    <issue
+        id="AndroidGradlePluginVersion"
         message="A newer version of com.android.library than 9.2.1 is available: 9.4.1"
         errorLine1="agp = &quot;9.2.1&quot;"
         errorLine2="      ~~~~~~~">
@@ -58,68 +69,13 @@
 
     <issue
         id="GradleDependency"
-        message="A newer version of androidx.core:core-ktx than 1.9.0 is available: 1.19.0"
-        errorLine1="androidxCoreKtx = &quot;1.9.0&quot;"
-        errorLine2="                  ~~~~~~~">
-        <location
-            file="$HOME/StudioProjects/MathClicker/gradle/libs.versions.toml"
-            line="8"
-            column="19"/>
-    </issue>
-
-    <issue
-        id="GradleDependency"
-        message="A newer version of androidx.appcompat:appcompat than 1.5.1 is available: 1.8.0"
-        errorLine1="androidxAppcompat = &quot;1.5.1&quot;"
-        errorLine2="                    ~~~~~~~">
-        <location
-            file="$HOME/StudioProjects/MathClicker/gradle/libs.versions.toml"
-            line="9"
-            column="21"/>
-    </issue>
-
-    <issue
-        id="GradleDependency"
         message="A newer version of androidx.lifecycle:lifecycle-runtime-ktx than 2.5.1 is available: 2.11.0"
         errorLine1="androidxLifecycleRuntimeKtx = &quot;2.5.1&quot;"
         errorLine2="                              ~~~~~~~">
         <location
             file="$HOME/StudioProjects/MathClicker/gradle/libs.versions.toml"
-            line="10"
+            line="8"
             column="31"/>
-    </issue>
-
-    <issue
-        id="GradleDependency"
-        message="A newer version of androidx.lifecycle:lifecycle-service than 2.5.1 is available: 2.11.0"
-        errorLine1="androidxLifecycleService = &quot;2.5.1&quot;"
-        errorLine2="                           ~~~~~~~">
-        <location
-            file="$HOME/StudioProjects/MathClicker/gradle/libs.versions.toml"
-            line="11"
-            column="28"/>
-    </issue>
-
-    <issue
-        id="GradleDependency"
-        message="A newer version of androidx.lifecycle:lifecycle-viewmodel-ktx than 2.5.1 is available: 2.11.0"
-        errorLine1="androidxLifecycleViewmodelKtx = &quot;2.5.1&quot;"
-        errorLine2="                                ~~~~~~~">
-        <location
-            file="$HOME/StudioProjects/MathClicker/gradle/libs.versions.toml"
-            line="13"
-            column="33"/>
-    </issue>
-
-    <issue
-        id="GradleDependency"
-        message="A newer version of androidx.core:core-splashscreen than 1.0.0 is available: 1.2.0"
-        errorLine1="androidxCoreSplashscreen = &quot;1.0.0&quot;"
-        errorLine2="                           ~~~~~~~">
-        <location
-            file="$HOME/StudioProjects/MathClicker/gradle/libs.versions.toml"
-            line="14"
-            column="28"/>
     </issue>
 
     <issue
@@ -129,7 +85,7 @@
         errorLine2="                                  ~~~~~~~">
         <location
             file="$HOME/StudioProjects/MathClicker/gradle/libs.versions.toml"
-            line="15"
+            line="9"
             column="35"/>
     </issue>
 
@@ -140,118 +96,8 @@
         errorLine2="                          ~~~~~~~~~~~~~~~">
         <location
             file="$HOME/StudioProjects/MathClicker/gradle/libs.versions.toml"
-            line="16"
+            line="10"
             column="27"/>
-    </issue>
-
-    <issue
-        id="GradleDependency"
-        message="A newer version of androidx.hilt:hilt-compiler than 1.0.0 is available: 1.4.0"
-        errorLine1="androidxHilt = &quot;1.0.0&quot;"
-        errorLine2="               ~~~~~~~">
-        <location
-            file="$HOME/StudioProjects/MathClicker/gradle/libs.versions.toml"
-            line="17"
-            column="16"/>
-    </issue>
-
-    <issue
-        id="GradleDependency"
-        message="A newer version of androidx.hilt:hilt-navigation-compose than 1.0.0 is available: 1.4.0"
-        errorLine1="androidxHilt = &quot;1.0.0&quot;"
-        errorLine2="               ~~~~~~~">
-        <location
-            file="$HOME/StudioProjects/MathClicker/gradle/libs.versions.toml"
-            line="17"
-            column="16"/>
-    </issue>
-
-    <issue
-        id="GradleDependency"
-        message="A newer version of androidx.compose.ui:ui than 1.3.2 is available: 1.12.1"
-        errorLine1="composeUi = &quot;1.3.2&quot;"
-        errorLine2="            ~~~~~~~">
-        <location
-            file="$HOME/StudioProjects/MathClicker/gradle/libs.versions.toml"
-            line="18"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="GradleDependency"
-        message="A newer version of androidx.compose.ui:ui-tooling-preview than 1.3.2 is available: 1.12.1"
-        errorLine1="composeUi = &quot;1.3.2&quot;"
-        errorLine2="            ~~~~~~~">
-        <location
-            file="$HOME/StudioProjects/MathClicker/gradle/libs.versions.toml"
-            line="18"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="GradleDependency"
-        message="A newer version of androidx.compose.material:material than 1.3.1 is available: 1.12.1"
-        errorLine1="composeMaterial = &quot;1.3.1&quot;"
-        errorLine2="                  ~~~~~~~">
-        <location
-            file="$HOME/StudioProjects/MathClicker/gradle/libs.versions.toml"
-            line="19"
-            column="19"/>
-    </issue>
-
-    <issue
-        id="GradleDependency"
-        message="A newer version of androidx.compose.animation:animation than 1.3.0 is available: 1.12.1"
-        errorLine1="composeFoundation = &quot;1.3.0&quot;"
-        errorLine2="                    ~~~~~~~">
-        <location
-            file="$HOME/StudioProjects/MathClicker/gradle/libs.versions.toml"
-            line="24"
-            column="21"/>
-    </issue>
-
-    <issue
-        id="GradleDependency"
-        message="A newer version of androidx.compose.animation:animation-core than 1.3.0 is available: 1.12.1"
-        errorLine1="composeFoundation = &quot;1.3.0&quot;"
-        errorLine2="                    ~~~~~~~">
-        <location
-            file="$HOME/StudioProjects/MathClicker/gradle/libs.versions.toml"
-            line="24"
-            column="21"/>
-    </issue>
-
-    <issue
-        id="GradleDependency"
-        message="A newer version of androidx.compose.foundation:foundation-layout than 1.3.0 is available: 1.12.1"
-        errorLine1="composeFoundation = &quot;1.3.0&quot;"
-        errorLine2="                    ~~~~~~~">
-        <location
-            file="$HOME/StudioProjects/MathClicker/gradle/libs.versions.toml"
-            line="24"
-            column="21"/>
-    </issue>
-
-    <issue
-        id="GradleDependency"
-        message="Upgrade `androidx.compose.foundation` for keyboard and mouse support"
-        errorLine1="composeFoundation = &quot;1.3.0&quot;"
-        errorLine2="                    ~~~~~~~">
-        <location
-            file="$HOME/StudioProjects/MathClicker/gradle/libs.versions.toml"
-            line="24"
-            column="21"/>
-    </issue>
-
-    <issue
-        id="GradleDependency"
-        message="A newer version of com.google.android.material:material than 1.7.0 is available: 1.14.0"
-        errorLine1="googleMaterial = &quot;1.7.0&quot;"
-        errorLine2="                 ~~~~~~~">
-        <location
-            file="$HOME/StudioProjects/MathClicker/gradle/libs.versions.toml"
-            line="31"
-            column="18"/>
     </issue>
 
     <issue
@@ -268,6 +114,17 @@
     <issue
         id="NewerVersionAvailable"
         message="A newer version of org.jetbrains.kotlin.jvm than 2.4.0 is available: 2.4.20"
+        errorLine1="kotlin = &quot;2.4.0&quot;"
+        errorLine2="         ~~~~~~~">
+        <location
+            file="$HOME/StudioProjects/MathClicker/gradle/libs.versions.toml"
+            line="3"
+            column="10"/>
+    </issue>
+
+    <issue
+        id="NewerVersionAvailable"
+        message="A newer version of org.jetbrains.kotlin.multiplatform than 2.4.0 is available: 2.4.20"
         errorLine1="kotlin = &quot;2.4.0&quot;"
         errorLine2="         ~~~~~~~">
         <location
@@ -300,35 +157,24 @@
 
     <issue
         id="NewerVersionAvailable"
-        message="A newer version of com.google.accompanist:accompanist-navigation-animation than 0.27.0 is available: 0.36.0"
-        errorLine1="accompanistNavigationAnimation = &quot;0.27.0&quot;"
-        errorLine2="                                 ~~~~~~~~">
+        message="A newer version of com.arkivanov.essenty:instance-keeper than 2.5.0 is available: 2.6.0"
+        errorLine1="essenty = &quot;2.5.0&quot;"
+        errorLine2="          ~~~~~~~">
         <location
             file="$HOME/StudioProjects/MathClicker/gradle/libs.versions.toml"
-            line="25"
-            column="34"/>
+            line="13"
+            column="11"/>
     </issue>
 
     <issue
         id="NewerVersionAvailable"
-        message="A newer version of com.airbnb.android:lottie-compose than 5.2.0 is available: 6.7.1"
-        errorLine1="lottieCompose = &quot;5.2.0&quot;"
-        errorLine2="                ~~~~~~~">
+        message="A newer version of com.arkivanov.essenty:lifecycle than 2.5.0 is available: 2.6.0"
+        errorLine1="essenty = &quot;2.5.0&quot;"
+        errorLine2="          ~~~~~~~">
         <location
             file="$HOME/StudioProjects/MathClicker/gradle/libs.versions.toml"
-            line="26"
-            column="17"/>
-    </issue>
-
-    <issue
-        id="NewerVersionAvailable"
-        message="A newer version of org.jetbrains.kotlinx:kotlinx-serialization-json than 1.3.3 is available: 1.11.0"
-        errorLine1="kotlinxSerializationJson = &quot;1.3.3&quot;"
-        errorLine2="                           ~~~~~~~">
-        <location
-            file="$HOME/StudioProjects/MathClicker/gradle/libs.versions.toml"
-            line="27"
-            column="28"/>
+            line="13"
+            column="11"/>
     </issue>
 
     <issue
@@ -338,8 +184,30 @@
         errorLine2="                              ~~~~~~~">
         <location
             file="$HOME/StudioProjects/MathClicker/gradle/libs.versions.toml"
-            line="28"
+            line="16"
             column="31"/>
+    </issue>
+
+    <issue
+        id="NewerVersionAvailable"
+        message="A newer version of org.jetbrains.kotlinx:kotlinx-coroutines-core than 1.8.1 is available: 1.11.0"
+        errorLine1="kotlinxCoroutines = &quot;1.8.1&quot;"
+        errorLine2="                    ~~~~~~~">
+        <location
+            file="$HOME/StudioProjects/MathClicker/gradle/libs.versions.toml"
+            line="18"
+            column="21"/>
+    </issue>
+
+    <issue
+        id="NewerVersionAvailable"
+        message="A newer version of org.jetbrains.kotlinx:kotlinx-coroutines-test than 1.8.1 is available: 1.11.0"
+        errorLine1="kotlinxCoroutines = &quot;1.8.1&quot;"
+        errorLine2="                    ~~~~~~~">
+        <location
+            file="$HOME/StudioProjects/MathClicker/gradle/libs.versions.toml"
+            line="18"
+            column="21"/>
     </issue>
 
     <issue
@@ -362,17 +230,6 @@
             file="src/main/res/values/strings.xml"
             line="13"
             column="342"/>
-    </issue>
-
-    <issue
-        id="KaptUsageInsteadOfKsp"
-        message="This library supports using KSP instead of kapt, which greatly improves performance. Learn more: https://developer.android.com/studio/build/migrate-to-ksp"
-        errorLine1="    kapt(libs.room.compiler)"
-        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="build.gradle.kts"
-            line="97"
-            column="5"/>
     </issue>
 
     <issue
