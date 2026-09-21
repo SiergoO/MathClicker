@@ -2,6 +2,7 @@ plugins {
     id("mathclicker.android.application")
     id("mathclicker.android.compose")
     alias(libs.plugins.sqldelight)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -50,7 +51,11 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.ktx)
 
     // Navigation
-    implementation(libs.accompanist.navigation.animation)
+    implementation(libs.decompose)
+    implementation(libs.decompose.compose)
+    implementation(libs.essenty.lifecycle)
+    implementation(libs.essenty.instance.keeper)
+    implementation(libs.kotlinx.serialization.core)
 
     // Splash screen
     implementation(libs.androidx.core.splashscreen)
@@ -62,9 +67,6 @@ dependencies {
     // Lifecycle
     implementation(libs.androidx.lifecycle.service)
     implementation(libs.androidx.lifecycle.extensions)
-
-    // ViewModel
-    implementation(libs.androidx.lifecycle.viewmodel.ktx)
 
     // Compose
     implementation(libs.compose.ui)
@@ -85,7 +87,6 @@ dependencies {
 
     // Koin
     implementation(libs.koin.android)
-    implementation(libs.koin.androidx.compose)
     testImplementation(libs.koin.test)
 
     // SQLDelight

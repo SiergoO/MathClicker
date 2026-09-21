@@ -15,7 +15,6 @@ import androidx.compose.material.ButtonDefaults
 import androidx.compose.material.IconButton
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -25,34 +24,24 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.constraintlayout.compose.ChainStyle
 import androidx.constraintlayout.compose.ConstraintLayout
-import androidx.navigation.NavController
 import com.sdomashchuk.mathclicker.R
 import com.sdomashchuk.mathclicker.presentation.component.MathClickerDialog
-import com.sdomashchuk.mathclicker.presentation.navigation.Screen
 import com.sdomashchuk.mathclicker.presentation.ui.theme.MathClickerTheme
 import com.sdomashchuk.mathclicker.presentation.ui.theme.Red500
 import com.sdomashchuk.mathclicker.presentation.ui.theme.Shapes
 import com.sdomashchuk.mathclicker.presentation.ui.theme.Typography
-import kotlinx.coroutines.flow.receiveAsFlow
-import org.koin.androidx.compose.koinViewModel
 
 @Composable
-fun MenuScreen(navController: NavController) {
-    val menuViewModel: MenuViewModel = koinViewModel()
-    val state = menuViewModel.state.collectAsState()
-
-    CollectUiEvents(
-        viewModel = menuViewModel,
-        navController = navController,
-    )
+fun MenuScreen(component: MenuComponent) {
+    val state = component.state.collectAsState()
 
     if (state.value.isOpenDialog) {
         MathClickerDialog(
             headerText = stringResource(id = R.string.how_to_play_dialog_header),
             bodyText = stringResource(id = R.string.how_to_play_dialog_body),
-            onDismiss = { menuViewModel.sendAction(MenuViewModel.Action.CloseDialog) },
+            onDismiss = { component.sendAction(MenuViewModel.Action.CloseDialog) },
             positiveButtonText = stringResource(id = R.string.how_to_play_dialog_button_positive),
-            onPositive = { menuViewModel.sendAction(MenuViewModel.Action.CloseDialog) },
+            onPositive = { component.sendAction(MenuViewModel.Action.CloseDialog) },
         )
     }
 
@@ -81,7 +70,7 @@ fun MenuScreen(navController: NavController) {
                     )
                 },
                 onClick = {
-                    menuViewModel.sendAction(MenuViewModel.Action.OpenDialog)
+                    component.sendAction(MenuViewModel.Action.OpenDialog)
                 },
             )
             Image(
@@ -109,7 +98,7 @@ fun MenuScreen(navController: NavController) {
             ) {
                 MenuButton(
                     text = stringResource(id = R.string.menu_button_play),
-                    onClick = { menuViewModel.sendAction(MenuViewModel.Action.ButtonPlayClicked) },
+                    onClick = { component.sendAction(MenuViewModel.Action.ButtonPlayClicked) },
                 )
             }
             createVerticalChain(logoImage, menuButtons, chainStyle = ChainStyle.Spread)
@@ -137,23 +126,4 @@ fun MenuButton(
             style = Typography.h2,
         )
     }
-}
-
-@Composable
-fun CollectUiEvents(
-    viewModel: MenuViewModel,
-    navController: NavController,
-) {
-    LaunchedEffect(
-        key1 = null,
-        block = {
-            viewModel.uiEvents.receiveAsFlow().collect {
-                when (it) {
-                    is MenuViewModel.UiEvent.NavigateToGameScreen -> {
-                        navController.navigate(Screen.Game.route)
-                    }
-                }
-            }
-        },
-    )
 }

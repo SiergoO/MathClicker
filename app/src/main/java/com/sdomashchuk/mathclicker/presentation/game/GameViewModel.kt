@@ -1,13 +1,11 @@
 package com.sdomashchuk.mathclicker.presentation.game
 
-import android.util.Log
 import android.util.Size
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
 import com.sdomashchuk.mathclicker.domain.repository.GameRepository
 import com.sdomashchuk.mathclicker.game.Game
 import com.sdomashchuk.mathclicker.model.Field
 import com.sdomashchuk.mathclicker.model.Target
+import com.sdomashchuk.mathclicker.presentation.viewmodel.ComponentViewModel
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
@@ -21,7 +19,7 @@ import kotlinx.coroutines.launch
 class GameViewModel(
     private val game: Game,
     private val gameRepository: GameRepository,
-) : ViewModel() {
+) : ComponentViewModel() {
     private val action = Channel<Action>(Channel.UNLIMITED)
 
     private val _state = MutableStateFlow(State())

@@ -5,4 +5,4 @@ package com.sdomashchuk.mathclicker.di
  * list the app actually starts with — a module registered in one place and not the other is a
  * crash on first screen, not a compile error.
  */
-val appModules = listOf(dataModule, gameModule, viewModelModule)
+val appModules = listOf(dataModule, gameModule)

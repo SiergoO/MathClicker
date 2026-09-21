@@ -1,7 +1,6 @@
 package com.sdomashchuk.mathclicker.presentation.menu
 
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
+import com.sdomashchuk.mathclicker.presentation.viewmodel.ComponentViewModel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -9,7 +8,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.consumeAsFlow
 import kotlinx.coroutines.launch
 
-class MenuViewModel : ViewModel() {
+class MenuViewModel : ComponentViewModel() {
     private val action = Channel<Action>(Channel.UNLIMITED)
 
     private val _state = MutableStateFlow(State())

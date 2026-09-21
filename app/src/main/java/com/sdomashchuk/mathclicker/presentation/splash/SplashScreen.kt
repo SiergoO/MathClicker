@@ -10,9 +10,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalResources
-import androidx.navigation.NavHostController
 import com.sdomashchuk.mathclicker.R
-import com.sdomashchuk.mathclicker.presentation.navigation.Screen
 import io.github.alexzhirkevich.compottie.DotLottie
 import io.github.alexzhirkevich.compottie.LottieCompositionSpec
 import io.github.alexzhirkevich.compottie.animateLottieCompositionAsState
@@ -20,7 +18,7 @@ import io.github.alexzhirkevich.compottie.rememberLottieComposition
 import io.github.alexzhirkevich.compottie.rememberLottiePainter
 
 @Composable
-fun SplashScreen(navController: NavHostController) {
+fun SplashScreen(component: SplashComponent) {
     Row(
         modifier =
             Modifier
@@ -42,7 +40,7 @@ fun SplashScreen(navController: NavHostController) {
         )
         LaunchedEffect(progress) {
             if (progress >= 1f) {
-                navController.navigate(Screen.Menu.route)
+                component.onFinished()
             }
         }
     }

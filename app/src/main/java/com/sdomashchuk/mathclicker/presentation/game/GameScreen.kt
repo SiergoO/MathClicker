@@ -60,11 +60,9 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
-import androidx.navigation.NavController
 import com.sdomashchuk.mathclicker.R
 import com.sdomashchuk.mathclicker.model.Target
 import com.sdomashchuk.mathclicker.presentation.component.GameMenuDialog
-import com.sdomashchuk.mathclicker.presentation.navigation.Screen
 import com.sdomashchuk.mathclicker.presentation.ui.theme.MathClickerTheme
 import com.sdomashchuk.mathclicker.presentation.ui.theme.Red200
 import com.sdomashchuk.mathclicker.presentation.ui.theme.Red500
@@ -77,19 +75,11 @@ import io.github.alexzhirkevich.compottie.LottieCompositionSpec
 import io.github.alexzhirkevich.compottie.animateLottieCompositionAsState
 import io.github.alexzhirkevich.compottie.rememberLottieComposition
 import io.github.alexzhirkevich.compottie.rememberLottiePainter
-import kotlinx.coroutines.flow.receiveAsFlow
-import org.koin.androidx.compose.koinViewModel
 import kotlin.math.roundToInt
 
 @Composable
-fun GameScreen(navController: NavController) {
-    val gameViewModel: GameViewModel = koinViewModel()
-    val gameState = gameViewModel.state.collectAsState()
-
-    CollectUiEvents(
-        viewModel = gameViewModel,
-        navController = navController,
-    )
+fun GameScreen(component: GameComponent) {
+    val gameState = component.state.collectAsState()
 
     MathClickerTheme {
         Column(
@@ -100,9 +90,9 @@ fun GameScreen(navController: NavController) {
                 gameState.value.field.isClosed -> {
                     GameMenuDialog(
                         headerText = stringResource(id = R.string.game_over),
-                        onRestartClicked = { gameViewModel.sendAction(GameViewModel.Action.RestartGame) },
+                        onRestartClicked = { component.sendAction(GameViewModel.Action.RestartGame) },
                         onBackToMainMenuClicked = {
-                            gameViewModel.sendAction(
+                            component.sendAction(
                                 GameViewModel.Action.BackToMainMenuClicked,
                             )
                         },
@@ -111,13 +101,13 @@ fun GameScreen(navController: NavController) {
 
                 gameState.value.isGamePaused -> {
                     GamePausedOverlay {
-                        gameViewModel.sendAction(GameViewModel.Action.ReadyToPlayButtonClicked)
+                        component.sendAction(GameViewModel.Action.ReadyToPlayButtonClicked)
                     }
                 }
 
                 !gameState.value.isGameStarted -> {
                     CountdownOverlay {
-                        gameViewModel.sendAction(GameViewModel.Action.StartGame)
+                        component.sendAction(GameViewModel.Action.StartGame)
                     }
                 }
 
@@ -125,15 +115,15 @@ fun GameScreen(navController: NavController) {
                     Field(
                         gameState,
                         onGameColumnSizeMeasured = { size ->
-                            gameViewModel.sendAction(GameViewModel.Action.GameColumnSizeMeasured(size))
+                            component.sendAction(GameViewModel.Action.GameColumnSizeMeasured(size))
                         },
-                        onTargetRevealed = { id -> gameViewModel.sendAction(GameViewModel.Action.TargetRevealed(id)) },
-                        onTargetClicked = { id -> gameViewModel.sendAction(GameViewModel.Action.TargetClicked(id)) },
+                        onTargetRevealed = { id -> component.sendAction(GameViewModel.Action.TargetRevealed(id)) },
+                        onTargetClicked = { id -> component.sendAction(GameViewModel.Action.TargetClicked(id)) },
                         onTargetDidBreakout = { id ->
-                            gameViewModel.sendAction(GameViewModel.Action.TargetDidBreakout(id))
+                            component.sendAction(GameViewModel.Action.TargetDidBreakout(id))
                         },
                         onTargetPositionSave = { id, position, gameColumnHeightPx ->
-                            gameViewModel.sendAction(
+                            component.sendAction(
                                 GameViewModel.Action.SaveTargetPosition(
                                     id,
                                     position,
@@ -141,13 +131,13 @@ fun GameScreen(navController: NavController) {
                                 ),
                             )
                         },
-                        onFireClicked = { gameViewModel.sendAction(GameViewModel.Action.FireButtonClicked) },
+                        onFireClicked = { component.sendAction(GameViewModel.Action.FireButtonClicked) },
                     )
                 }
             }
         }
         BackHandler {
-            gameViewModel.sendAction(GameViewModel.Action.PauseGame)
+            component.sendAction(GameViewModel.Action.PauseGame)
         }
     }
 }
@@ -485,23 +475,4 @@ fun OnLifecycleEvent(onEvent: (owner: LifecycleOwner, event: Lifecycle.Event) ->
             lifecycle.removeObserver(observer)
         }
     }
-}
-
-@Composable
-fun CollectUiEvents(
-    viewModel: GameViewModel,
-    navController: NavController,
-) {
-    LaunchedEffect(
-        key1 = null,
-        block = {
-            viewModel.uiEvents.receiveAsFlow().collect { gameUiEvent ->
-                when (gameUiEvent) {
-                    is GameViewModel.UiEvent.NavigateToMainMenuScreen -> {
-                        navController.navigate(Screen.Menu.route)
-                    }
-                }
-            }
-        },
-    )
 }
