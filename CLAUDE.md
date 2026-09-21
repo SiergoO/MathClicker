@@ -30,6 +30,10 @@ Android Compose game. Modules: `:app` (UI, data, domain, DI), `:core` (pure game
 `./gradlew testDebugUnitTest` either: only `:app` still has that task, so it passes while running
 none of `:core`'s tests.
 
+The same trap applies to any module-scoped test task: on a module that has no tests yet it is
+`NO-SOURCE` and reports success. `:feature:game:allTests` was MC-17's gate and ran nothing. A gate
+cell naming a task that cannot fail is not a gate — use `./gradlew check` until the module has a test.
+
 Prefer module-scoped tasks over whole-project ones; a full build here is slow.
 
 Detekt and spotless are applied by a convention plugin in `build-logic`, so no module can opt out.
