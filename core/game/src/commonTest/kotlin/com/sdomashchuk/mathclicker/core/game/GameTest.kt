@@ -110,6 +110,31 @@ class GameTest {
         }
 
     @Test
+    fun `targetDidBreakout called twice for the same target only decrements life count once`() =
+        runTest {
+            // Guards against MC-27: a burst of recompositions (or any other repeat signal) firing
+            // this for the same fall must not cost more than one life. A second, still-active target
+            // keeps the level from advancing and regenerating ids out from under the repeated call.
+            val game = Game(FakeSessionHelper(targetAmount = 2), backgroundScope, Random(7))
+            game.start()
+            game.createField(1)
+            game.createTargets()
+            testScheduler.runCurrent()
+            val targetId =
+                game.targetsFlow.value
+                    .first()
+                    .id
+
+            game.targetDidBreakout(targetId)
+            testScheduler.runCurrent()
+            game.targetDidBreakout(targetId)
+            testScheduler.runCurrent()
+
+            assertEquals(2, game.fieldFlow.value.lifeCount)
+            assertFalse(game.fieldFlow.value.isClosed)
+        }
+
+    @Test
     fun `seeded random reproduces the same field across separate game instances`() =
         runTest {
             val sessionHelper = FakeSessionHelper()

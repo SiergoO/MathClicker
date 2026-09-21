@@ -385,8 +385,12 @@ fun TargetButton(
     onTargetPositionSave: (id: Int, position: Int, gameColumnHeightPx: Int) -> Unit,
 ) {
     var isNeedToRefreshAnimation by remember { mutableStateOf(true) }
+    var hasRevealedThisActivation by remember { mutableStateOf(false) }
+    var hasBrokenOutThisActivation by remember { mutableStateOf(false) }
     LaunchedEffect(key1 = target.appearanceDelayMs, key2 = target.isActive) {
         isNeedToRefreshAnimation = true
+        hasRevealedThisActivation = false
+        hasBrokenOutThisActivation = false
     }
     val infiniteTransition =
         if (!isNeedToRefreshAnimation && target.isActive) {
@@ -404,7 +408,7 @@ fun TargetButton(
                     infiniteRepeatable(
                         animation =
                             tween(
-                                target.lifetimeMs,
+                                remainingFallDurationMs(target, gameColumnSize.height),
                                 easing = LinearEasing,
                                 delayMillis = target.appearanceDelayMs,
                             ),
@@ -415,9 +419,18 @@ fun TargetButton(
         } else {
             0f
         }
-    if (targetButtonYOffset > 0f && !target.isVisible) onTargetRevealed.invoke(target.id)
-    if (gameColumnSize.height != 0 && targetButtonYOffset.roundToInt() + 1 >= gameColumnSize.height) {
-        onTargetDidBreakout.invoke(target.id)
+    // Effect-scoped and flag-guarded so a burst of recompositions (e.g. across a pause/resume)
+    // can't re-fire either callback for the same activation; each target.appearanceDelayMs/isActive
+    // change above starts a new activation and re-arms both flags.
+    LaunchedEffect(targetButtonYOffset) {
+        if (shouldReveal(targetButtonYOffset, target.isVisible, hasRevealedThisActivation)) {
+            hasRevealedThisActivation = true
+            onTargetRevealed.invoke(target.id)
+        }
+        if (shouldBreakout(targetButtonYOffset, gameColumnSize.height, hasBrokenOutThisActivation)) {
+            hasBrokenOutThisActivation = true
+            onTargetDidBreakout.invoke(target.id)
+        }
     }
     if (target.isActive && targetButtonYOffset.dp > 0.dp) {
         Button(
@@ -446,6 +459,34 @@ fun TargetButton(
         }
     }
 }
+
+// target.lifetimeMs is the fall's original total duration (see updateTargetPositioning); the
+// remaining distance from the last saved position is animated over the matching remaining share
+// of it, so a pause/resume restart can't shrink the fall's real duration (MC-27).
+private fun remainingFallDurationMs(
+    target: Target,
+    gameColumnHeightPx: Int,
+): Int =
+    if (gameColumnHeightPx > 0) {
+        (target.lifetimeMs * (1f - target.position.toFloat() / gameColumnHeightPx)).toInt().coerceAtLeast(0)
+    } else {
+        target.lifetimeMs
+    }
+
+private fun shouldReveal(
+    targetButtonYOffset: Float,
+    isVisible: Boolean,
+    hasRevealedThisActivation: Boolean,
+): Boolean = targetButtonYOffset > 0f && !isVisible && !hasRevealedThisActivation
+
+private fun shouldBreakout(
+    targetButtonYOffset: Float,
+    gameColumnHeightPx: Int,
+    hasBrokenOutThisActivation: Boolean,
+): Boolean =
+    gameColumnHeightPx != 0 &&
+        targetButtonYOffset.roundToInt() + 1 >= gameColumnHeightPx &&
+        !hasBrokenOutThisActivation
 
 @Composable
 fun VerticalDivider() {

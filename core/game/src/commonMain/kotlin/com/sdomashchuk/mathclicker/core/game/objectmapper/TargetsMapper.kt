@@ -90,12 +90,15 @@ internal fun List<Target>.updateTargetPositioning(
 ): List<Target> =
     this.map {
         if (id == it.id) {
+            // lifetimeMs must stay the fall's original total duration: it is the divisor the UI
+            // uses to derive the remaining animation time from the saved position on every resume.
+            // Shrinking it here used to compound across repeated pause/resume cycles until the
+            // remaining duration collapsed to ~0 while the target was nowhere near the bottom,
+            // causing a spurious breakout (MC-27).
             val progressInPercents = 1f - position.toFloat() / gameColumnHeightPx.toFloat()
-            val updatedLifetimeMs = (it.lifetimeMs * progressInPercents).toInt()
             val updatedAppearance = if (position > 0) 0 else (it.appearanceDelayMs * progressInPercents).toInt()
             it.copy(
                 position = position,
-                lifetimeMs = updatedLifetimeMs,
                 appearanceDelayMs = updatedAppearance,
             )
         } else {

@@ -96,6 +96,10 @@ class Game(
     }
 
     fun targetDidBreakout(id: Int) {
+        // A target can only ever cost one life: if it is already inactive (a previous breakout,
+        // or the UI re-firing for the same fall) this is a no-op rather than a second decrement.
+        val target = targetsFlow.value.firstOrNull { it.id == id } ?: return
+        if (!target.isActive) return
         val updatedTargets =
             targetsFlow.value
                 .changeActiveness(id, false)

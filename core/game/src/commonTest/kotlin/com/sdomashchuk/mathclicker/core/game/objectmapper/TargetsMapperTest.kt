@@ -103,4 +103,24 @@ class TargetsMapperTest {
         // Neither result reaches zero, so the multiplier only ever rises from its initial 0 to 1.
         assertEquals(10, score)
     }
+
+    @Test
+    fun `updateTargetPositioning leaves lifetimeMs untouched across repeated pause-resume saves`() {
+        // Mutation test: if lifetimeMs goes back to being re-derived from itself (MC-27's bug), this
+        // would shrink further on the second call even though the target barely moved, and fail.
+        val original = target(id = 1, value = 10).copy(lifetimeMs = 10000)
+        val targets = listOf(original)
+
+        val afterFirstPause = targets.updateTargetPositioning(id = 1, position = 100, gameColumnHeightPx = 1000)
+        val afterSecondPause =
+            afterFirstPause.updateTargetPositioning(
+                id = 1,
+                position = 110,
+                gameColumnHeightPx = 1000,
+            )
+
+        assertEquals(10000, afterFirstPause.first().lifetimeMs)
+        assertEquals(10000, afterSecondPause.first().lifetimeMs)
+        assertEquals(110, afterSecondPause.first().position)
+    }
 }
