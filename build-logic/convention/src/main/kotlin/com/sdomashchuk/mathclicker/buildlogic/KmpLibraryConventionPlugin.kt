@@ -44,12 +44,12 @@ class KmpLibraryConventionPlugin : Plugin<Project> {
             iosArm64()
             iosSimulatorArm64()
 
-            sourceSets.commonMain.dependencies {
-                implementation(libs.library("kotlinx-coroutines-core"))
-            }
+            // kotlin.test only. Coroutines are not every module's business — pushing them in
+            // here put kotlinx-coroutines-core into :core:model, whose whole reason to exist is
+            // depending on nothing, and a convention that hands out runtime libraries makes each
+            // module's real dependencies unreadable from its own build file.
             sourceSets.commonTest.dependencies {
                 implementation(kotlin("test"))
-                implementation(libs.library("kotlinx-coroutines-test"))
             }
         }
     }

@@ -1,7 +1,7 @@
 package com.sdomashchuk.mathclicker.data.database.dao
 
+import com.sdomashchuk.mathclicker.core.model.Target
 import com.sdomashchuk.mathclicker.data.database.local.TargetsQueries
-import com.sdomashchuk.mathclicker.model.Target
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.sdomashchuk.mathclicker.data.database.local.Targets as LocalTargets

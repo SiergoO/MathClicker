@@ -1,8 +1,8 @@
 package com.sdomashchuk.mathclicker.data.database.dao
 
+import com.sdomashchuk.mathclicker.core.model.Field
+import com.sdomashchuk.mathclicker.core.model.OperationSign
 import com.sdomashchuk.mathclicker.data.database.local.FieldQueries
-import com.sdomashchuk.mathclicker.model.Field
-import com.sdomashchuk.mathclicker.model.OperationSign
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.sdomashchuk.mathclicker.data.database.local.Field_ as LocalField

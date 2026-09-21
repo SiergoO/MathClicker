@@ -1,7 +1,7 @@
 package com.sdomashchuk.mathclicker.di
 
+import com.sdomashchuk.mathclicker.core.game.Game
 import com.sdomashchuk.mathclicker.domain.repository.GameRepository
-import com.sdomashchuk.mathclicker.game.Game
 import kotlinx.coroutines.CoroutineScope
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame

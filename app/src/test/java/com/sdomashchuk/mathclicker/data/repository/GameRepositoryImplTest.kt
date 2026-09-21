@@ -1,12 +1,12 @@
 package com.sdomashchuk.mathclicker.data.repository
 
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
+import com.sdomashchuk.mathclicker.core.model.Field
+import com.sdomashchuk.mathclicker.core.model.OperationSign
+import com.sdomashchuk.mathclicker.core.model.Target
 import com.sdomashchuk.mathclicker.data.database.dao.FieldDao
 import com.sdomashchuk.mathclicker.data.database.dao.TargetsDao
 import com.sdomashchuk.mathclicker.data.database.local.MathClickerDatabase
-import com.sdomashchuk.mathclicker.model.Field
-import com.sdomashchuk.mathclicker.model.OperationSign
-import com.sdomashchuk.mathclicker.model.Target
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull

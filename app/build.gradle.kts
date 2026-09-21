@@ -45,7 +45,8 @@ sqldelight {
 
 dependencies {
 
-    implementation(project(":core"))
+    implementation(project(":core:model"))
+    implementation(project(":core:game"))
 
     implementation(libs.androidx.lifecycle.runtime.ktx)
 

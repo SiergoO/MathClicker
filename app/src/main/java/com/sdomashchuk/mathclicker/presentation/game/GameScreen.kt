@@ -61,7 +61,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
 import com.sdomashchuk.mathclicker.R
-import com.sdomashchuk.mathclicker.model.Target
+import com.sdomashchuk.mathclicker.core.model.Target
 import com.sdomashchuk.mathclicker.presentation.component.GameMenuDialog
 import com.sdomashchuk.mathclicker.presentation.ui.theme.MathClickerTheme
 import com.sdomashchuk.mathclicker.presentation.ui.theme.Red200
