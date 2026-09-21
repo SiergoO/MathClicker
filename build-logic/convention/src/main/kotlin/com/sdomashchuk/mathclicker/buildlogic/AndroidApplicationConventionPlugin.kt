@@ -1,9 +1,15 @@
 package com.sdomashchuk.mathclicker.buildlogic
 
+import com.android.build.api.artifact.SingleArtifact
 import com.android.build.api.dsl.ApplicationExtension
+import com.android.build.api.variant.ApplicationAndroidComponentsExtension
 import org.gradle.api.Plugin
 import org.gradle.api.Project
+import org.gradle.api.Task
 import org.gradle.kotlin.dsl.configure
+import org.gradle.kotlin.dsl.getByType
+import org.gradle.kotlin.dsl.named
+import org.gradle.kotlin.dsl.register
 
 /**
  * `mathclicker.android.application` — the launcher module convention: Android application
@@ -21,6 +27,19 @@ class AndroidApplicationConventionPlugin : Plugin<Project> {
             configureKotlinAndroid(this)
             defaultConfig.targetSdk = 33
             packaging { }
+        }
+
+        val androidComponents = extensions.getByType<ApplicationAndroidComponentsExtension>()
+        androidComponents.onVariants(androidComponents.selector().withBuildType("debug")) { variant ->
+            val checkAppLaunch =
+                tasks.register<AppLaunchCheckTask>("checkAppLaunch") {
+                    apkFolder.set(variant.artifacts.get(SingleArtifact.APK))
+                    builtArtifactsLoader.set(variant.artifacts.getBuiltArtifactsLoader())
+                    applicationId.set(variant.applicationId)
+                    adbExecutable.set(androidComponents.sdkComponents.adb)
+                    requestedSerial.set(providers.environmentVariable("ANDROID_SERIAL"))
+                }
+            tasks.named<Task>("check") { dependsOn(checkAppLaunch) }
         }
     }
 }
