@@ -1,4 +1,4 @@
-package com.sdomashchuk.mathclicker.presentation.menu
+package com.sdomashchuk.mathclicker.feature.menu
 
 import com.sdomashchuk.mathclicker.core.component.ComponentViewModel
 import kotlinx.coroutines.channels.Channel

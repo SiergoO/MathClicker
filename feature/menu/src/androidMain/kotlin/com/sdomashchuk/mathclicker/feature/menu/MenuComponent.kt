@@ -1,4 +1,4 @@
-package com.sdomashchuk.mathclicker.presentation.menu
+package com.sdomashchuk.mathclicker.feature.menu
 
 import com.arkivanov.decompose.ComponentContext
 import com.arkivanov.essenty.lifecycle.doOnDestroy

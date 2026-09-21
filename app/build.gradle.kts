@@ -42,6 +42,7 @@ dependencies {
     implementation(project(":core:ui"))
     implementation(project(":core:component"))
     implementation(project(":feature:game"))
+    implementation(project(":feature:menu"))
 
     // Navigation
     implementation(libs.decompose)
@@ -64,7 +65,6 @@ dependencies {
     implementation(libs.compose.foundation.layout)
     implementation(libs.compose.animation)
     implementation(libs.compose.animation.core)
-    implementation(libs.androidx.constraintlayout.compose)
     implementation(libs.androidx.activity.compose)
 
     // Koin

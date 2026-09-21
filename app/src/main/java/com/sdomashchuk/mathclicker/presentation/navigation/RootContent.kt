@@ -5,7 +5,7 @@ import com.arkivanov.decompose.ExperimentalDecomposeApi
 import com.arkivanov.decompose.extensions.compose.stack.animation.fade
 import com.arkivanov.decompose.extensions.compose.stack.animation.stackAnimation
 import com.sdomashchuk.mathclicker.feature.game.GameScreen
-import com.sdomashchuk.mathclicker.presentation.menu.MenuScreen
+import com.sdomashchuk.mathclicker.feature.menu.MenuScreen
 import com.sdomashchuk.mathclicker.presentation.splash.SplashScreen
 
 @OptIn(ExperimentalDecomposeApi::class)

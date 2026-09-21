@@ -1,4 +1,4 @@
-package com.sdomashchuk.mathclicker.presentation.menu
+package com.sdomashchuk.mathclicker.feature.menu
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
@@ -18,7 +18,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.constraintlayout.compose.ChainStyle
 import androidx.constraintlayout.compose.ConstraintLayout
-import com.sdomashchuk.mathclicker.R
 import com.sdomashchuk.mathclicker.core.ui.component.MathClickerDialog
 import com.sdomashchuk.mathclicker.core.ui.component.MenuButton
 import com.sdomashchuk.mathclicker.core.ui.theme.MathClickerTheme
