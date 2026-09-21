@@ -2,17 +2,6 @@
 <issues format="6" by="lint 9.2.1" type="baseline" client="gradle" dependencies="false" name="AGP (9.2.1)" variant="all" version="9.2.1">
 
     <issue
-        id="VectorRaster"
-        message="Limit vector icons sizes to 200×200 to keep icon drawing fast; see https://developer.android.com/studio/write/vector-asset-studio#when for more"
-        errorLine1="    android:width=&quot;400dp&quot;"
-        errorLine2="                   ~~~~~">
-        <location
-            file="src/main/res/drawable/logo.xml"
-            line="2"
-            column="20"/>
-    </issue>
-
-    <issue
         id="AndroidGradlePluginVersion"
         message="A newer version of Gradle than 9.4.1 is available: 9.7.1"
         errorLine1="distributionUrl=https\://services.gradle.org/distributions/gradle-9.4.1-bin.zip"
@@ -219,17 +208,6 @@
             file="src/main/AndroidManifest.xml"
             line="19"
             column="13"/>
-    </issue>
-
-    <issue
-        id="Typos"
-        message="Repeated word &quot;scelerisque&quot; in message: possible typo"
-        errorLine1="    &lt;string name=&quot;how_to_play_dialog_body&quot;>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Suspendisse sit amet nisi lorem. Donec a ipsum semper, porttitor sapien a, pharetra dui. Mauris accumsan, tellus volutpat rhoncus tempus, dolor nulla mollis nisi, ut placerat nibh risus eget tellus. Phasellus fermentum posuere augue. Nullam scelerisque scelerisque augue, quis suscipit lacus iaculis maximus. Nulla sagittis magna ex, nec mollis lorem molestie ac. Nam aliquam diam nulla, id pellentesque metus vestibulum faucibus. Curabitur ex elit, semper et consequat a, malesuada at tortor. Suspendisse lobortis cursus ex, in fermentum nunc dapibus sit amet. Vivamus eget lobortis orci. Nullam egestas, mauris vitae ornare semper, libero urna maximus ipsum, eu efficitur metus erat ac nulla.&lt;/string>"
-        errorLine2="                                                                                                                                                                                                                                                                                                                                                     ~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="13"
-            column="342"/>
     </issue>
 
     <issue

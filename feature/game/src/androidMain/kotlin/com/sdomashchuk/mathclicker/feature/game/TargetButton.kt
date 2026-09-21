@@ -118,7 +118,9 @@ fun TargetButton(
 // target.lifetimeMs is the fall's original total duration (see updateTargetPositioning); the
 // remaining distance from the last saved position is animated over the matching remaining share
 // of it, so a pause/resume restart can't shrink the fall's real duration (MC-27).
-private fun remainingFallDurationMs(
+// internal, not private: it is otherwise a pure function of its inputs, and TargetButtonLogicTest
+// exercises it directly rather than through Compose.
+internal fun remainingFallDurationMs(
     target: Target,
     gameColumnHeightPx: Int,
 ): Int =
@@ -128,13 +130,13 @@ private fun remainingFallDurationMs(
         target.lifetimeMs
     }
 
-private fun shouldReveal(
+internal fun shouldReveal(
     targetButtonYOffset: Float,
     isVisible: Boolean,
     hasRevealedThisActivation: Boolean,
 ): Boolean = targetButtonYOffset > 0f && !isVisible && !hasRevealedThisActivation
 
-private fun shouldBreakout(
+internal fun shouldBreakout(
     targetButtonYOffset: Float,
     gameColumnHeightPx: Int,
     hasBrokenOutThisActivation: Boolean,

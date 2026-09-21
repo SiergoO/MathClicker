@@ -36,11 +36,9 @@ android {
 
 dependencies {
 
-    implementation(project(":core:model"))
     implementation(project(":core:game"))
     implementation(project(":core:database"))
     implementation(project(":core:ui"))
-    implementation(project(":core:component"))
     implementation(project(":feature:game"))
     implementation(project(":feature:menu"))
 
@@ -63,7 +61,6 @@ dependencies {
     // so statusBarsPadding/navigationBarsPadding are unresolved without it.
     implementation(libs.compose.foundation)
     implementation(libs.compose.foundation.layout)
-    implementation(libs.compose.animation)
     implementation(libs.compose.animation.core)
     implementation(libs.androidx.activity.compose)
 

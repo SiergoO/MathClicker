@@ -23,11 +23,13 @@ kotlin {
             implementation(projects.core.component)
             implementation(libs.androidx.activity.compose)
             implementation(libs.androidx.lifecycle.runtime.ktx)
-            implementation(libs.compose.animation)
             implementation(libs.compose.animation.core)
             implementation(libs.compottie)
             implementation(libs.compottie.dot)
             implementation(libs.kotlinx.collections.immutable)
+        }
+        androidHostTest.dependencies {
+            implementation(libs.junit)
         }
     }
 }
