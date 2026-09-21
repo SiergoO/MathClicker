@@ -14,6 +14,7 @@ private class FakeSessionHelper(
     private val targetAmount: Int = 1,
     private val targetValue: Int = 10,
     private val appearanceDelayMs: Int = 0,
+    private val appearanceDelayMsById: ((Int) -> Int)? = null,
 ) : SessionHelper {
     override val levelRange = 1..999
     override val initialTargetValueRange = 1..20
@@ -27,7 +28,7 @@ private class FakeSessionHelper(
 
     override fun getTargetLifetimeMsByLevel(level: Int) = 1000
 
-    override fun getTargetAppearanceDelayMsById(id: Int) = appearanceDelayMs
+    override fun getTargetAppearanceDelayMsById(id: Int) = appearanceDelayMsById?.invoke(id) ?: appearanceDelayMs
 
     override fun getTargetAmountByLevel(level: Int) = targetAmount
 
@@ -122,6 +123,59 @@ class GameTest {
             assertEquals(first.fieldFlow.value.currentOperationDigit, second.fieldFlow.value.currentOperationDigit)
             assertEquals(first.fieldFlow.value.nextOperationSign, second.fieldFlow.value.nextOperationSign)
             assertEquals(first.fieldFlow.value.nextOperationDigit, second.fieldFlow.value.nextOperationDigit)
+
+            // Pins what Random(42) actually draws, so a bare .random() (agreeing 1 time in 4) or a
+            // hardcoded DIVISION (agreeing always) both fail this instead of passing by luck.
+            assertEquals(OperationSign.SUBTRACTION, first.fieldFlow.value.currentOperationSign)
+            assertEquals(3, first.fieldFlow.value.currentOperationDigit)
+            assertEquals(OperationSign.SUBTRACTION, first.fieldFlow.value.nextOperationSign)
+            assertEquals(3, first.fieldFlow.value.nextOperationDigit)
+        }
+
+    @Test
+    fun `start called twice does not leak a collector that outlives stop`() =
+        runTest {
+            // If start() doesn't cancel the earlier job, stop() only cancels the second one, and the
+            // first keeps collecting: the level-up below would still fire after stop().
+            val game = Game(FakeSessionHelper(targetAmount = 1), backgroundScope, Random(5))
+            game.start()
+            game.start()
+            game.createField(1)
+            game.createTargets()
+            testScheduler.runCurrent()
+            val targetId =
+                game.targetsFlow.value
+                    .first()
+                    .id
+            game.targetRevealed(targetId)
+            testScheduler.runCurrent()
+
+            game.stop()
+            game.targetDidBreakout(targetId)
+            testScheduler.runCurrent()
+
+            assertEquals(1, game.fieldFlow.value.level)
+        }
+
+    @Test
+    fun `no visible targets with unequal delays shortens only the seeded subset`() =
+        runTest {
+            // Unequal delays make the two branches of shortenAppearanceDelay diverge, so this is only
+            // pinnable once the injected Random reaches it - the workaround above sidesteps that.
+            val delays = listOf(100, 200, 300, 400)
+            val sessionHelper = FakeSessionHelper(targetAmount = 4, appearanceDelayMsById = { delays[it] })
+            val game = Game(sessionHelper, backgroundScope, Random(6))
+            game.start()
+            game.createField(1)
+            game.createTargets()
+            testScheduler.runCurrent()
+
+            assertEquals(
+                listOf(0, 0, 0, 100),
+                game.targetsFlow.value
+                    .sortedBy { it.id }
+                    .map { it.appearanceDelayMs },
+            )
         }
 
     @Test

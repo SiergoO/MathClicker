@@ -2,6 +2,7 @@ package com.sdomashchuk.mathclicker.game.objectmapper
 
 import com.sdomashchuk.mathclicker.model.OperationSign
 import com.sdomashchuk.mathclicker.model.Target
+import kotlin.random.Random
 
 internal fun List<Target>.changeVisibility(
     id: Int,
@@ -102,11 +103,11 @@ internal fun List<Target>.updateTargetPositioning(
         }
     }
 
-internal fun List<Target>.shortenAppearanceDelay(): List<Target> {
+internal fun List<Target>.shortenAppearanceDelay(random: Random = Random.Default): List<Target> {
     val nonVisibleAliveTargets =
         this.filter { it.isActive && !it.isVisible }.sortedBy { it.appearanceDelayMs }
     return if (nonVisibleAliveTargets.isNotEmpty()) {
-        val closestTargetsToReveal = nonVisibleAliveTargets.take((1..4).random())
+        val closestTargetsToReveal = nonVisibleAliveTargets.take((1..4).random(random))
         this.map { target ->
             if (closestTargetsToReveal.contains(target)) {
                 target.copy(appearanceDelayMs = 0)

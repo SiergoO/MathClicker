@@ -41,6 +41,7 @@ class Game(
     private var collectorJob: Job? = null
 
     fun start() {
+        collectorJob?.cancel()
         collectorJob =
             scope.launch {
                 _targetsFlow.collect { targets ->
@@ -151,7 +152,7 @@ class Game(
     }
 
     private fun visibleTargetsAbsent() {
-        val updatedTargets = targetsFlow.value.shortenAppearanceDelay()
+        val updatedTargets = targetsFlow.value.shortenAppearanceDelay(random)
         _targetsFlow.value = updatedTargets
     }
 
