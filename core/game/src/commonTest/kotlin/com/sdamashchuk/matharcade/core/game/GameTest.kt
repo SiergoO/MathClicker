@@ -61,7 +61,7 @@ class GameTest {
             game.createTargets()
             testScheduler.runCurrent()
             val targetId =
-                game.targetsFlow.value
+                game.stateFlow.value.targets
                     .first()
                     .id
             game.targetRevealed(targetId)
@@ -70,10 +70,13 @@ class GameTest {
             game.targetDidBreakout(targetId)
             testScheduler.runCurrent()
 
-            assertEquals(2, game.fieldFlow.value.level)
+            assertEquals(2, game.stateFlow.value.field.level)
             // FakeSessionHelper's amount is level-dependent: targetAmount 1 at level 2 is 1 + (2 - 1).
-            assertEquals(2, game.targetsFlow.value.size)
-            assertTrue(game.targetsFlow.value.all { it.isActive })
+            assertEquals(2, game.stateFlow.value.targets.size)
+            assertTrue(
+                game.stateFlow.value.targets
+                    .all { it.isActive },
+            )
         }
 
     @Test
@@ -88,7 +91,10 @@ class GameTest {
             game.createTargets()
             testScheduler.runCurrent()
 
-            assertTrue(game.targetsFlow.value.all { it.appearanceDelayMs == 0 })
+            assertTrue(
+                game.stateFlow.value.targets
+                    .all { it.appearanceDelayMs == 0 },
+            )
         }
 
     @Test
@@ -100,7 +106,7 @@ class GameTest {
             game.createTargets()
             testScheduler.runCurrent()
             val targetId =
-                game.targetsFlow.value
+                game.stateFlow.value.targets
                     .first()
                     .id
             game.targetRevealed(targetId)
@@ -109,7 +115,7 @@ class GameTest {
             // Level up to 2 first: getNextSignAndDigit hardcoding level 1 is invisible at level 1.
             game.targetDidBreakout(targetId)
             testScheduler.runCurrent()
-            assertEquals(2, game.fieldFlow.value.level)
+            assertEquals(2, game.stateFlow.value.field.level)
 
             game.fireButtonClicked()
             testScheduler.runCurrent()
@@ -120,8 +126,8 @@ class GameTest {
             // draw SUBTRACTION so a hardcoded DIVISION is also caught - the real-helper determinism
             // test below happens to draw DIVISION at its own call site, so between the two, a
             // hardcoded sign of either value fails at least one test.
-            assertEquals(OperationSign.SUBTRACTION, game.fieldFlow.value.nextOperationSign)
-            assertEquals(4, game.fieldFlow.value.nextOperationDigit)
+            assertEquals(OperationSign.SUBTRACTION, game.stateFlow.value.field.nextOperationSign)
+            assertEquals(4, game.stateFlow.value.field.nextOperationDigit)
         }
 
     @Test
@@ -132,22 +138,22 @@ class GameTest {
             game.createField(1)
             game.createTargets()
             testScheduler.runCurrent()
-            val targets = game.targetsFlow.value
+            val targets = game.stateFlow.value.targets
 
             game.targetDidBreakout(targets[0].id)
             testScheduler.runCurrent()
-            assertEquals(2, game.fieldFlow.value.lifeCount)
-            assertFalse(game.fieldFlow.value.isClosed)
+            assertEquals(2, game.stateFlow.value.field.lifeCount)
+            assertFalse(game.stateFlow.value.field.isClosed)
 
             game.targetDidBreakout(targets[1].id)
             testScheduler.runCurrent()
-            assertEquals(1, game.fieldFlow.value.lifeCount)
-            assertFalse(game.fieldFlow.value.isClosed)
+            assertEquals(1, game.stateFlow.value.field.lifeCount)
+            assertFalse(game.stateFlow.value.field.isClosed)
 
             game.targetDidBreakout(targets[2].id)
             testScheduler.runCurrent()
-            assertEquals(0, game.fieldFlow.value.lifeCount)
-            assertTrue(game.fieldFlow.value.isClosed)
+            assertEquals(0, game.stateFlow.value.field.lifeCount)
+            assertTrue(game.stateFlow.value.field.isClosed)
         }
 
     @Test
@@ -162,7 +168,7 @@ class GameTest {
             game.createTargets()
             testScheduler.runCurrent()
             val targetId =
-                game.targetsFlow.value
+                game.stateFlow.value.targets
                     .first()
                     .id
 
@@ -171,8 +177,8 @@ class GameTest {
             game.targetDidBreakout(targetId)
             testScheduler.runCurrent()
 
-            assertEquals(2, game.fieldFlow.value.lifeCount)
-            assertFalse(game.fieldFlow.value.isClosed)
+            assertEquals(2, game.stateFlow.value.field.lifeCount)
+            assertFalse(game.stateFlow.value.field.isClosed)
         }
 
     @Test
@@ -185,17 +191,26 @@ class GameTest {
             first.createField(1)
             second.createField(1)
 
-            assertEquals(first.fieldFlow.value.currentOperationSign, second.fieldFlow.value.currentOperationSign)
-            assertEquals(first.fieldFlow.value.currentOperationDigit, second.fieldFlow.value.currentOperationDigit)
-            assertEquals(first.fieldFlow.value.nextOperationSign, second.fieldFlow.value.nextOperationSign)
-            assertEquals(first.fieldFlow.value.nextOperationDigit, second.fieldFlow.value.nextOperationDigit)
+            assertEquals(
+                first.stateFlow.value.field.currentOperationSign,
+                second.stateFlow.value.field.currentOperationSign,
+            )
+            assertEquals(
+                first.stateFlow.value.field.currentOperationDigit,
+                second.stateFlow.value.field.currentOperationDigit,
+            )
+            assertEquals(first.stateFlow.value.field.nextOperationSign, second.stateFlow.value.field.nextOperationSign)
+            assertEquals(
+                first.stateFlow.value.field.nextOperationDigit,
+                second.stateFlow.value.field.nextOperationDigit,
+            )
 
             // Pins what Random(42) actually draws, so a bare .random() (agreeing 1 time in 4) or a
             // hardcoded DIVISION (agreeing always) both fail this instead of passing by luck.
-            assertEquals(OperationSign.SUBTRACTION, first.fieldFlow.value.currentOperationSign)
-            assertEquals(3, first.fieldFlow.value.currentOperationDigit)
-            assertEquals(OperationSign.SUBTRACTION, first.fieldFlow.value.nextOperationSign)
-            assertEquals(3, first.fieldFlow.value.nextOperationDigit)
+            assertEquals(OperationSign.SUBTRACTION, first.stateFlow.value.field.currentOperationSign)
+            assertEquals(3, first.stateFlow.value.field.currentOperationDigit)
+            assertEquals(OperationSign.SUBTRACTION, first.stateFlow.value.field.nextOperationSign)
+            assertEquals(3, first.stateFlow.value.field.nextOperationDigit)
         }
 
     @Test
@@ -213,7 +228,7 @@ class GameTest {
                 testScheduler.runCurrent()
 
                 val firstTargetId =
-                    game.targetsFlow.value
+                    game.stateFlow.value.targets
                         .first()
                         .id
                 game.targetRevealed(firstTargetId)
@@ -222,12 +237,12 @@ class GameTest {
                 game.fireButtonClicked()
                 testScheduler.runCurrent()
 
-                game.targetsFlow.value
+                game.stateFlow.value.targets
                     .map { it.id }
                     .forEach { game.targetDidBreakout(it) }
                 testScheduler.runCurrent()
 
-                return game.fieldFlow.value to game.targetsFlow.value
+                return game.stateFlow.value.field to game.stateFlow.value.targets
             }
 
             val (firstField, firstTargets) = runSession()
@@ -281,7 +296,7 @@ class GameTest {
             game.createTargets()
             testScheduler.runCurrent()
             val targetId =
-                game.targetsFlow.value
+                game.stateFlow.value.targets
                     .first()
                     .id
             game.targetRevealed(targetId)
@@ -291,7 +306,7 @@ class GameTest {
             game.targetDidBreakout(targetId)
             testScheduler.runCurrent()
 
-            assertEquals(1, game.fieldFlow.value.level)
+            assertEquals(1, game.stateFlow.value.field.level)
         }
 
     @Test
@@ -309,7 +324,7 @@ class GameTest {
 
             assertEquals(
                 listOf(0, 0, 0, 100),
-                game.targetsFlow.value
+                game.stateFlow.value.targets
                     .sortedBy { it.id }
                     .map { it.appearanceDelayMs },
             )
@@ -324,7 +339,7 @@ class GameTest {
             game.createTargets()
             testScheduler.runCurrent()
             val targetId =
-                game.targetsFlow.value
+                game.stateFlow.value.targets
                     .first()
                     .id
             game.targetRevealed(targetId)
@@ -334,7 +349,7 @@ class GameTest {
             game.targetDidBreakout(targetId)
             testScheduler.runCurrent()
 
-            assertEquals(1, game.fieldFlow.value.level)
+            assertEquals(1, game.stateFlow.value.field.level)
         }
 
     @Test
@@ -346,7 +361,7 @@ class GameTest {
             game.createTargets()
             testScheduler.runCurrent()
             val targetId =
-                game.targetsFlow.value
+                game.stateFlow.value.targets
                     .first()
                     .id
 
@@ -355,11 +370,11 @@ class GameTest {
 
             assertEquals(
                 9,
-                game.targetsFlow.value
+                game.stateFlow.value.targets
                     .first { it.id == targetId }
                     .value,
             )
-            assertEquals(1, game.fieldFlow.value.score)
+            assertEquals(1, game.stateFlow.value.field.score)
         }
 
     @Test
@@ -371,7 +386,7 @@ class GameTest {
             game.createTargets()
             testScheduler.runCurrent()
             val targetId =
-                game.targetsFlow.value
+                game.stateFlow.value.targets
                     .first()
                     .id
             game.targetRevealed(targetId)
@@ -381,21 +396,23 @@ class GameTest {
             // against value 1 that takes the losing branch: value grows to 4, isProfitable flips false.
             game.fireButtonClicked()
             testScheduler.runCurrent()
-            val afterFire = game.targetsFlow.value.first { it.id == targetId }
+            val afterFire =
+                game.stateFlow.value.targets
+                    .first { it.id == targetId }
             assertFalse(afterFire.isProfitable)
             assertEquals(4, afterFire.value)
-            assertEquals(0, game.fieldFlow.value.score)
+            assertEquals(0, game.stateFlow.value.field.score)
 
             game.targetClicked(targetId)
             testScheduler.runCurrent()
 
             assertEquals(
                 3,
-                game.targetsFlow.value
+                game.stateFlow.value.targets
                     .first { it.id == targetId }
                     .value,
             )
-            assertEquals(0, game.fieldFlow.value.score)
+            assertEquals(0, game.stateFlow.value.field.score)
         }
 
     @Test
@@ -409,7 +426,7 @@ class GameTest {
             game.createTargets()
             testScheduler.runCurrent()
             val targetId =
-                game.targetsFlow.value
+                game.stateFlow.value.targets
                     .sortedBy { it.id }
                     .first()
                     .id
@@ -419,11 +436,13 @@ class GameTest {
             game.targetClicked(targetId)
             testScheduler.runCurrent()
 
-            val cleared = game.targetsFlow.value.first { it.id == targetId }
+            val cleared =
+                game.stateFlow.value.targets
+                    .first { it.id == targetId }
             assertEquals(0, cleared.value)
             assertFalse(cleared.isActive)
             assertFalse(cleared.isVisible)
-            assertEquals(1, game.fieldFlow.value.score)
+            assertEquals(1, game.stateFlow.value.field.score)
         }
 
     @Test
@@ -435,7 +454,7 @@ class GameTest {
             game.createTargets()
             testScheduler.runCurrent()
             val targetId =
-                game.targetsFlow.value
+                game.stateFlow.value.targets
                     .first()
                     .id
 
@@ -444,9 +463,12 @@ class GameTest {
 
             // Without ensureAlive(id) the cleared target stays active, the board never empties and
             // the level never advances - the soft-lock the engine audit named for this function.
-            assertEquals(2, game.fieldFlow.value.level)
-            assertEquals(2, game.targetsFlow.value.size)
-            assertTrue(game.targetsFlow.value.all { it.isActive })
+            assertEquals(2, game.stateFlow.value.field.level)
+            assertEquals(2, game.stateFlow.value.targets.size)
+            assertTrue(
+                game.stateFlow.value.targets
+                    .all { it.isActive },
+            )
         }
 
     @Test
@@ -461,7 +483,7 @@ class GameTest {
             game.createTargets()
             testScheduler.runCurrent()
             val targetId =
-                game.targetsFlow.value
+                game.stateFlow.value.targets
                     .sortedBy { it.id }
                     .first()
                     .id
@@ -473,11 +495,13 @@ class GameTest {
             game.fireButtonClicked()
             testScheduler.runCurrent()
 
-            val cleared = game.targetsFlow.value.first { it.id == targetId }
+            val cleared =
+                game.stateFlow.value.targets
+                    .first { it.id == targetId }
             assertEquals(0, cleared.value)
             assertFalse(cleared.isActive)
             assertFalse(cleared.isVisible)
-            assertEquals(3, game.fieldFlow.value.score)
+            assertEquals(3, game.stateFlow.value.field.score)
         }
 
     @Test
@@ -489,7 +513,7 @@ class GameTest {
             game.createTargets()
             testScheduler.runCurrent()
             val targetId =
-                game.targetsFlow.value
+                game.stateFlow.value.targets
                     .first()
                     .id
             game.targetRevealed(targetId)
@@ -497,11 +521,13 @@ class GameTest {
 
             game.targetDidBreakout(targetId)
             testScheduler.runCurrent()
-            assertEquals(2, game.fieldFlow.value.level)
+            assertEquals(2, game.stateFlow.value.field.level)
 
             // FakeSessionHelper: value = targetValue + (level - 1), lifetimeMs = 1000 + (level - 1).
             // A hardcoded 1 or an off-by-one level + 1 both land on a different number than this.
-            val regenerated = game.targetsFlow.value.first()
+            val regenerated =
+                game.stateFlow.value.targets
+                    .first()
             assertEquals(11, regenerated.value)
             assertEquals(1001, regenerated.lifetimeMs)
         }
@@ -514,7 +540,9 @@ class GameTest {
             game.createField(1)
             game.createTargets()
             testScheduler.runCurrent()
-            val targets = game.targetsFlow.value.sortedBy { it.id }
+            val targets =
+                game.stateFlow.value.targets
+                    .sortedBy { it.id }
             val revealedId = targets[0].id
             val untouchedId = targets[1].id
 
@@ -522,12 +550,12 @@ class GameTest {
             testScheduler.runCurrent()
 
             assertTrue(
-                game.targetsFlow.value
+                game.stateFlow.value.targets
                     .first { it.id == revealedId }
                     .isVisible,
             )
             assertFalse(
-                game.targetsFlow.value
+                game.stateFlow.value.targets
                     .first { it.id == untouchedId }
                     .isVisible,
             )
@@ -543,13 +571,15 @@ class GameTest {
             game.createField(1)
             game.createTargets()
             val targetId =
-                game.targetsFlow.value
+                game.stateFlow.value.targets
                     .first()
                     .id
 
             game.targetShouldBeSaved(targetId, position = 50, gameColumnHeightPx = 100)
 
-            val saved = game.targetsFlow.value.first { it.id == targetId }
+            val saved =
+                game.stateFlow.value.targets
+                    .first { it.id == targetId }
             assertEquals(50, saved.position)
             assertEquals(0, saved.appearanceDelayMs)
         }
@@ -561,13 +591,15 @@ class GameTest {
             game.createField(1)
             game.createTargets()
             val targetId =
-                game.targetsFlow.value
+                game.stateFlow.value.targets
                     .first()
                     .id
 
             game.targetShouldBeSaved(targetId, position = 0, gameColumnHeightPx = 100)
 
-            val saved = game.targetsFlow.value.first { it.id == targetId }
+            val saved =
+                game.stateFlow.value.targets
+                    .first { it.id == targetId }
             assertEquals(0, saved.position)
             assertEquals(8000, saved.appearanceDelayMs)
         }
@@ -580,8 +612,8 @@ class GameTest {
             game.gameColumnSizeMeasured(width = 300, height = 700)
             testScheduler.runCurrent()
 
-            assertEquals(300, game.fieldFlow.value.gameColumnWidthPx)
-            assertEquals(700, game.fieldFlow.value.gameColumnHeightPx)
+            assertEquals(300, game.stateFlow.value.field.gameColumnWidthPx)
+            assertEquals(700, game.stateFlow.value.field.gameColumnHeightPx)
         }
 
     @Test
@@ -600,7 +632,7 @@ class GameTest {
             game.fieldRestored(restoredField)
             testScheduler.runCurrent()
 
-            assertEquals(restoredField, game.fieldFlow.value)
+            assertEquals(restoredField, game.stateFlow.value.field)
         }
 
     @Test
@@ -632,6 +664,39 @@ class GameTest {
             game.targetsRestored(restoredTargets)
             testScheduler.runCurrent()
 
-            assertEquals(restoredTargets, game.targetsFlow.value)
+            assertEquals(restoredTargets, game.stateFlow.value.targets)
+        }
+
+    @Test
+    fun `a field-only change does not replay the target list through the collector`() =
+        runTest {
+            // Guards the distinctUntilChanged filter in start(). A combined state flow also emits on
+            // field-only changes; without the filter such an emission replays an unchanged target
+            // list through visibleTargetsAbsent(), which runs a second shortenAppearanceDelay pass
+            // and silently rewrites appearance delays the player is already waiting out. Seed 5 is
+            // one of the seeds where the extra pass actually changes the delays - with the filter
+            // removed this test goes red, with it in place the delays are untouched.
+            val game =
+                Game(
+                    FakeSessionHelper(targetAmount = 4, appearanceDelayMsById = { listOf(100, 200, 300, 400)[it] }),
+                    backgroundScope,
+                    Random(5),
+                )
+            game.start()
+            game.createField(1)
+            game.createTargets()
+            testScheduler.runCurrent()
+            val delaysBefore =
+                game.stateFlow.value.targets
+                    .map { it.id to it.appearanceDelayMs }
+
+            game.gameColumnSizeMeasured(width = 300, height = 700)
+            testScheduler.runCurrent()
+
+            assertEquals(
+                delaysBefore,
+                game.stateFlow.value.targets
+                    .map { it.id to it.appearanceDelayMs },
+            )
         }
 }

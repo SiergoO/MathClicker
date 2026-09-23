@@ -1,6 +1,7 @@
 package com.sdamashchuk.matharcade.core.game
 
 import com.sdamashchuk.matharcade.core.game.helper.SessionHelper
+import com.sdamashchuk.matharcade.core.game.model.GameState
 import com.sdamashchuk.matharcade.core.model.Field
 import com.sdamashchuk.matharcade.core.model.OperationSign
 import com.sdamashchuk.matharcade.core.model.Target
@@ -8,6 +9,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
@@ -31,7 +34,7 @@ private class RaceSessionHelper : SessionHelper {
     override val initialDivisionValueRange = 2..5
     override val initialSubtractionValueRange = 1..3
 
-    override fun getTargetValueByLevel(level: Int) = 1_000_000
+    override fun getTargetValueByLevel(level: Int) = UNKILLABLE_TARGET_VALUE
 
     override fun getTargetLifetimeMsByLevel(level: Int) = 1000
 
@@ -55,6 +58,12 @@ private class RaceSessionHelper : SessionHelper {
 // timing out here.
 private const val SETTLE_TIMEOUT_MS = 300L
 
+private const val UNKILLABLE_TARGET_VALUE = 1_000_000
+
+// The measured tear rate is under 1% per trial, so 400 trials leave roughly a 2% chance of a
+// genuinely torn build going green. 2000 puts that below 1e-8 and costs a fraction of a second.
+private const val TEAR_TRIALS = 2000
+
 // Runs the single-target-breakout-vs-fire race on a real Dispatchers.Default scope - the collector
 // launched by start() and the two racing calls genuinely run on different threads, unlike GameTest's
 // virtual-time runTest. Settles by polling rather than a fixed delay: the correct end state is
@@ -67,31 +76,175 @@ private suspend fun raceLevelUpAgainstFire(seed: Long): Pair<Field, List<Target>
         game.createField(1)
         game.createTargets()
         val targetId =
-            game.targetsFlow.value
+            game.stateFlow.value.targets
                 .first()
                 .id
         game.targetRevealed(targetId)
-        val startingLevel = game.fieldFlow.value.level
+        val startingLevel = game.stateFlow.value.field.level
 
         scope.launch { game.targetDidBreakout(targetId) }
         scope.launch { game.fireButtonClicked() }
 
-        // fieldFlow and targetsFlow are two separate StateFlows, so even a correct run has a real,
-        // benign instant between activeTargetsAbsent's two writes where a reader outside the lock
-        // sees the bumped level against the not-yet-replaced target list. Polling on the level alone
-        // would sample inside that window and misreport it as corruption. Wait for both flows to
-        // agree on the fully-settled shape instead; a genuinely corrupted run (stuck, or advanced
-        // more than once) never reaches this and is read as whatever it settled on at the timeout.
+        // field and targets publish as one GameState now, so there is no torn instant left to sample
+        // - but the two launched coroutines can still legitimately take a few dispatch cycles to
+        // reach the settled shape depending on which wins the race. Wait for it instead of a fixed
+        // delay; a genuinely corrupted run (stuck, or advanced more than once) never reaches this and
+        // is read as whatever it settled on at the timeout.
         withTimeoutOrNull(SETTLE_TIMEOUT_MS) {
             while (
-                game.fieldFlow.value.level != startingLevel + 1 ||
-                game.targetsFlow.value.size != 1 ||
-                !game.targetsFlow.value.all { it.isActive }
+                game.stateFlow.value.field.level != startingLevel + 1 ||
+                game.stateFlow.value.targets.size != 1 ||
+                !game.stateFlow.value.targets
+                    .all { it.isActive }
             ) {
                 yield()
             }
         }
-        return game.fieldFlow.value to game.targetsFlow.value
+        return game.stateFlow.value.field to game.stateFlow.value.targets
+    } finally {
+        scope.cancel()
+    }
+}
+
+// Isolates the reader/writer tear MC-42 exists for from the writer/writer race above: a single call
+// to targetDidBreakout that costs the last life writes both the deactivated target and the closed
+// field under one mutex.withLock. A concurrent reader busy-polling stateFlow.value from a second real
+// thread - no suspension point in the loop, so nothing yields the window away - must only ever see
+// the target's active flag and the field's closed flag agree; either both still false (untouched) or
+// both true (fully applied), never one ahead of the other. No start(): the level-up this would
+// otherwise trigger is a different transition, already covered above, and would recreate this exact
+// target id and confuse the invariant being checked here.
+private suspend fun readerSeesTornStateOnLastLifeBreakout(seed: Long): Boolean {
+    val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    try {
+        val game = Game(RaceSessionHelper(), scope, Random(seed))
+        game.createField(1)
+        game.createTargets()
+        val targetId =
+            game.stateFlow.value.targets
+                .first()
+                .id
+        game.targetRevealed(targetId)
+        game.fieldRestored(
+            game.stateFlow.value.field
+                .copy(lifeCount = 1),
+        )
+
+        var torn = false
+        val reader =
+            scope.launch {
+                while (isActive) {
+                    val snapshot: GameState = game.stateFlow.value
+                    val targetInactive = !snapshot.targets.first { it.id == targetId }.isActive
+                    if (targetInactive != snapshot.field.isClosed) {
+                        torn = true
+                        break
+                    }
+                }
+            }
+
+        game.targetDidBreakout(targetId)
+        withTimeoutOrNull(SETTLE_TIMEOUT_MS) {
+            while (!game.stateFlow.value.field.isClosed) yield()
+        }
+        reader.cancelAndJoin()
+        return torn
+    } finally {
+        scope.cancel()
+    }
+}
+
+// The level-up half of the same tear. activeTargetsAbsent() publishes the bumped field and the
+// regenerated target set; before MC-42 it wrote them as two assignments, so a reader could catch
+// level 2 against the cleared level-1 board - the "new level against the previous target set" the
+// task exists to close. Needs start(), because the collector is what drives the level-up.
+// Invariant: once the level has advanced, a target set must exist to play, so a level above 1 with
+// nothing active is a state that never holds inside the lock. RaceSessionHelper's targets are
+// unkillable and never broken out again, so level 2 with an all-inactive board cannot arise
+// legitimately after the single level-up this drives.
+private suspend fun readerSeesTornStateOnLevelUp(seed: Long): Boolean {
+    val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    try {
+        val game = Game(RaceSessionHelper(), scope, Random(seed))
+        game.start()
+        game.createField(1)
+        game.createTargets()
+        val targetId =
+            game.stateFlow.value.targets
+                .first()
+                .id
+
+        var torn = false
+        val reader =
+            scope.launch {
+                while (isActive) {
+                    val snapshot: GameState = game.stateFlow.value
+                    if (snapshot.field.level > 1 && snapshot.targets.none { it.isActive }) {
+                        torn = true
+                        break
+                    }
+                }
+            }
+
+        game.targetDidBreakout(targetId)
+        withTimeoutOrNull(SETTLE_TIMEOUT_MS) {
+            while (game.stateFlow.value.field.level < 2) yield()
+        }
+        reader.cancelAndJoin()
+        return torn
+    } finally {
+        scope.cancel()
+    }
+}
+
+// The fire-press half. fireButtonClicked publishes the operated-on targets and the rescored field
+// together; split, a reader sees one ahead of the other. The operation sign and digit are pinned
+// through fieldRestored rather than left to the seed, so the transition is the same on every trial:
+// subtracting 1 from RaceSessionHelper's 1_000_000 takes the value to 999_999 and the score from 0
+// to 1 in one step. Either both have moved or neither has.
+private suspend fun readerSeesTornStateOnFirePress(seed: Long): Boolean {
+    val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    try {
+        val game = Game(RaceSessionHelper(), scope, Random(seed))
+        game.createField(1)
+        game.createTargets()
+        val targetId =
+            game.stateFlow.value.targets
+                .first()
+                .id
+        game.targetRevealed(targetId)
+        game.fieldRestored(
+            game.stateFlow.value.field.copy(
+                score = 0,
+                currentOperationSign = OperationSign.SUBTRACTION,
+                currentOperationDigit = 1,
+            ),
+        )
+
+        var torn = false
+        val reader =
+            scope.launch {
+                while (isActive) {
+                    val snapshot: GameState = game.stateFlow.value
+                    val valueUntouched = snapshot.targets.first { it.id == targetId }.value == UNKILLABLE_TARGET_VALUE
+                    if (valueUntouched != (snapshot.field.score == 0)) {
+                        torn = true
+                        break
+                    }
+                }
+            }
+
+        game.fireButtonClicked()
+        withTimeoutOrNull(SETTLE_TIMEOUT_MS) {
+            while (game.stateFlow.value.targets
+                    .first { it.id == targetId }
+                    .value == UNKILLABLE_TARGET_VALUE
+            ) {
+                yield()
+            }
+        }
+        reader.cancelAndJoin()
+        return torn
     } finally {
         scope.cancel()
     }
@@ -154,5 +307,50 @@ class GameConcurrencyTest {
                 if (!agree) diverged++
             }
             assertEquals(0, diverged, "$diverged/$pairs pairs landed on different outcomes")
+        }
+
+    // The direct proof for this task: before MC-42, targetDidBreakout published the target list and
+    // the field as two separate StateFlow writes, so a reader outside the lock could catch the target
+    // already deactivated while the field still reported the life as un-lost (or vice versa). One
+    // GameState published in a single assignment closes that window.
+    @Test
+    fun `a reader never observes the target and field halves of a breakout half-applied`() =
+        runBlocking {
+            val trials = TEAR_TRIALS
+            val maxTornBeforeStopping = 5
+            var torn = 0
+            var ran = 0
+            for (trial in 0 until trials) {
+                ran++
+                if (readerSeesTornStateOnLastLifeBreakout(seed = trial.toLong())) torn++
+                if (torn >= maxTornBeforeStopping) break
+            }
+            assertEquals(0, torn, "reader observed a torn field/target pairing in $torn/$ran trials")
+        }
+
+    @Test
+    fun `a reader never observes a level-up half-applied`() =
+        runBlocking {
+            var torn = 0
+            var ran = 0
+            for (trial in 0 until TEAR_TRIALS) {
+                ran++
+                if (readerSeesTornStateOnLevelUp(seed = trial.toLong())) torn++
+                if (torn >= 5) break
+            }
+            assertEquals(0, torn, "reader observed a level above 1 against a cleared board in $torn/$ran trials")
+        }
+
+    @Test
+    fun `a reader never observes a fire press half-applied`() =
+        runBlocking {
+            var torn = 0
+            var ran = 0
+            for (trial in 0 until TEAR_TRIALS) {
+                ran++
+                if (readerSeesTornStateOnFirePress(seed = trial.toLong())) torn++
+                if (torn >= 5) break
+            }
+            assertEquals(0, torn, "reader observed a rescored field against untouched targets in $torn/$ran trials")
         }
 }

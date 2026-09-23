@@ -34,32 +34,31 @@ class GameViewModel(
             updateSession()
         }
         viewModelScope.launch {
-            game.targetsFlow.collect { targets ->
-                if (targets.isNotEmpty()) {
-                    val previousIds =
-                        state.value.targetList
-                            .map { it.id }
-                            .toSet()
-                    _state.value =
-                        state.value.copy(
-                            targetList = targets.toImmutableList(),
-                        )
+            // A single collector on Game's combined state, not one per half: two collectors each
+            // doing a read-modify-write copy() on the same _state could interleave and have one
+            // clobber the other's field (MC-42). One assignment below publishes both halves at once.
+            game.stateFlow.collect { gameState ->
+                val (field, targets) = gameState
+                if (field.id == 0) return@collect
+                val previousField = state.value.field
+                val previousTargets = state.value.targetList
+                val fieldChanged = field != previousField
+                val targetsChanged = targets.isNotEmpty() && targets != previousTargets
+                _state.value =
+                    state.value.copy(
+                        field = field,
+                        targetList = if (targets.isNotEmpty()) targets.toImmutableList() else previousTargets,
+                    )
+                if (fieldChanged) {
+                    gameRepository.updateField(field)
+                }
+                if (targetsChanged) {
+                    val previousIds = previousTargets.map { it.id }.toSet()
                     if (shouldRefreshTargets(previousIds, targets.map { it.id }.toSet())) {
                         gameRepository.refreshTargets(targets)
                     } else {
                         gameRepository.updateTargets(targets)
                     }
-                }
-            }
-        }
-        viewModelScope.launch {
-            game.fieldFlow.collect { field ->
-                if (field.id != 0) {
-                    _state.value =
-                        state.value.copy(
-                            field = field,
-                        )
-                    gameRepository.updateField(field)
                 }
             }
         }
@@ -161,8 +160,8 @@ class GameViewModel(
                 val sessionCount = getFieldCount()
                 game.createField(sessionCount + 1)
                 game.createTargets()
-                insertField(game.fieldFlow.value)
-                refreshTargets(game.targetsFlow.value)
+                insertField(game.stateFlow.value.field)
+                refreshTargets(game.stateFlow.value.targets)
             } else {
                 game.fieldRestored(unfinishedField)
                 if (unfinishedTargets.isEmpty()) {
@@ -173,7 +172,7 @@ class GameViewModel(
                     // Game's own recovery guard never sees it), so recreate the level directly instead
                     // of relying on that.
                     game.createTargets()
-                    refreshTargets(game.targetsFlow.value)
+                    refreshTargets(game.stateFlow.value.targets)
                 } else {
                     game.targetsRestored(unfinishedTargets)
                 }

@@ -145,11 +145,11 @@ class GameViewModelTest {
             val viewModel = GameViewModel(game, repository)
 
             assertEquals(existingTargets, viewModel.state.value.targetList)
-            assertEquals(existingTargets, game.targetsFlow.value)
+            assertEquals(existingTargets, game.stateFlow.value.targets)
         }
 
-    // This is the collector's own choice of method (GameViewModel.kt:37-58), not the explicit
-    // refreshTargets() call updateSession() makes on restore/new-session: a same-level mutation
+    // This is the collector's own choice of method (GameViewModel's combined stateFlow collector),
+    // not the explicit refreshTargets() call updateSession() makes on restore/new-session: a same-level mutation
     // (targetClicked) must stay on the cheap updateTargets path, and a level-up growing the id set
     // must go through refreshTargets or the grown rows are silently dropped (MC-34's original bug).
     @Test
@@ -200,7 +200,7 @@ class GameViewModelTest {
             assertTrue(repository.refreshTargetsCalls.isNotEmpty())
             assertEquals(
                 setOf(1, 2, 3),
-                game.targetsFlow.value
+                game.stateFlow.value.targets
                     .map { it.id }
                     .toSet(),
             )
