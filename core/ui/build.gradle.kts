@@ -8,7 +8,7 @@ plugins {
 // would hand it dependencies it never uses — Compose is declared directly instead.
 compose {
     resources {
-        packageOfResClass = "com.sdomashchuk.mathclicker.core.ui.resources"
+        packageOfResClass = "com.sdamashchuk.matharcade.core.ui.resources"
     }
 }
 

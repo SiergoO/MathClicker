@@ -5,10 +5,10 @@ plugins {
 }
 
 android {
-    namespace = "com.sdomashchuk.mathclicker"
+    namespace = "com.sdamashchuk.matharcade"
 
     defaultConfig {
-        applicationId = "com.sdomashchuk.mathclicker"
+        applicationId = "com.sdamashchuk.matharcade"
         versionCode = 1
         versionName = "1.0"
 

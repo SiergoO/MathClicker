@@ -2,7 +2,7 @@ plugins {
     `kotlin-dsl`
 }
 
-group = "com.sdomashchuk.mathclicker.buildlogic"
+group = "com.sdamashchuk.matharcade.buildlogic"
 
 java {
     toolchain {
@@ -23,27 +23,27 @@ gradlePlugin {
     plugins {
         register("androidLibrary") {
             id = "mathclicker.android.library"
-            implementationClass = "com.sdomashchuk.mathclicker.buildlogic.AndroidLibraryConventionPlugin"
+            implementationClass = "com.sdamashchuk.matharcade.buildlogic.AndroidLibraryConventionPlugin"
         }
         register("androidApplication") {
             id = "mathclicker.android.application"
-            implementationClass = "com.sdomashchuk.mathclicker.buildlogic.AndroidApplicationConventionPlugin"
+            implementationClass = "com.sdamashchuk.matharcade.buildlogic.AndroidApplicationConventionPlugin"
         }
         register("androidCompose") {
             id = "mathclicker.android.compose"
-            implementationClass = "com.sdomashchuk.mathclicker.buildlogic.AndroidComposeConventionPlugin"
+            implementationClass = "com.sdamashchuk.matharcade.buildlogic.AndroidComposeConventionPlugin"
         }
         register("quality") {
             id = "mathclicker.quality"
-            implementationClass = "com.sdomashchuk.mathclicker.buildlogic.QualityConventionPlugin"
+            implementationClass = "com.sdamashchuk.matharcade.buildlogic.QualityConventionPlugin"
         }
         register("kmpLibrary") {
             id = "mathclicker.kmp.library"
-            implementationClass = "com.sdomashchuk.mathclicker.buildlogic.KmpLibraryConventionPlugin"
+            implementationClass = "com.sdamashchuk.matharcade.buildlogic.KmpLibraryConventionPlugin"
         }
         register("kmpFeature") {
             id = "mathclicker.kmp.feature"
-            implementationClass = "com.sdomashchuk.mathclicker.buildlogic.KmpFeatureConventionPlugin"
+            implementationClass = "com.sdamashchuk.matharcade.buildlogic.KmpFeatureConventionPlugin"
         }
     }
 }

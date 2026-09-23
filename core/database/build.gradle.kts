@@ -10,7 +10,7 @@ sqldelight {
         // text must not drift: SQLDelight opens Room's existing on-device file in place only
         // because they still match.
         create("MathClickerDatabase") {
-            packageName.set("com.sdomashchuk.mathclicker.core.database.local")
+            packageName.set("com.sdamashchuk.matharcade.core.database.local")
             // .sqm files live next to the .sq files they migrate. SQLDelight numbers a migration
             // file by the version it migrates *from* — 1.sqm takes version 1 to 2 — and both Room
             // (`@Database(version = 1)`) and the pre-migration SQLDelight schema already wrote

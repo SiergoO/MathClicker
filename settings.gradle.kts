@@ -17,5 +17,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "MathClicker"
+rootProject.name = "MathArcade"
 include(":app", ":core:model", ":core:game", ":core:database", ":core:ui", ":core:component", ":feature:game", ":feature:menu")
