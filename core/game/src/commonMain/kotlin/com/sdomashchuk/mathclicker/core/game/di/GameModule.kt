@@ -11,11 +11,13 @@ import org.koin.dsl.module
 val gameModule =
     module {
         // SessionHelperImpl and Game each default their own Random rather than share one instance.
-        // Both are already called from two threads - the caller's, and Game's collector coroutine
-        // on Dispatchers.Default (createTargets, shortenAppearanceDelay) - so separating them does
-        // not make either Random thread-safe; that unsynchronized-mutation problem is bug 1 and is
-        // untouched here. What separating them buys is that each consumer's draw sequence depends
-        // only on its own call count, not on how many draws the other consumer made first - the
+        // Both are still called from two threads - the caller's, and Game's collector coroutine on
+        // Dispatchers.Default (createTargets, shortenAppearanceDelay) - but MC-32 gave Game an
+        // internal Mutex that every mutating call, including every sessionHelper call it makes,
+        // now runs inside; SessionHelperImpl has no caller outside Game, so its draws are
+        // serialised transitively. Separating the two Random instances no longer buys thread
+        // safety, it never needed to - it buys that each consumer's draw sequence depends only on
+        // its own call count, not on how many draws the other consumer made first, which is the
         // property a seeded, reproducible session actually needs.
         single { SessionHelperImpl() } bind SessionHelper::class
         // Game owns a flow collector that only runs once start() is called; a factory would hand

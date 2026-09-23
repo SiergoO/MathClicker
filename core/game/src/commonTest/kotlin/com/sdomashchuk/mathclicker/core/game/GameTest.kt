@@ -204,7 +204,7 @@ class GameTest {
             // The fake above proves Game's own Random is seeded; this proves the session as a
             // whole is, by routing the same seed through the production SessionHelperImpl - the
             // six call sites this task fixes - instead of a fake that never drew from it.
-            fun runSession(): Pair<Field, List<Target>> {
+            suspend fun runSession(): Pair<Field, List<Target>> {
                 val seed = 99L
                 val game = Game(SessionHelperImpl(random = Random(seed)), backgroundScope, Random(seed))
                 game.start()
@@ -224,7 +224,7 @@ class GameTest {
 
                 game.targetsFlow.value
                     .map { it.id }
-                    .forEach(game::targetDidBreakout)
+                    .forEach { game.targetDidBreakout(it) }
                 testScheduler.runCurrent()
 
                 return game.fieldFlow.value to game.targetsFlow.value
