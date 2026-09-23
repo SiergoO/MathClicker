@@ -36,11 +36,19 @@ class GameViewModel(
         viewModelScope.launch {
             game.targetsFlow.collect { targets ->
                 if (targets.isNotEmpty()) {
+                    val previousIds =
+                        state.value.targetList
+                            .map { it.id }
+                            .toSet()
                     _state.value =
                         state.value.copy(
                             targetList = targets.toImmutableList(),
                         )
-                    gameRepository.updateTargets(targets)
+                    if (shouldRefreshTargets(previousIds, targets.map { it.id }.toSet())) {
+                        gameRepository.refreshTargets(targets)
+                    } else {
+                        gameRepository.updateTargets(targets)
+                    }
                 }
             }
         }
@@ -157,7 +165,18 @@ class GameViewModel(
                 refreshTargets(game.targetsFlow.value)
             } else {
                 game.fieldRestored(unfinishedField)
-                game.targetsRestored(unfinishedTargets)
+                if (unfinishedTargets.isEmpty()) {
+                    // refreshTargets is now one transaction, so this shouldn't arise from persistence
+                    // going forward — but an old install or a corrupt row can still hand back zero
+                    // targets for an open field. targetsRestored(emptyList()) would be a no-op here
+                    // (the flow already starts empty, so setting it to an equal value never emits and
+                    // Game's own recovery guard never sees it), so recreate the level directly instead
+                    // of relying on that.
+                    game.createTargets()
+                    refreshTargets(game.targetsFlow.value)
+                } else {
+                    game.targetsRestored(unfinishedTargets)
+                }
             }
         }
     }
@@ -211,3 +230,11 @@ class GameViewModel(
         object NavigateToMainMenuScreen : UiEvent()
     }
 }
+
+// A level-up hands the engine an entirely new id set, so an UPDATE alone would silently drop the
+// grown rows or leave the shrunk ones behind as ghosts (MC-34). Only the cheaper UPDATE is safe
+// when the ids are exactly what was last persisted.
+internal fun shouldRefreshTargets(
+    previousIds: Set<Int>,
+    nextIds: Set<Int>,
+) = previousIds != nextIds

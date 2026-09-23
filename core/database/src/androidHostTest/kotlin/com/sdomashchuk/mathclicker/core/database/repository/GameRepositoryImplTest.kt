@@ -114,6 +114,59 @@ class GameRepositoryImplTest {
             assertEquals(moved, repository.getTargets().sortedBy { it.id })
         }
 
+    // Every later level calls Game.createTargets() and hands the collector a brand new id set;
+    // refreshTargets (not updateTargets) is what has to carry that set into the DB intact.
+    @Test
+    fun `refreshTargets replaces a smaller target set with a larger one exactly`() =
+        runTest {
+            val levelOne = (1..6).map { target(id = it, value = it, position = it) }
+            repository.refreshTargets(levelOne)
+
+            val levelTwo = (1..9).map { target(id = it, value = it * 10, position = it * 10) }
+            repository.refreshTargets(levelTwo)
+
+            assertEquals(levelTwo.sortedBy { it.id }, repository.getTargets().sortedBy { it.id })
+        }
+
+    @Test
+    fun `refreshTargets replaces a larger target set with a smaller one, leaving no ghost rows`() =
+        runTest {
+            val levelOne = (1..10).map { target(id = it, value = it, position = it) }
+            repository.refreshTargets(levelOne)
+
+            val levelTwo = (1..6).map { target(id = it, value = it * 10, position = it * 10) }
+            repository.refreshTargets(levelTwo)
+
+            assertEquals(levelTwo.sortedBy { it.id }, repository.getTargets().sortedBy { it.id })
+        }
+
+    // Proves delete-then-insert is a single transaction: a failure partway through the insert must
+    // roll back the delete too, or an interrupted refresh could commit an empty table.
+    @Test
+    fun `refreshTargets rolls back the delete when the insert fails partway through`() =
+        runTest {
+            val original = listOf(target(id = 1, value = 1, position = 1), target(id = 2, value = 2, position = 2))
+            repository.insertTargets(original)
+
+            val poisoned =
+                object : AbstractList<Target>() {
+                    override val size = 2
+
+                    override fun get(index: Int): Target =
+                        if (index == 1) throw IllegalStateException("boom") else target(id = 3, value = 3, position = 3)
+                }
+
+            var thrown: IllegalStateException? = null
+            try {
+                repository.refreshTargets(poisoned)
+            } catch (e: IllegalStateException) {
+                thrown = e
+            }
+
+            assertEquals("boom", thrown?.message)
+            assertEquals(original, repository.getTargets().sortedBy { it.id })
+        }
+
     @Test
     fun `target value survives the value_ rename without swapping columns`() =
         runTest {

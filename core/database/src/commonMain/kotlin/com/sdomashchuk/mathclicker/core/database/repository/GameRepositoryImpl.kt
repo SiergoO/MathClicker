@@ -42,8 +42,7 @@ class GameRepositoryImpl(
     override suspend fun getTargets(): List<Target> = targetsDao.getTargets()
 
     override suspend fun refreshTargets(targets: List<Target>) {
-        targetsDao.deleteTargets()
-        insertTargets(targets)
+        targetsDao.refreshTargets(targets)
     }
 
     override suspend fun deleteAllTargets() {

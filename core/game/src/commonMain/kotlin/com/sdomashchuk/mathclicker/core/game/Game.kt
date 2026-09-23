@@ -44,6 +44,14 @@ class Game(
         collectorJob =
             scope.launch {
                 _targetsFlow.collect { targets ->
+                    // start() registers this collector asynchronously on the injected scope, so its
+                    // first delivery races updateSession()'s own createField()/createTargets() calls:
+                    // gating on fieldFlow.value.id != 0 instead of targets.isNotEmpty() let that first,
+                    // still-empty delivery see a live field id and level up with no player input.
+                    // GameViewModel.updateSession() now recreates a restored empty target list itself
+                    // (targetsRestored(emptyList()) is otherwise a no-op MutableStateFlow never emits
+                    // a value equal to its current one), so nothing in production ever hands this
+                    // collector an empty list to recover from. Keep the cheap guard.
                     if (targets.isNotEmpty() && targets.none { it.isVisible }) {
                         visibleTargetsAbsent()
                     }

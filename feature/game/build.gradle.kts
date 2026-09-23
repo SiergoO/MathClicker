@@ -30,6 +30,7 @@ kotlin {
         }
         androidHostTest.dependencies {
             implementation(libs.junit)
+            implementation(libs.kotlinx.coroutines.test)
         }
     }
 }

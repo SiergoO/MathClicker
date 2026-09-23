@@ -26,6 +26,16 @@ class TargetsDao(
 
     suspend fun deleteTargets() = withContext(dispatcher) { queries.deleteTargets() }
 
+    // Delete and insert must land in one SQL transaction: run as two separate calls, process death
+    // between them commits the delete without the insert, leaving an open field with zero targets.
+    suspend fun refreshTargets(targets: List<Target>) =
+        withContext(dispatcher) {
+            queries.transaction {
+                queries.deleteTargets()
+                targets.forEach { queries.insert(it) }
+            }
+        }
+
     suspend fun getTargets(): List<Target> =
         withContext(dispatcher) { queries.getTargets().executeAsList().map { it.toDomainModel() } }
 }
