@@ -1,8 +1,11 @@
 package com.sdomashchuk.mathclicker.core.game.helper
 
 import com.sdomashchuk.mathclicker.core.model.OperationSign
+import kotlin.random.Random
 
-class SessionHelperImpl : SessionHelper {
+class SessionHelperImpl(
+    private val random: Random = Random.Default,
+) : SessionHelper {
     companion object {
         private const val LEVEL_MIN = 1
         private const val LEVEL_MAX = 999
@@ -46,7 +49,7 @@ class SessionHelperImpl : SessionHelper {
     override fun getTargetLifetimeMsByLevel(level: Int): Int {
         val minThreshold = initialTargetLifetimeMsRange.first - level * 15
         val maxThreshold = initialTargetLifetimeMsRange.last - level * 30
-        return IntRange(minThreshold, maxThreshold).random()
+        return IntRange(minThreshold, maxThreshold).random(random)
     }
 
     /**
@@ -58,7 +61,7 @@ class SessionHelperImpl : SessionHelper {
     override fun getTargetAppearanceDelayMsById(id: Int): Int {
         val minThreshold = initialTargetAppearanceDelayMsRange.first * (id / GAME_COLUMN_AMOUNT)
         val maxThreshold = initialTargetAppearanceDelayMsRange.last * (id / GAME_COLUMN_AMOUNT)
-        return IntRange(minThreshold, maxThreshold).random()
+        return IntRange(minThreshold, maxThreshold).random(random)
     }
 
     /**
@@ -69,7 +72,7 @@ class SessionHelperImpl : SessionHelper {
     override fun getTargetValueByLevel(level: Int): Int {
         val minThreshold = initialTargetValueRange.first + level / 10
         val maxThreshold = initialTargetValueRange.last + level * 3
-        return IntRange(minThreshold, maxThreshold).random()
+        return IntRange(minThreshold, maxThreshold).random(random)
     }
 
     /**
@@ -81,7 +84,7 @@ class SessionHelperImpl : SessionHelper {
     override fun getTargetAmountByLevel(level: Int): Int {
         val minThreshold = initialTargetAmountRange.first + level / 5
         val maxThreshold = initialTargetAmountRange.last + level / 3
-        return IntRange(minThreshold, maxThreshold).random()
+        return IntRange(minThreshold, maxThreshold).random(random)
     }
 
     /**
@@ -111,7 +114,7 @@ class SessionHelperImpl : SessionHelper {
     override fun getDivisionDigitByLevel(level: Int): Int {
         val minThreshold = initialDivisionValueRange.first + level / 10
         val maxThreshold = initialDivisionValueRange.last + level / 5
-        return IntRange(minThreshold, maxThreshold).random()
+        return IntRange(minThreshold, maxThreshold).random(random)
     }
 
     /**
@@ -122,6 +125,6 @@ class SessionHelperImpl : SessionHelper {
     override fun getSubtractionDigitByLevel(level: Int): Int {
         val minThreshold = initialSubtractionValueRange.first + level / 10
         val maxThreshold = initialSubtractionValueRange.last + level / 3
-        return IntRange(minThreshold, maxThreshold).random()
+        return IntRange(minThreshold, maxThreshold).random(random)
     }
 }

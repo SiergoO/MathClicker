@@ -1,7 +1,10 @@
 package com.sdomashchuk.mathclicker.core.game
 
 import com.sdomashchuk.mathclicker.core.game.helper.SessionHelper
+import com.sdomashchuk.mathclicker.core.game.helper.SessionHelperImpl
+import com.sdomashchuk.mathclicker.core.model.Field
 import com.sdomashchuk.mathclicker.core.model.OperationSign
+import com.sdomashchuk.mathclicker.core.model.Target
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import kotlin.random.Random
@@ -24,23 +27,27 @@ private class FakeSessionHelper(
     override val initialDivisionValueRange = 2..5
     override val initialSubtractionValueRange = 1..3
 
-    override fun getTargetValueByLevel(level: Int) = targetValue
+    // Offset by (level - 1) so every value matches its old constant at level 1 - the level every
+    // existing test runs at - while still diverging at any other level, which is what makes a level
+    // argument silently swapped for a literal (createTargets, getNextSignAndDigit, recreateField)
+    // observable.
+    override fun getTargetValueByLevel(level: Int) = targetValue + (level - 1)
 
-    override fun getTargetLifetimeMsByLevel(level: Int) = 1000
+    override fun getTargetLifetimeMsByLevel(level: Int) = 1000 + (level - 1)
 
     override fun getTargetAppearanceDelayMsById(id: Int) = appearanceDelayMsById?.invoke(id) ?: appearanceDelayMs
 
-    override fun getTargetAmountByLevel(level: Int) = targetAmount
+    override fun getTargetAmountByLevel(level: Int) = targetAmount + (level - 1)
 
     // Sign-dependent digits so the reproducibility test can notice a sign that came out different.
     override fun getOperationDigitByLevel(
         operationSign: OperationSign,
         level: Int,
-    ) = if (operationSign == OperationSign.DIVISION) 2 else 3
+    ) = if (operationSign == OperationSign.DIVISION) 2 + (level - 1) else 3 + (level - 1)
 
-    override fun getDivisionDigitByLevel(level: Int) = 2
+    override fun getDivisionDigitByLevel(level: Int) = 2 + (level - 1)
 
-    override fun getSubtractionDigitByLevel(level: Int) = 3
+    override fun getSubtractionDigitByLevel(level: Int) = 3 + (level - 1)
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -64,7 +71,8 @@ class GameTest {
             testScheduler.runCurrent()
 
             assertEquals(2, game.fieldFlow.value.level)
-            assertEquals(1, game.targetsFlow.value.size)
+            // FakeSessionHelper's amount is level-dependent: targetAmount 1 at level 2 is 1 + (2 - 1).
+            assertEquals(2, game.targetsFlow.value.size)
             assertTrue(game.targetsFlow.value.all { it.isActive })
         }
 
@@ -81,6 +89,39 @@ class GameTest {
             testScheduler.runCurrent()
 
             assertTrue(game.targetsFlow.value.all { it.appearanceDelayMs == 0 })
+        }
+
+    @Test
+    fun `fireButtonClicked derives the next operation digit from the current level`() =
+        runTest {
+            val game = Game(FakeSessionHelper(targetAmount = 1), backgroundScope, Random(10))
+            game.start()
+            game.createField(1)
+            game.createTargets()
+            testScheduler.runCurrent()
+            val targetId =
+                game.targetsFlow.value
+                    .first()
+                    .id
+            game.targetRevealed(targetId)
+            testScheduler.runCurrent()
+
+            // Level up to 2 first: getNextSignAndDigit hardcoding level 1 is invisible at level 1.
+            game.targetDidBreakout(targetId)
+            testScheduler.runCurrent()
+            assertEquals(2, game.fieldFlow.value.level)
+
+            game.fireButtonClicked()
+            testScheduler.runCurrent()
+
+            // Random(10)'s third draw (after recreateField's two) is pinned here, not derived from
+            // the field under test: reading nextOperationSign back out of the result being asserted
+            // let a hardcoded sign in getNextSignAndDigit survive undetected. Seeded specifically to
+            // draw SUBTRACTION so a hardcoded DIVISION is also caught - the real-helper determinism
+            // test below happens to draw DIVISION at its own call site, so between the two, a
+            // hardcoded sign of either value fails at least one test.
+            assertEquals(OperationSign.SUBTRACTION, game.fieldFlow.value.nextOperationSign)
+            assertEquals(4, game.fieldFlow.value.nextOperationDigit)
         }
 
     @Test
@@ -155,6 +196,77 @@ class GameTest {
             assertEquals(3, first.fieldFlow.value.currentOperationDigit)
             assertEquals(OperationSign.SUBTRACTION, first.fieldFlow.value.nextOperationSign)
             assertEquals(3, first.fieldFlow.value.nextOperationDigit)
+        }
+
+    @Test
+    fun `seeded Game reproduces the same session with the real session helper`() =
+        runTest {
+            // The fake above proves Game's own Random is seeded; this proves the session as a
+            // whole is, by routing the same seed through the production SessionHelperImpl - the
+            // six call sites this task fixes - instead of a fake that never drew from it.
+            fun runSession(): Pair<Field, List<Target>> {
+                val seed = 99L
+                val game = Game(SessionHelperImpl(random = Random(seed)), backgroundScope, Random(seed))
+                game.start()
+                game.createField(1)
+                game.createTargets()
+                testScheduler.runCurrent()
+
+                val firstTargetId =
+                    game.targetsFlow.value
+                        .first()
+                        .id
+                game.targetRevealed(firstTargetId)
+                testScheduler.runCurrent()
+
+                game.fireButtonClicked()
+                testScheduler.runCurrent()
+
+                game.targetsFlow.value
+                    .map { it.id }
+                    .forEach(game::targetDidBreakout)
+                testScheduler.runCurrent()
+
+                return game.fieldFlow.value to game.targetsFlow.value
+            }
+
+            val (firstField, firstTargets) = runSession()
+            val (secondField, secondTargets) = runSession()
+
+            assertEquals(firstField, secondField)
+            assertEquals(firstTargets, secondTargets)
+
+            // Comparing the two runs to each other cannot fail on a range narrow enough that an
+            // unseeded draw coincides by chance (getSubtractionDigitByLevel's 1..3 at level 1 agrees
+            // roughly one run in four). Pinning exact seed-99 values is what actually catches that.
+            assertEquals(
+                Field(
+                    id = 1,
+                    level = 2,
+                    score = 0,
+                    lifeCount = -5,
+                    bonusMultiplier = 0,
+                    currentOperationSign = OperationSign.SUBTRACTION,
+                    currentOperationDigit = 2,
+                    nextOperationSign = OperationSign.DIVISION,
+                    nextOperationDigit = 5,
+                    gameColumnWidthPx = 0,
+                    gameColumnHeightPx = 0,
+                    isClosed = true,
+                ),
+                firstField,
+            )
+            assertEquals(
+                listOf(
+                    Target(1, 1, 0, 13, 0, 0, 28861),
+                    Target(2, 1, 1, 25, 0, 0, 27622),
+                    Target(3, 1, 2, 12, 0, 0, 39078),
+                    Target(4, 1, 3, 24, 0, 0, 37001),
+                    Target(5, 1, 1, 20, 0, 17208, 35309),
+                    Target(6, 1, 2, 23, 0, 16318, 19998),
+                ),
+                firstTargets,
+            )
         }
 
     @Test
