@@ -336,4 +336,302 @@ class GameTest {
 
             assertEquals(1, game.fieldFlow.value.level)
         }
+
+    @Test
+    fun `targetClicked reduces the target's value by exactly one and scores a profitable hit`() =
+        runTest {
+            val game = Game(FakeSessionHelper(targetAmount = 1, targetValue = 10), backgroundScope, Random(16))
+            game.start()
+            game.createField(1)
+            game.createTargets()
+            testScheduler.runCurrent()
+            val targetId =
+                game.targetsFlow.value
+                    .first()
+                    .id
+
+            game.targetClicked(targetId)
+            testScheduler.runCurrent()
+
+            assertEquals(
+                9,
+                game.targetsFlow.value
+                    .first { it.id == targetId }
+                    .value,
+            )
+            assertEquals(1, game.fieldFlow.value.score)
+        }
+
+    @Test
+    fun `targetClicked does not score a target that fireButtonClicked marked unprofitable`() =
+        runTest {
+            val game = Game(FakeSessionHelper(targetAmount = 1, targetValue = 1), backgroundScope, Random(42))
+            game.start()
+            game.createField(1)
+            game.createTargets()
+            testScheduler.runCurrent()
+            val targetId =
+                game.targetsFlow.value
+                    .first()
+                    .id
+            game.targetRevealed(targetId)
+            testScheduler.runCurrent()
+
+            // Random(42) draws SUBTRACTION/3 here (pinned by the seeded-reproducibility test above);
+            // against value 1 that takes the losing branch: value grows to 4, isProfitable flips false.
+            game.fireButtonClicked()
+            testScheduler.runCurrent()
+            val afterFire = game.targetsFlow.value.first { it.id == targetId }
+            assertFalse(afterFire.isProfitable)
+            assertEquals(4, afterFire.value)
+            assertEquals(0, game.fieldFlow.value.score)
+
+            game.targetClicked(targetId)
+            testScheduler.runCurrent()
+
+            assertEquals(
+                3,
+                game.targetsFlow.value
+                    .first { it.id == targetId }
+                    .value,
+            )
+            assertEquals(0, game.fieldFlow.value.score)
+        }
+
+    @Test
+    fun `targetClicked retires a target it clears to zero`() =
+        runTest {
+            // A second, never-revealed target keeps the board non-empty so clearing the first one
+            // does not level up and regenerate the id being asserted on.
+            val game = Game(FakeSessionHelper(targetAmount = 2, targetValue = 1), backgroundScope, Random(21))
+            game.start()
+            game.createField(1)
+            game.createTargets()
+            testScheduler.runCurrent()
+            val targetId =
+                game.targetsFlow.value
+                    .sortedBy { it.id }
+                    .first()
+                    .id
+            game.targetRevealed(targetId)
+            testScheduler.runCurrent()
+
+            game.targetClicked(targetId)
+            testScheduler.runCurrent()
+
+            val cleared = game.targetsFlow.value.first { it.id == targetId }
+            assertEquals(0, cleared.value)
+            assertFalse(cleared.isActive)
+            assertFalse(cleared.isVisible)
+            assertEquals(1, game.fieldFlow.value.score)
+        }
+
+    @Test
+    fun `clicking the last target to zero clears the board and advances the level`() =
+        runTest {
+            val game = Game(FakeSessionHelper(targetAmount = 1, targetValue = 1), backgroundScope, Random(22))
+            game.start()
+            game.createField(1)
+            game.createTargets()
+            testScheduler.runCurrent()
+            val targetId =
+                game.targetsFlow.value
+                    .first()
+                    .id
+
+            game.targetClicked(targetId)
+            testScheduler.runCurrent()
+
+            // Without ensureAlive(id) the cleared target stays active, the board never empties and
+            // the level never advances - the soft-lock the engine audit named for this function.
+            assertEquals(2, game.fieldFlow.value.level)
+            assertEquals(2, game.targetsFlow.value.size)
+            assertTrue(game.targetsFlow.value.all { it.isActive })
+        }
+
+    @Test
+    fun `fireButtonClicked scores a successful hit and retires a target cleared to zero`() =
+        runTest {
+            // A second, never-revealed target stays active throughout so clearing the first one
+            // doesn't leave the board fully inactive - that would level up and regenerate the whole
+            // target set out from under the id being asserted on below.
+            val game = Game(FakeSessionHelper(targetAmount = 2, targetValue = 3), backgroundScope, Random(42))
+            game.start()
+            game.createField(1)
+            game.createTargets()
+            testScheduler.runCurrent()
+            val targetId =
+                game.targetsFlow.value
+                    .sortedBy { it.id }
+                    .first()
+                    .id
+            game.targetRevealed(targetId)
+            testScheduler.runCurrent()
+
+            // Random(42) draws SUBTRACTION/3 here; against value 3 that is the winning branch that
+            // clears the target to exactly zero and must retire it, not just leave it at 0 and alive.
+            game.fireButtonClicked()
+            testScheduler.runCurrent()
+
+            val cleared = game.targetsFlow.value.first { it.id == targetId }
+            assertEquals(0, cleared.value)
+            assertFalse(cleared.isActive)
+            assertFalse(cleared.isVisible)
+            assertEquals(3, game.fieldFlow.value.score)
+        }
+
+    @Test
+    fun `level-up regenerates targets whose value and lifetime scale with the new level`() =
+        runTest {
+            val game = Game(FakeSessionHelper(targetAmount = 1, targetValue = 10), backgroundScope, Random(17))
+            game.start()
+            game.createField(1)
+            game.createTargets()
+            testScheduler.runCurrent()
+            val targetId =
+                game.targetsFlow.value
+                    .first()
+                    .id
+            game.targetRevealed(targetId)
+            testScheduler.runCurrent()
+
+            game.targetDidBreakout(targetId)
+            testScheduler.runCurrent()
+            assertEquals(2, game.fieldFlow.value.level)
+
+            // FakeSessionHelper: value = targetValue + (level - 1), lifetimeMs = 1000 + (level - 1).
+            // A hardcoded 1 or an off-by-one level + 1 both land on a different number than this.
+            val regenerated = game.targetsFlow.value.first()
+            assertEquals(11, regenerated.value)
+            assertEquals(1001, regenerated.lifetimeMs)
+        }
+
+    @Test
+    fun `targetRevealed makes only the targeted target visible`() =
+        runTest {
+            val game = Game(FakeSessionHelper(targetAmount = 2), backgroundScope, Random(14))
+            game.start()
+            game.createField(1)
+            game.createTargets()
+            testScheduler.runCurrent()
+            val targets = game.targetsFlow.value.sortedBy { it.id }
+            val revealedId = targets[0].id
+            val untouchedId = targets[1].id
+
+            game.targetRevealed(revealedId)
+            testScheduler.runCurrent()
+
+            assertTrue(
+                game.targetsFlow.value
+                    .first { it.id == revealedId }
+                    .isVisible,
+            )
+            assertFalse(
+                game.targetsFlow.value
+                    .first { it.id == untouchedId }
+                    .isVisible,
+            )
+        }
+
+    @Test
+    fun `targetShouldBeSaved clears the appearance delay of a target already falling`() =
+        runTest {
+            // No start() here: the collector's visibleTargetsAbsent() branch zeroes appearanceDelayMs
+            // on every non-visible target, so with it running the delay assertion below passes even
+            // against a mapper that never writes the field at all.
+            val game = Game(FakeSessionHelper(targetAmount = 1, appearanceDelayMs = 500), backgroundScope, Random(15))
+            game.createField(1)
+            game.createTargets()
+            val targetId =
+                game.targetsFlow.value
+                    .first()
+                    .id
+
+            game.targetShouldBeSaved(targetId, position = 50, gameColumnHeightPx = 100)
+
+            val saved = game.targetsFlow.value.first { it.id == targetId }
+            assertEquals(50, saved.position)
+            assertEquals(0, saved.appearanceDelayMs)
+        }
+
+    @Test
+    fun `targetShouldBeSaved keeps the delay of a target paused before it appears`() =
+        runTest {
+            val game = Game(FakeSessionHelper(targetAmount = 1, appearanceDelayMs = 8000), backgroundScope, Random(15))
+            game.createField(1)
+            game.createTargets()
+            val targetId =
+                game.targetsFlow.value
+                    .first()
+                    .id
+
+            game.targetShouldBeSaved(targetId, position = 0, gameColumnHeightPx = 100)
+
+            val saved = game.targetsFlow.value.first { it.id == targetId }
+            assertEquals(0, saved.position)
+            assertEquals(8000, saved.appearanceDelayMs)
+        }
+
+    @Test
+    fun `gameColumnSizeMeasured stores width and height without swapping them`() =
+        runTest {
+            val game = Game(FakeSessionHelper(), backgroundScope, Random(13))
+
+            game.gameColumnSizeMeasured(width = 300, height = 700)
+            testScheduler.runCurrent()
+
+            assertEquals(300, game.fieldFlow.value.gameColumnWidthPx)
+            assertEquals(700, game.fieldFlow.value.gameColumnHeightPx)
+        }
+
+    @Test
+    fun `fieldRestored replaces the field with exactly the restored value`() =
+        runTest {
+            val game = Game(FakeSessionHelper(), backgroundScope, Random(18))
+            val restoredField =
+                Field(
+                    id = 7,
+                    level = 5,
+                    score = 42,
+                    lifeCount = 1,
+                    isClosed = false,
+                )
+
+            game.fieldRestored(restoredField)
+            testScheduler.runCurrent()
+
+            assertEquals(restoredField, game.fieldFlow.value)
+        }
+
+    @Test
+    fun `targetsRestored replaces the target list with exactly the restored targets`() =
+        runTest {
+            val game = Game(FakeSessionHelper(), backgroundScope, Random(19))
+            val restoredTargets =
+                listOf(
+                    Target(
+                        id = 1,
+                        relatedFieldId = 7,
+                        columnId = 0,
+                        value = 9,
+                        position = 120,
+                        appearanceDelayMs = 0,
+                        lifetimeMs = 30000,
+                    ),
+                    Target(
+                        id = 2,
+                        relatedFieldId = 7,
+                        columnId = 1,
+                        value = 4,
+                        position = 0,
+                        appearanceDelayMs = 5000,
+                        lifetimeMs = 25000,
+                    ),
+                )
+
+            game.targetsRestored(restoredTargets)
+            testScheduler.runCurrent()
+
+            assertEquals(restoredTargets, game.targetsFlow.value)
+        }
 }
