@@ -31,9 +31,14 @@ internal fun Field.updateGameColumnSize(
         gameColumnHeightPx = height,
     )
 
-internal fun Field.updateLevel(): Field =
+// Mirrors SessionHelperImpl's LEVEL_MAX: past level 1334 getTargetLifetimeMsByLevel's min/max
+// thresholds cross and IntRange.random() throws on an empty range. Enforced here, not on the
+// helper, because updateLevel is the only place a level is ever incremented.
+private const val LEVEL_MAX = 999
+
+internal fun Field.updateLevel(maxLevel: Int = LEVEL_MAX): Field =
     this.copy(
-        level = level + 1,
+        level = (level + 1).coerceAtMost(maxLevel),
     )
 
 internal fun Field.updateScore(scoreToAdd: Int): Field {

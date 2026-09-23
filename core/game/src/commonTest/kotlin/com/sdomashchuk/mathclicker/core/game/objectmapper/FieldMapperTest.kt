@@ -22,6 +22,22 @@ class FieldMapperTest {
     }
 
     @Test
+    fun `updateLevel increments normally below the clamp`() {
+        assertEquals(2, Field(level = 1).updateLevel().level)
+    }
+
+    @Test
+    fun `updateLevel clamps at 999 and does not advance past it`() {
+        // Level 999 is SessionHelperImpl's own declared levelRange.last, chosen for a large margin
+        // below level 1334, where getTargetLifetimeMsByLevel's threshold range goes empty and throws.
+        var field = Field(level = 999)
+
+        repeat(500) { field = field.updateLevel() }
+
+        assertEquals(999, field.level)
+    }
+
+    @Test
     fun `updateActionButtons promotes the pending operation and queues a new one`() {
         val field =
             Field(
