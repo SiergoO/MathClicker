@@ -9,7 +9,7 @@ import org.gradle.kotlin.dsl.configure
 import org.jetbrains.kotlin.gradle.dsl.KotlinProjectExtension
 
 /**
- * `mathclicker.quality` — applied by every library and application convention, so no module
+ * `matharcade.quality` — applied by every library and application convention, so no module
  * can opt out once it is wired.
  */
 class QualityConventionPlugin : Plugin<Project> {

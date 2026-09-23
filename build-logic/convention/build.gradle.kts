@@ -22,27 +22,27 @@ dependencies {
 gradlePlugin {
     plugins {
         register("androidLibrary") {
-            id = "mathclicker.android.library"
+            id = "matharcade.android.library"
             implementationClass = "com.sdamashchuk.matharcade.buildlogic.AndroidLibraryConventionPlugin"
         }
         register("androidApplication") {
-            id = "mathclicker.android.application"
+            id = "matharcade.android.application"
             implementationClass = "com.sdamashchuk.matharcade.buildlogic.AndroidApplicationConventionPlugin"
         }
         register("androidCompose") {
-            id = "mathclicker.android.compose"
+            id = "matharcade.android.compose"
             implementationClass = "com.sdamashchuk.matharcade.buildlogic.AndroidComposeConventionPlugin"
         }
         register("quality") {
-            id = "mathclicker.quality"
+            id = "matharcade.quality"
             implementationClass = "com.sdamashchuk.matharcade.buildlogic.QualityConventionPlugin"
         }
         register("kmpLibrary") {
-            id = "mathclicker.kmp.library"
+            id = "matharcade.kmp.library"
             implementationClass = "com.sdamashchuk.matharcade.buildlogic.KmpLibraryConventionPlugin"
         }
         register("kmpFeature") {
-            id = "mathclicker.kmp.feature"
+            id = "matharcade.kmp.feature"
             implementationClass = "com.sdamashchuk.matharcade.buildlogic.KmpFeatureConventionPlugin"
         }
     }

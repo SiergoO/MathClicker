@@ -1,5 +1,5 @@
 plugins {
-    id("mathclicker.kmp.library")
+    id("matharcade.kmp.library")
 }
 
 kotlin {

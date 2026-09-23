@@ -16,7 +16,7 @@ import kotlin.math.abs
 
 /**
  * Decompose's own `fade()` animates enter and exit with the same [FiniteAnimationSpec][androidx.compose.animation.core.FiniteAnimationSpec].
- * MathClicker's screens fade in and out over different durations (e.g. Menu: 500ms in, 200ms out),
+ * Math Arcade's screens fade in and out over different durations (e.g. Menu: 500ms in, 200ms out),
  * so this picks the duration by [Direction] instead.
  */
 fun asymmetricFade(

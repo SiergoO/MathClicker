@@ -1,6 +1,6 @@
 plugins {
-    id("mathclicker.android.application")
-    id("mathclicker.android.compose")
+    id("matharcade.android.application")
+    id("matharcade.android.compose")
     alias(libs.plugins.kotlin.serialization)
 }
 

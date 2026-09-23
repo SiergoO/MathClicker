@@ -222,7 +222,7 @@ abstract class AppLaunchCheckTask : DefaultTask() {
         appId: String,
     ): String {
         // Resolved from the package rather than hardcoded, so this task stays correct for any
-        // application module that applies mathclicker.android.application, not just :app today.
+        // application module that applies matharcade.android.application, not just :app today.
         val resolved =
             adbOut(
                 adb,

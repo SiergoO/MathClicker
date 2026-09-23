@@ -9,7 +9,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 
 /**
- * `mathclicker.kmp.library` — the convention for pure-logic KMP modules: AGP's KMP-native
+ * `matharcade.kmp.library` — the convention for pure-logic KMP modules: AGP's KMP-native
  * Android library plugin (`com.android.kotlin.multiplatform.library`, not the
  * `com.android.library` + `org.jetbrains.kotlin.multiplatform` pairing AGP 9 forbids), an Android
  * host-test target plus `iosArm64`/`iosSimulatorArm64`, and `kotlinx-coroutines-core`/`kotlin.test`
@@ -23,7 +23,7 @@ class KmpLibraryConventionPlugin : Plugin<Project> {
     override fun apply(target: Project) = with(target) {
         pluginManager.apply("org.jetbrains.kotlin.multiplatform")
         pluginManager.apply("com.android.kotlin.multiplatform.library")
-        pluginManager.apply("mathclicker.quality")
+        pluginManager.apply("matharcade.quality")
 
         extensions.configure<KotlinMultiplatformExtension> {
             extensions.configure(KotlinMultiplatformAndroidLibraryTarget::class.java) {

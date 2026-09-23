@@ -4,7 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import com.arkivanov.decompose.retainedComponent
-import com.sdamashchuk.matharcade.core.ui.theme.MathClickerTheme
+import com.sdamashchuk.matharcade.core.ui.theme.MathArcadeTheme
 import com.sdamashchuk.matharcade.presentation.navigation.RootComponent
 import com.sdamashchuk.matharcade.presentation.navigation.RootContent
 
@@ -16,7 +16,7 @@ class MainActivity : ComponentActivity() {
         // reachable ones are font scale, dark mode and locale.
         val root = retainedComponent { RootComponent(it) }
         setContent {
-            MathClickerTheme {
+            MathArcadeTheme {
                 RootContent(root)
             }
         }

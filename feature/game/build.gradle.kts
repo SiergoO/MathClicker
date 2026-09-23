@@ -1,5 +1,5 @@
 plugins {
-    id("mathclicker.kmp.feature")
+    id("matharcade.kmp.feature")
 }
 
 kotlin {

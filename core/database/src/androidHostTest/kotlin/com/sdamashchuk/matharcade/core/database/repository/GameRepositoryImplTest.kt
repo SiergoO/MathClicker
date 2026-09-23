@@ -3,7 +3,7 @@ package com.sdamashchuk.matharcade.core.database.repository
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
 import com.sdamashchuk.matharcade.core.database.dao.FieldDao
 import com.sdamashchuk.matharcade.core.database.dao.TargetsDao
-import com.sdamashchuk.matharcade.core.database.local.MathClickerDatabase
+import com.sdamashchuk.matharcade.core.database.local.MathArcadeDatabase
 import com.sdamashchuk.matharcade.core.model.Field
 import com.sdamashchuk.matharcade.core.model.OperationSign
 import com.sdamashchuk.matharcade.core.model.Target
@@ -16,15 +16,15 @@ import org.junit.Test
 
 class GameRepositoryImplTest {
     // GameRepository dropped getFieldById (MC-37, no production caller); read straight from the
-    // DAO for the round-trip assertions below, the same way MathClickerDatabaseMigrationTest does.
+    // DAO for the round-trip assertions below, the same way MathArcadeDatabaseMigrationTest does.
     private lateinit var fieldDao: FieldDao
     private lateinit var repository: GameRepositoryImpl
 
     @Before
     fun setUp() {
         val driver = JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY)
-        MathClickerDatabase.Schema.create(driver)
-        val database = MathClickerDatabase(driver)
+        MathArcadeDatabase.Schema.create(driver)
+        val database = MathArcadeDatabase(driver)
         fieldDao = FieldDao(database.fieldQueries, Dispatchers.Unconfined)
         repository =
             GameRepositoryImpl(

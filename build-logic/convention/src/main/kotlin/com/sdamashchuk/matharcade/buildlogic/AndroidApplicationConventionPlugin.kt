@@ -12,7 +12,7 @@ import org.gradle.kotlin.dsl.named
 import org.gradle.kotlin.dsl.register
 
 /**
- * `mathclicker.android.application` — the launcher module convention: Android application
+ * `matharcade.android.application` — the launcher module convention: Android application
  * plugin, Kotlin, the shared compile/lint config, and the app's `targetSdk`.
  *
  * Kotlin support is AGP 9's built-in default now that android.builtInKotlin is no longer forced
@@ -21,7 +21,7 @@ import org.gradle.kotlin.dsl.register
 class AndroidApplicationConventionPlugin : Plugin<Project> {
     override fun apply(target: Project) = with(target) {
         pluginManager.apply("com.android.application")
-        pluginManager.apply("mathclicker.quality")
+        pluginManager.apply("matharcade.quality")
 
         extensions.configure<ApplicationExtension> {
             configureKotlinAndroid(this)

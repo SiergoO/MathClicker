@@ -9,7 +9,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-class MathClickerDatabaseMigrationTest {
+class MathArcadeDatabaseMigrationTest {
     // Hand-written rather than Schema.create(), because Schema.create() already targets the
     // current (post-migration) version. This is the exact CREATE TABLE text Room and the
     // pre-migration SQLDelight schema both shipped at user_version 1 — what every existing
@@ -36,10 +36,10 @@ class MathClickerDatabaseMigrationTest {
                 0,
             )
 
-            MathClickerDatabase.Schema.migrate(driver, oldVersion = 1, newVersion = 2)
+            MathArcadeDatabase.Schema.migrate(driver, oldVersion = 1, newVersion = 2)
 
-            assertEquals(2L, MathClickerDatabase.Schema.version)
-            val database = MathClickerDatabase(driver)
+            assertEquals(2L, MathArcadeDatabase.Schema.version)
+            val database = MathArcadeDatabase(driver)
             val restored = FieldDao(database.fieldQueries, Dispatchers.Unconfined).getFieldById(1)
             assertEquals(
                 Field(

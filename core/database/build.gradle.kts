@@ -1,5 +1,5 @@
 plugins {
-    id("mathclicker.kmp.library")
+    id("matharcade.kmp.library")
     alias(libs.plugins.sqldelight)
 }
 
@@ -9,7 +9,7 @@ sqldelight {
         // builds the driver — see DatabaseModule.kt. The name, schema version and CREATE TABLE
         // text must not drift: SQLDelight opens Room's existing on-device file in place only
         // because they still match.
-        create("MathClickerDatabase") {
+        create("MathArcadeDatabase") {
             packageName.set("com.sdamashchuk.matharcade.core.database.local")
             // .sqm files live next to the .sq files they migrate. SQLDelight numbers a migration
             // file by the version it migrates *from* — 1.sqm takes version 1 to 2 — and both Room
@@ -19,7 +19,7 @@ sqldelight {
             // they migrate from and fails the build if the result drifts from what the .sq CREATE
             // TABLE statements declare for the current version.
             verifyMigrations.set(true)
-            // Where `generateCommonMainMathClickerDatabaseSchema` writes a `<version>.db` snapshot of
+            // Where `generateCommonMainMathArcadeDatabaseSchema` writes a `<version>.db` snapshot of
             // the schema as it stood at that version, and where verifyMigrations expects to find one
             // per released version to replay each later .sqm against.
             schemaOutputDirectory.set(layout.projectDirectory.dir("src/commonMain/sqldelight/databases"))

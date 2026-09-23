@@ -8,13 +8,13 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import com.sdamashchuk.matharcade.core.ui.theme.MathClickerTheme
+import com.sdamashchuk.matharcade.core.ui.theme.MathArcadeTheme
 
 @Composable
 fun GameScreen(component: GameComponent) {
     val gameState = component.state.collectAsState()
 
-    MathClickerTheme {
+    MathArcadeTheme {
         Column(
             modifier = Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally,

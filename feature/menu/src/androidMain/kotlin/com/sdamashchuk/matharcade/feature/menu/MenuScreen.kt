@@ -18,16 +18,16 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.constraintlayout.compose.ChainStyle
 import androidx.constraintlayout.compose.ConstraintLayout
-import com.sdamashchuk.matharcade.core.ui.component.MathClickerDialog
+import com.sdamashchuk.matharcade.core.ui.component.MathArcadeDialog
 import com.sdamashchuk.matharcade.core.ui.component.MenuButton
-import com.sdamashchuk.matharcade.core.ui.theme.MathClickerTheme
+import com.sdamashchuk.matharcade.core.ui.theme.MathArcadeTheme
 
 @Composable
 fun MenuScreen(component: MenuComponent) {
     val state = component.state.collectAsState()
 
     if (state.value.isOpenDialog) {
-        MathClickerDialog(
+        MathArcadeDialog(
             headerText = stringResource(id = R.string.how_to_play_dialog_header),
             bodyText = stringResource(id = R.string.how_to_play_dialog_body),
             onDismiss = { component.sendAction(MenuViewModel.Action.CloseDialog) },
@@ -36,7 +36,7 @@ fun MenuScreen(component: MenuComponent) {
         )
     }
 
-    MathClickerTheme {
+    MathArcadeTheme {
         ConstraintLayout(
             modifier =
                 Modifier

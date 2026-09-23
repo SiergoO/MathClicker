@@ -4,7 +4,7 @@ import app.cash.sqldelight.db.SqlDriver
 import com.sdamashchuk.matharcade.core.database.dao.FieldDao
 import com.sdamashchuk.matharcade.core.database.dao.TargetsDao
 import com.sdamashchuk.matharcade.core.database.local.FieldQueries
-import com.sdamashchuk.matharcade.core.database.local.MathClickerDatabase
+import com.sdamashchuk.matharcade.core.database.local.MathArcadeDatabase
 import com.sdamashchuk.matharcade.core.database.local.TargetsQueries
 import com.sdamashchuk.matharcade.core.database.repository.GameRepository
 import com.sdamashchuk.matharcade.core.database.repository.GameRepositoryImpl
@@ -20,9 +20,9 @@ import org.koin.dsl.module
 // (:app today) builds the platform driver and binds it; this module only consumes SqlDriver.
 val databaseModule =
     module {
-        single<MathClickerDatabase> { MathClickerDatabase(get<SqlDriver>()) }
-        single<FieldQueries> { get<MathClickerDatabase>().fieldQueries }
-        single<TargetsQueries> { get<MathClickerDatabase>().targetsQueries }
+        single<MathArcadeDatabase> { MathArcadeDatabase(get<SqlDriver>()) }
+        single<FieldQueries> { get<MathArcadeDatabase>().fieldQueries }
+        single<TargetsQueries> { get<MathArcadeDatabase>().targetsQueries }
         single { FieldDao(get(), get()) }
         single { TargetsDao(get(), get()) }
         single { GameRepositoryImpl(get(), get()) } bind GameRepository::class

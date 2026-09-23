@@ -25,7 +25,7 @@ private val LightColorPalette =
     )
 
 @Composable
-fun MathClickerTheme(
+fun MathArcadeTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit,
 ) {

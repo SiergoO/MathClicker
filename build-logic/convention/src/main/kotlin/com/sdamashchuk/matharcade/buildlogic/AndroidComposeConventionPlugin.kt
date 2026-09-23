@@ -6,7 +6,7 @@ import org.gradle.api.Project
 import org.gradle.kotlin.dsl.configure
 
 /**
- * `mathclicker.android.compose` — enables Compose, applies the Kotlin Compose compiler plugin
+ * `matharcade.android.compose` — enables Compose, applies the Kotlin Compose compiler plugin
  * (replacing the removed `composeOptions.kotlinCompilerExtensionVersion` DSL), and applies the
  * Compose Multiplatform plugin so `:app`'s dependencies resolve against the CMP BOM.
  */

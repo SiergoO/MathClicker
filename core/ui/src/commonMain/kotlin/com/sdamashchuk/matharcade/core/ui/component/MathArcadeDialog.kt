@@ -18,7 +18,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 
 @Composable
-fun MathClickerDialog(
+fun MathArcadeDialog(
     headerText: String,
     bodyText: String,
     onDismiss: () -> Unit,
