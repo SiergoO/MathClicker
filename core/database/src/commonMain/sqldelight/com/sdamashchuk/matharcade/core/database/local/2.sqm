@@ -1,0 +1,69 @@
+-- MC-38 (with MC-43 absorbed): targets stops storing a device-pixel fall position and starts
+-- storing elapsed fall time, and field drops the two geometry columns that pixel position depended
+-- on. Order is not negotiable: targets is rebuilt first, reading field.gameColumnHeightPx one last
+-- time to convert each stored pixel position into the equivalent elapsed milliseconds; only once
+-- that conversion is done does field get rebuilt to drop the columns it needed.
+--
+-- Neither RENAME COLUMN (SQLite 3.25) nor DROP COLUMN (3.35) is available at minSdk 24 - the first
+-- Android whose SQLite is new enough is API 30 - so both tables are rebuilt by hand instead.
+CREATE TABLE `targets_new` (
+    `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    `relatedFieldId` INTEGER NOT NULL,
+    `columnId` INTEGER NOT NULL,
+    `value` INTEGER NOT NULL,
+    `fallenMs` INTEGER NOT NULL,
+    `appearanceDelayMs` INTEGER NOT NULL,
+    `lifetimeMs` INTEGER NOT NULL,
+    `isProfitable` INTEGER AS kotlin.Boolean NOT NULL,
+    `isVisible` INTEGER AS kotlin.Boolean NOT NULL,
+    `isActive` INTEGER AS kotlin.Boolean NOT NULL
+);
+
+-- relatedFieldId is never queried in production, so a target's own field can't be looked up by it;
+-- the tallest gameColumnHeightPx across every field row stands in for it instead. `field` empty
+-- while `targets` is not is reachable - nothing enforces referential integrity between them - so
+-- the COALESCE has to live inside the subquery: an outer MAX(h.px, 1) still lets a NULL MAX() from
+-- an empty `field` poison the expression, and this migration crashed on exactly that upgrade before
+-- the fix. The CASE below is the second guard, for h.px = 0 rather than NULL: same empty-field case,
+-- reached after the COALESCE has already turned NULL into a real number.
+INSERT INTO `targets_new` (`id`, `relatedFieldId`, `columnId`, `value`, `fallenMs`, `appearanceDelayMs`, `lifetimeMs`, `isProfitable`, `isVisible`, `isActive`)
+SELECT
+    t.id,
+    t.relatedFieldId,
+    t.columnId,
+    t.value,
+    CASE
+        WHEN h.px <= 0 THEN 0
+        ELSE CAST(MIN(MAX(t.position, 0), h.px) AS INTEGER) * t.lifetimeMs / h.px
+    END,
+    t.appearanceDelayMs,
+    t.lifetimeMs,
+    t.isProfitable,
+    t.isVisible,
+    t.isActive
+FROM `targets` t, (SELECT COALESCE(MAX(gameColumnHeightPx), 0) AS px FROM `field`) h;
+
+-- sqlite_sequence does not survive a table rebuild, but insertTarget always binds id explicitly
+-- (see Targets.sq), so nothing here ever relied on AUTOINCREMENT picking up where it left off.
+DROP TABLE `targets`;
+ALTER TABLE `targets_new` RENAME TO `targets`;
+
+CREATE TABLE `field_new` (
+    `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    `level` INTEGER NOT NULL,
+    `score` INTEGER NOT NULL,
+    `lifeCount` INTEGER NOT NULL,
+    `bonusMultiplier` INTEGER NOT NULL,
+    `currentOperationSign` TEXT NOT NULL,
+    `currentOperationDigit` INTEGER NOT NULL,
+    `nextOperationSign` TEXT NOT NULL,
+    `nextOperationDigit` INTEGER NOT NULL,
+    `isClosed` INTEGER AS kotlin.Boolean NOT NULL
+);
+
+INSERT INTO `field_new` (`id`, `level`, `score`, `lifeCount`, `bonusMultiplier`, `currentOperationSign`, `currentOperationDigit`, `nextOperationSign`, `nextOperationDigit`, `isClosed`)
+SELECT `id`, `level`, `score`, `lifeCount`, `bonusMultiplier`, `currentOperationSign`, `currentOperationDigit`, `nextOperationSign`, `nextOperationDigit`, `isClosed`
+FROM `field`;
+
+DROP TABLE `field`;
+ALTER TABLE `field_new` RENAME TO `field`;

@@ -8,33 +8,24 @@ import org.junit.Test
 
 class TargetButtonLogicTest {
     @Test
-    fun `remainingFallDurationMs scales lifetime by the share of the column not yet fallen`() {
-        val target = target(lifetimeMs = 2000, position = 250)
+    fun `remainingFallDurationMs subtracts the elapsed fall time from the lifetime`() {
+        val target = target(lifetimeMs = 2000, fallenMs = 500)
 
-        assertEquals(1500, remainingFallDurationMs(target, gameColumnHeightPx = 1000))
+        assertEquals(1500, remainingFallDurationMs(target))
     }
 
     @Test
-    fun `remainingFallDurationMs returns the full lifetime when the column has no height yet`() {
-        val target = target(lifetimeMs = 2000, position = 250)
+    fun `remainingFallDurationMs returns the full lifetime when nothing has fallen yet`() {
+        val target = target(lifetimeMs = 2000, fallenMs = 0)
 
-        assertEquals(2000, remainingFallDurationMs(target, gameColumnHeightPx = 0))
+        assertEquals(2000, remainingFallDurationMs(target))
     }
 
     @Test
-    fun `remainingFallDurationMs floors at zero when the saved position is past the column`() {
-        val target = target(lifetimeMs = 2000, position = 1500)
+    fun `remainingFallDurationMs floors at zero when fallenMs exceeds the lifetime`() {
+        val target = target(lifetimeMs = 2000, fallenMs = 3000)
 
-        assertEquals(0, remainingFallDurationMs(target, gameColumnHeightPx = 1000))
-    }
-
-    // 2001 * 0.75 = 1500.75, which toInt() truncates to 1500 and roundToInt() would round to
-    // 1501 — the two prior cases land on whole numbers, where the two agree.
-    @Test
-    fun `remainingFallDurationMs truncates the fractional result rather than rounding it`() {
-        val target = target(lifetimeMs = 2001, position = 250)
-
-        assertEquals(1500, remainingFallDurationMs(target, gameColumnHeightPx = 1000))
+        assertEquals(0, remainingFallDurationMs(target))
     }
 
     @Test
@@ -97,13 +88,13 @@ class TargetButtonLogicTest {
 
     private fun target(
         lifetimeMs: Int,
-        position: Int,
+        fallenMs: Int,
     ) = Target(
         id = 1,
         relatedFieldId = 1,
         columnId = 1,
         value = 5,
-        position = position,
+        fallenMs = fallenMs,
         appearanceDelayMs = 0,
         lifetimeMs = lifetimeMs,
     )

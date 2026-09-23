@@ -15,15 +15,6 @@ internal fun Field.closeIfNecessary(): Field =
         isClosed = lifeCount <= 0,
     )
 
-internal fun Field.updateGameColumnSize(
-    width: Int,
-    height: Int,
-): Field =
-    this.copy(
-        gameColumnWidthPx = width,
-        gameColumnHeightPx = height,
-    )
-
 // Mirrors SessionHelperImpl's LEVEL_MAX: past level 1334 getTargetLifetimeMsByLevel's min/max
 // thresholds cross and IntRange.random() throws on an empty range. Enforced here, not on the
 // helper, because updateLevel is the only place a level is ever incremented.

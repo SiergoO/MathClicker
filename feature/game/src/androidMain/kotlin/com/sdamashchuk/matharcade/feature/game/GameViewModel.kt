@@ -1,6 +1,5 @@
 package com.sdamashchuk.matharcade.feature.game
 
-import android.util.Size
 import com.sdamashchuk.matharcade.core.component.ComponentViewModel
 import com.sdamashchuk.matharcade.core.database.repository.GameRepository
 import com.sdamashchuk.matharcade.core.game.Game
@@ -119,10 +118,6 @@ class GameViewModel(
                             )
                     }
 
-                    is Action.GameColumnSizeMeasured -> {
-                        game.gameColumnSizeMeasured(action.size.width, action.size.height)
-                    }
-
                     is Action.TargetRevealed -> {
                         game.targetRevealed(action.id)
                     }
@@ -192,10 +187,6 @@ class GameViewModel(
         object RestartGame : Action()
 
         object BackToMainMenuClicked : Action()
-
-        data class GameColumnSizeMeasured(
-            val size: Size,
-        ) : Action()
 
         data class TargetRevealed(
             val id: Int,

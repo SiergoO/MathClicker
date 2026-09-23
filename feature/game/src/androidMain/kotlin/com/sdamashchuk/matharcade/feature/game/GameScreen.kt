@@ -47,9 +47,6 @@ fun GameScreen(component: GameComponent) {
                 else -> {
                     Field(
                         gameState,
-                        onGameColumnSizeMeasured = { size ->
-                            component.sendAction(GameViewModel.Action.GameColumnSizeMeasured(size))
-                        },
                         onTargetRevealed = { id -> component.sendAction(GameViewModel.Action.TargetRevealed(id)) },
                         onTargetClicked = { id -> component.sendAction(GameViewModel.Action.TargetClicked(id)) },
                         onTargetDidBreakout = { id ->

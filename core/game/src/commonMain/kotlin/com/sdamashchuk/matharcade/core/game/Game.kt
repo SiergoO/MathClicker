@@ -11,7 +11,6 @@ import com.sdamashchuk.matharcade.core.game.objectmapper.ensureAlive
 import com.sdamashchuk.matharcade.core.game.objectmapper.ensureVisible
 import com.sdamashchuk.matharcade.core.game.objectmapper.shortenAppearanceDelay
 import com.sdamashchuk.matharcade.core.game.objectmapper.updateActionButtons
-import com.sdamashchuk.matharcade.core.game.objectmapper.updateGameColumnSize
 import com.sdamashchuk.matharcade.core.game.objectmapper.updateLevel
 import com.sdamashchuk.matharcade.core.game.objectmapper.updateScore
 import com.sdamashchuk.matharcade.core.game.objectmapper.updateTargetPositioning
@@ -176,13 +175,6 @@ class Game(
             _stateFlow.value = GameState(updatedField, updatedTargets)
         }
 
-    suspend fun gameColumnSizeMeasured(
-        width: Int,
-        height: Int,
-    ) = mutex.withLock {
-        _stateFlow.value = _stateFlow.value.copy(field = _stateFlow.value.field.updateGameColumnSize(width, height))
-    }
-
     private suspend fun activeTargetsAbsent() =
         mutex.withLock {
             // Re-check under the lock: the collector's own condition (targets.none { it.isActive })
@@ -238,7 +230,7 @@ class Game(
                 relatedFieldId = field.id,
                 columnId = id.toGameColumnId(),
                 value = sessionHelper.getTargetValueByLevel(field.level),
-                position = 0,
+                fallenMs = 0,
                 appearanceDelayMs = sessionHelper.getTargetAppearanceDelayMsById(id),
                 lifetimeMs = sessionHelper.getTargetLifetimeMsByLevel(field.level),
             )

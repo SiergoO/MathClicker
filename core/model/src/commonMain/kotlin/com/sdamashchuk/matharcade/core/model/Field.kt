@@ -10,7 +10,5 @@ data class Field(
     val currentOperationDigit: Int = 0,
     val nextOperationSign: OperationSign = OperationSign.DIVISION,
     val nextOperationDigit: Int = 0,
-    val gameColumnWidthPx: Int = 0,
-    val gameColumnHeightPx: Int = 0,
     val isClosed: Boolean = false,
 )

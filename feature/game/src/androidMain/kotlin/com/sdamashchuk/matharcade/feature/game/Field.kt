@@ -48,7 +48,6 @@ import com.sdamashchuk.matharcade.core.ui.theme.White
 @Composable
 fun Field(
     gameState: State<GameViewModel.State>,
-    onGameColumnSizeMeasured: (gameColumnSize: Size) -> Unit,
     onTargetRevealed: (id: Int) -> Unit,
     onTargetClicked: (id: Int) -> Unit,
     onTargetDidBreakout: (id: Int) -> Unit,
@@ -115,7 +114,6 @@ fun Field(
                                 .toInt() - (gameColumnWidth * 0.8).toInt()
                         }
                     gameColumnSize = Size(gameColumnWidth, gameColumnHeight)
-                    onGameColumnSizeMeasured.invoke(gameColumnSize)
                 },
     ) {
         repeat(GAME_COLUMN_COUNT) { columnId ->

@@ -17,7 +17,7 @@ private fun target(
     relatedFieldId = 0,
     columnId = 0,
     value = value,
-    position = 0,
+    fallenMs = 0,
     appearanceDelayMs = 0,
     lifetimeMs = 0,
     isProfitable = isProfitable,
@@ -64,6 +64,6 @@ class TargetsMapperTest {
 
         assertEquals(10000, afterFirstPause.first().lifetimeMs)
         assertEquals(10000, afterSecondPause.first().lifetimeMs)
-        assertEquals(110, afterSecondPause.first().position)
+        assertEquals(1100, afterSecondPause.first().fallenMs)
     }
 }

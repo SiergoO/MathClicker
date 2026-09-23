@@ -19,7 +19,7 @@ private fun target(
     relatedFieldId = 0,
     columnId = 0,
     value = value,
-    position = 0,
+    fallenMs = 0,
     appearanceDelayMs = 0,
     lifetimeMs = 0,
     isProfitable = isProfitable,

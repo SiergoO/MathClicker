@@ -1,15 +1,15 @@
-CREATE TABLE IF NOT EXISTS `field` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `level` INTEGER NOT NULL, `score` INTEGER NOT NULL, `lifeCount` INTEGER NOT NULL, `bonusMultiplier` INTEGER NOT NULL, `currentOperationSign` TEXT NOT NULL, `currentOperationDigit` INTEGER NOT NULL, `nextOperationSign` TEXT NOT NULL, `nextOperationDigit` INTEGER NOT NULL, `gameColumnWidthPx` INTEGER NOT NULL, `gameColumnHeightPx` INTEGER NOT NULL, `isClosed` INTEGER AS kotlin.Boolean NOT NULL);
+CREATE TABLE IF NOT EXISTS "field" (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `level` INTEGER NOT NULL, `score` INTEGER NOT NULL, `lifeCount` INTEGER NOT NULL, `bonusMultiplier` INTEGER NOT NULL, `currentOperationSign` TEXT NOT NULL, `currentOperationDigit` INTEGER NOT NULL, `nextOperationSign` TEXT NOT NULL, `nextOperationDigit` INTEGER NOT NULL, `isClosed` INTEGER AS kotlin.Boolean NOT NULL);
 
 -- id is nullable here even though the column is NOT NULL: SQLDelight treats an INTEGER PRIMARY
 -- KEY as a rowid alias and lets an explicit NULL bind trigger SQLite's autoincrement, matching
 -- Room's 0-means-"generate" default on this column.
 insertField:
-INSERT OR IGNORE INTO field (id, level, score, lifeCount, bonusMultiplier, currentOperationSign, currentOperationDigit, nextOperationSign, nextOperationDigit, gameColumnWidthPx, gameColumnHeightPx, isClosed)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+INSERT OR IGNORE INTO field (id, level, score, lifeCount, bonusMultiplier, currentOperationSign, currentOperationDigit, nextOperationSign, nextOperationDigit, isClosed)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 updateField:
 UPDATE OR IGNORE field
-SET level = ?, score = ?, lifeCount = ?, bonusMultiplier = ?, currentOperationSign = ?, currentOperationDigit = ?, nextOperationSign = ?, nextOperationDigit = ?, gameColumnWidthPx = ?, gameColumnHeightPx = ?, isClosed = ?
+SET level = ?, score = ?, lifeCount = ?, bonusMultiplier = ?, currentOperationSign = ?, currentOperationDigit = ?, nextOperationSign = ?, nextOperationDigit = ?, isClosed = ?
 WHERE id = ?;
 
 getFieldById:

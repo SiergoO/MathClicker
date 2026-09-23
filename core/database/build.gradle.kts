@@ -19,6 +19,14 @@ sqldelight {
             // they migrate from and fails the build if the result drifts from what the .sq CREATE
             // TABLE statements declare for the current version.
             verifyMigrations.set(true)
+            // Kept on, and it takes one thing to keep it on: the CREATE TABLE statements in the
+            // .sq files must quote the table name with double quotes, not backticks. SQLite rewrites
+            // a renamed table's stored DDL with the name in double quotes whatever the original used
+            // (verified directly: backtick, double-quote and bare all come back as "a"), and a
+            // minSdk 24 migration can only rebuild a table via CREATE + INSERT..SELECT + DROP +
+            // RENAME. SQLDelight's comparator normalises away double quotes and whitespace but not
+            // backticks, so a backtick-quoted .sq reads as a permanent false CHANGED against every
+            // rebuild migration. Double quotes make both sides normalise identically.
             // Where `generateCommonMainMathArcadeDatabaseSchema` writes a `<version>.db` snapshot of
             // the schema as it stood at that version, and where verifyMigrations expects to find one
             // per released version to replay each later .sqm against.

@@ -26,8 +26,6 @@ class FieldDao(
                 currentOperationDigit = field.currentOperationDigit.toLong(),
                 nextOperationSign = field.nextOperationSign.sign,
                 nextOperationDigit = field.nextOperationDigit.toLong(),
-                gameColumnWidthPx = field.gameColumnWidthPx.toLong(),
-                gameColumnHeightPx = field.gameColumnHeightPx.toLong(),
                 isClosed = field.isClosed,
             )
         }
@@ -43,8 +41,6 @@ class FieldDao(
                 currentOperationDigit = field.currentOperationDigit.toLong(),
                 nextOperationSign = field.nextOperationSign.sign,
                 nextOperationDigit = field.nextOperationDigit.toLong(),
-                gameColumnWidthPx = field.gameColumnWidthPx.toLong(),
-                gameColumnHeightPx = field.gameColumnHeightPx.toLong(),
                 isClosed = field.isClosed,
                 id = field.id.toLong(),
             )
@@ -70,7 +66,5 @@ private fun LocalField.toDomainModel() =
         currentOperationDigit = currentOperationDigit.toInt(),
         nextOperationSign = OperationSign.values().first { it.sign == nextOperationSign },
         nextOperationDigit = nextOperationDigit.toInt(),
-        gameColumnWidthPx = gameColumnWidthPx.toInt(),
-        gameColumnHeightPx = gameColumnHeightPx.toInt(),
         isClosed = isClosed,
     )

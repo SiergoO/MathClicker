@@ -265,20 +265,66 @@ class GameTest {
                     currentOperationDigit = 2,
                     nextOperationSign = OperationSign.DIVISION,
                     nextOperationDigit = 5,
-                    gameColumnWidthPx = 0,
-                    gameColumnHeightPx = 0,
                     isClosed = true,
                 ),
                 firstField,
             )
             assertEquals(
                 listOf(
-                    Target(1, 1, 0, 13, 0, 0, 28861),
-                    Target(2, 1, 1, 25, 0, 0, 27622),
-                    Target(3, 1, 2, 12, 0, 0, 39078),
-                    Target(4, 1, 3, 24, 0, 0, 37001),
-                    Target(5, 1, 1, 20, 0, 17208, 35309),
-                    Target(6, 1, 2, 23, 0, 16318, 19998),
+                    Target(
+                        id = 1,
+                        relatedFieldId = 1,
+                        columnId = 0,
+                        value = 13,
+                        fallenMs = 0,
+                        appearanceDelayMs = 0,
+                        lifetimeMs = 28861,
+                    ),
+                    Target(
+                        id = 2,
+                        relatedFieldId = 1,
+                        columnId = 1,
+                        value = 25,
+                        fallenMs = 0,
+                        appearanceDelayMs = 0,
+                        lifetimeMs = 27622,
+                    ),
+                    Target(
+                        id = 3,
+                        relatedFieldId = 1,
+                        columnId = 2,
+                        value = 12,
+                        fallenMs = 0,
+                        appearanceDelayMs = 0,
+                        lifetimeMs = 39078,
+                    ),
+                    Target(
+                        id = 4,
+                        relatedFieldId = 1,
+                        columnId = 3,
+                        value = 24,
+                        fallenMs = 0,
+                        appearanceDelayMs = 0,
+                        lifetimeMs = 37001,
+                    ),
+                    Target(
+                        id = 5,
+                        relatedFieldId = 1,
+                        columnId = 1,
+                        value = 20,
+                        fallenMs = 0,
+                        appearanceDelayMs = 17208,
+                        lifetimeMs = 35309,
+                    ),
+                    Target(
+                        id = 6,
+                        relatedFieldId = 1,
+                        columnId = 2,
+                        value = 23,
+                        fallenMs = 0,
+                        appearanceDelayMs = 16318,
+                        lifetimeMs = 19998,
+                    ),
                 ),
                 firstTargets,
             )
@@ -580,7 +626,8 @@ class GameTest {
             val saved =
                 game.stateFlow.value.targets
                     .first { it.id == targetId }
-            assertEquals(50, saved.position)
+            // Halfway (50 of 100px) against this target's 1000ms lifetime at level 1.
+            assertEquals(500, saved.fallenMs)
             assertEquals(0, saved.appearanceDelayMs)
         }
 
@@ -600,20 +647,8 @@ class GameTest {
             val saved =
                 game.stateFlow.value.targets
                     .first { it.id == targetId }
-            assertEquals(0, saved.position)
+            assertEquals(0, saved.fallenMs)
             assertEquals(8000, saved.appearanceDelayMs)
-        }
-
-    @Test
-    fun `gameColumnSizeMeasured stores width and height without swapping them`() =
-        runTest {
-            val game = Game(FakeSessionHelper(), backgroundScope, Random(13))
-
-            game.gameColumnSizeMeasured(width = 300, height = 700)
-            testScheduler.runCurrent()
-
-            assertEquals(300, game.stateFlow.value.field.gameColumnWidthPx)
-            assertEquals(700, game.stateFlow.value.field.gameColumnHeightPx)
         }
 
     @Test
@@ -646,7 +681,7 @@ class GameTest {
                         relatedFieldId = 7,
                         columnId = 0,
                         value = 9,
-                        position = 120,
+                        fallenMs = 120,
                         appearanceDelayMs = 0,
                         lifetimeMs = 30000,
                     ),
@@ -655,7 +690,7 @@ class GameTest {
                         relatedFieldId = 7,
                         columnId = 1,
                         value = 4,
-                        position = 0,
+                        fallenMs = 0,
                         appearanceDelayMs = 5000,
                         lifetimeMs = 25000,
                     ),
@@ -690,7 +725,12 @@ class GameTest {
                 game.stateFlow.value.targets
                     .map { it.id to it.appearanceDelayMs }
 
-            game.gameColumnSizeMeasured(width = 300, height = 700)
+            // Any field-only mutator works here; fieldRestored is the one left after
+            // gameColumnSizeMeasured was deleted (MC-38/MC-43) - it touches only the field half.
+            val fieldOnlyChange =
+                game.stateFlow.value.field
+                    .copy(score = 5)
+            game.fieldRestored(fieldOnlyChange)
             testScheduler.runCurrent()
 
             assertEquals(

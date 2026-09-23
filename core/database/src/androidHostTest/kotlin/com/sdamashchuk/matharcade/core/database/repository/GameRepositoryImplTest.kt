@@ -46,8 +46,6 @@ class GameRepositoryImplTest {
                     currentOperationDigit = 7,
                     nextOperationSign = OperationSign.DIVISION,
                     nextOperationDigit = 9,
-                    gameColumnWidthPx = 640,
-                    gameColumnHeightPx = 480,
                     isClosed = true,
                 )
 
@@ -92,8 +90,6 @@ class GameRepositoryImplTest {
                     currentOperationDigit = 8,
                     nextOperationSign = OperationSign.SUBTRACTION,
                     nextOperationDigit = 2,
-                    gameColumnWidthPx = 1080,
-                    gameColumnHeightPx = 1920,
                     isClosed = true,
                 )
             repository.updateField(advanced)
@@ -104,14 +100,14 @@ class GameRepositoryImplTest {
     @Test
     fun `updateTargets rewrites each target without crossing columns`() =
         runTest {
-            val first = target(id = 1, value = 11, position = 22)
-            val second = target(id = 2, value = 33, position = 44)
+            val first = target(id = 1, value = 11, fallenMs = 22)
+            val second = target(id = 2, value = 33, fallenMs = 44)
             repository.refreshTargets(listOf(first, second))
 
             val moved =
                 listOf(
-                    first.copy(value = 99, position = 7, isVisible = false, isActive = false),
-                    second.copy(value = 5, position = 100, isProfitable = true),
+                    first.copy(value = 99, fallenMs = 7, isVisible = false, isActive = false),
+                    second.copy(value = 5, fallenMs = 100, isProfitable = true),
                 )
             repository.updateTargets(moved)
 
@@ -123,10 +119,10 @@ class GameRepositoryImplTest {
     @Test
     fun `refreshTargets replaces a smaller target set with a larger one exactly`() =
         runTest {
-            val levelOne = (1..6).map { target(id = it, value = it, position = it) }
+            val levelOne = (1..6).map { target(id = it, value = it, fallenMs = it) }
             repository.refreshTargets(levelOne)
 
-            val levelTwo = (1..9).map { target(id = it, value = it * 10, position = it * 10) }
+            val levelTwo = (1..9).map { target(id = it, value = it * 10, fallenMs = it * 10) }
             repository.refreshTargets(levelTwo)
 
             assertEquals(levelTwo.sortedBy { it.id }, repository.getTargets().sortedBy { it.id })
@@ -135,10 +131,10 @@ class GameRepositoryImplTest {
     @Test
     fun `refreshTargets replaces a larger target set with a smaller one, leaving no ghost rows`() =
         runTest {
-            val levelOne = (1..10).map { target(id = it, value = it, position = it) }
+            val levelOne = (1..10).map { target(id = it, value = it, fallenMs = it) }
             repository.refreshTargets(levelOne)
 
-            val levelTwo = (1..6).map { target(id = it, value = it * 10, position = it * 10) }
+            val levelTwo = (1..6).map { target(id = it, value = it * 10, fallenMs = it * 10) }
             repository.refreshTargets(levelTwo)
 
             assertEquals(levelTwo.sortedBy { it.id }, repository.getTargets().sortedBy { it.id })
@@ -149,7 +145,7 @@ class GameRepositoryImplTest {
     @Test
     fun `refreshTargets rolls back the delete when the insert fails partway through`() =
         runTest {
-            val original = listOf(target(id = 1, value = 1, position = 1), target(id = 2, value = 2, position = 2))
+            val original = listOf(target(id = 1, value = 1, fallenMs = 1), target(id = 2, value = 2, fallenMs = 2))
             repository.refreshTargets(original)
 
             val poisoned =
@@ -157,7 +153,7 @@ class GameRepositoryImplTest {
                     override val size = 2
 
                     override fun get(index: Int): Target =
-                        if (index == 1) throw IllegalStateException("boom") else target(id = 3, value = 3, position = 3)
+                        if (index == 1) throw IllegalStateException("boom") else target(id = 3, value = 3, fallenMs = 3)
                 }
 
             var thrown: IllegalStateException? = null
@@ -180,7 +176,7 @@ class GameRepositoryImplTest {
                     relatedFieldId = 1,
                     columnId = 2,
                     value = 987,
-                    position = 3,
+                    fallenMs = 3,
                     appearanceDelayMs = 100,
                     lifetimeMs = 2000,
                     isProfitable = false,
@@ -197,13 +193,13 @@ class GameRepositoryImplTest {
 private fun target(
     id: Int,
     value: Int,
-    position: Int,
+    fallenMs: Int,
 ) = Target(
     id = id,
     relatedFieldId = 1,
     columnId = 2,
     value = value,
-    position = position,
+    fallenMs = fallenMs,
     appearanceDelayMs = 100,
     lifetimeMs = 2000,
     isProfitable = false,

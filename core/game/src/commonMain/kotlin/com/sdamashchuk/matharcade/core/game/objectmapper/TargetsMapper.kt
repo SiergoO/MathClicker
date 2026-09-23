@@ -97,12 +97,23 @@ internal fun List<Target>.updateTargetPositioning(
             val progressInPercents = 1f - position.toFloat() / gameColumnHeightPx.toFloat()
             val updatedAppearance = if (position > 0) 0 else (it.appearanceDelayMs * progressInPercents).toInt()
             it.copy(
-                position = position,
+                fallenMs = (fallenFraction(position, gameColumnHeightPx) * it.lifetimeMs).toInt(),
                 appearanceDelayMs = updatedAppearance,
             )
         } else {
             it
         }
+    }
+
+// Clamped so a corrupt or overshooting saved position can't push fallenMs outside 0..lifetimeMs.
+private fun fallenFraction(
+    position: Int,
+    gameColumnHeightPx: Int,
+): Float =
+    if (gameColumnHeightPx > 0) {
+        (position.toFloat() / gameColumnHeightPx).coerceIn(0f, 1f)
+    } else {
+        0f
     }
 
 internal fun List<Target>.shortenAppearanceDelay(random: Random = Random.Default): List<Target> {

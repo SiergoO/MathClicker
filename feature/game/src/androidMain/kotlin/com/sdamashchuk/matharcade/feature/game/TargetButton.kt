@@ -57,13 +57,13 @@ fun TargetButton(
     val targetButtonYOffset =
         if (infiniteTransition != null) {
             val yOffset by infiniteTransition.animateFloat(
-                initialValue = target.position.toFloat(),
+                initialValue = target.position * gameColumnSize.height,
                 targetValue = gameColumnSize.height.toFloat(),
                 animationSpec =
                     infiniteRepeatable(
                         animation =
                             tween(
-                                remainingFallDurationMs(target, gameColumnSize.height),
+                                remainingFallDurationMs(target),
                                 easing = LinearEasing,
                                 delayMillis = target.appearanceDelayMs,
                             ),
@@ -116,19 +116,11 @@ fun TargetButton(
 }
 
 // target.lifetimeMs is the fall's original total duration (see updateTargetPositioning); the
-// remaining distance from the last saved position is animated over the matching remaining share
+// remaining distance from the last saved fallenMs is animated over the matching remaining share
 // of it, so a pause/resume restart can't shrink the fall's real duration (MC-27).
 // internal, not private: it is otherwise a pure function of its inputs, and TargetButtonLogicTest
 // exercises it directly rather than through Compose.
-internal fun remainingFallDurationMs(
-    target: Target,
-    gameColumnHeightPx: Int,
-): Int =
-    if (gameColumnHeightPx > 0) {
-        (target.lifetimeMs * (1f - target.position.toFloat() / gameColumnHeightPx)).toInt().coerceAtLeast(0)
-    } else {
-        target.lifetimeMs
-    }
+internal fun remainingFallDurationMs(target: Target): Int = (target.lifetimeMs - target.fallenMs).coerceAtLeast(0)
 
 internal fun shouldReveal(
     targetButtonYOffset: Float,
