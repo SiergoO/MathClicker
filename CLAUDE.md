@@ -72,8 +72,14 @@ python3 .claude/scripts/ask.py add --kind approval --text "…" --why "…" --op
 ```
 
 They answer on the board in one click, or in chat. Never report work as blocked without a matching
-open ask — check `ask.py list --open` first. A board click settles a scoped decision whose options
-you wrote; it cannot approve a whole plan or authorise something irreversible.
+open ask — check `ask.py list --open` first.
+
+**The board can approve a plan.** An unapproved epic shows an `approve & run` button that writes
+`approved.txt` and queues the plan in one press. This was not always true — the board could start
+an approved task but never approve one — and the old rule is gone because the owner asked for it
+twice and the control is theirs. Do not re-introduce a chat-only gate for plans, and do not treat
+an unapproved epic as `blocked`: it is new, not broken. What still never goes through a board
+click is anything irreversible outside the repo — pushing to origin, deleting a remote branch.
 
 | Command | Phase |
 | --- | --- |
