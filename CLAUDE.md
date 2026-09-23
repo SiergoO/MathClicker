@@ -1,34 +1,48 @@
-# MathClicker
+# Math Arcade
 
-Android Compose game. Modules: `:app` (UI, data, domain, DI), `:core` (pure game logic).
-`data/` and `domain/` directories exist on disk but are **not** in `settings.gradle` — they are orphaned, ignore them.
+Android Compose game, heading for Kotlin Multiplatform. Store title `Math Arcade: Tap to Zero`;
+`applicationId` is `com.sdamashchuk.matharcade` and sources live under `com/sdamashchuk/matharcade/`.
+It was called MathClicker until MC-44 — the *directory* on disk is still `MathClicker` and stays that
+way, because the tooling resolves through it.
+
+Eight modules: `:app`, `:core:model`, `:core:game`, `:core:database`, `:core:ui`, `:core:component`,
+`:feature:game`, `:feature:menu`. `data/` and `domain/` directories exist on disk but are **not** in
+`settings.gradle` — they are orphaned, ignore them.
 
 ## Toolchain constraints
 
 - Gradle 9.4.1, AGP 9.2.1, Kotlin 2.4.0, JDK 17. compileSdk 36, minSdk 24, targetSdk 33.
-- **No KSP release exists for Kotlin 2.4.0** (newest is 2.3.12). Anything that needs KSP — Room KMP included — is off the table until one ships. Room stays on kapt in `:app` for now.
+- **No KSP release exists for Kotlin 2.4.0** (newest is 2.3.12). Anything that needs KSP — Room KMP included — is off the table until one ships. This is *why* persistence is SQLDelight: **Room and kapt are gone from this project entirely**, replaced in MC-6. Do not reintroduce either.
 - JDK 17 is the only JDK installed.
 - `local.properties` is gitignored and required. Without it every Gradle task fails with "SDK location not found":
   `printf 'sdk.dir=%s/Library/Android/sdk\n' "$HOME" > local.properties`
-- `:core` is a KMP module (`commonMain` / `androidMain` / `commonTest`, targets androidHostTest + iosArm64 + iosSimulatorArm64) with **zero Android imports in `commonMain`** — put game rules there. `Dispatchers.IO` does not exist in `commonMain`; use `Dispatchers.Default`. Never add an Android or `javax.*` import to `commonMain`.
-- `:core` has **no Android lint**: AGP 9.2.1's KMP library plugin creates only `lintAnalyzeAndroidHostTest` for it, no production analysis task and no report. detekt and spotless do cover it. Re-check on a later AGP.
+- The `:core:*` modules are KMP (`commonMain` / `androidMain` / `commonTest`, targets androidHostTest + iosArm64 + iosSimulatorArm64) with **zero Android imports in `commonMain`** — game rules go in `:core:game`. `Dispatchers.IO` does not exist in `commonMain`; use `Dispatchers.Default`. Never add an Android or `javax.*` import to `commonMain`.
+- `:core:*` has **no Android lint**: AGP 9.2.1's KMP library plugin creates only `lintAnalyzeAndroidHostTest`, no production analysis task and no report. detekt and spotless do cover it. Re-check on a later AGP.
 - **Direction:** Android-only today → KMP (Koin, SQLDelight, Compose Multiplatform), following EyeXP's stack. See `.claude/specs/MC-6-kmp-migration.md`.
 
 ## Commands
 
 ```bash
-./gradlew :core:allTests               # fast: core logic on every target (androidHostTest + iosSimulatorArm64)
-./gradlew :core:testAndroidHostTest    # faster still: JVM only, skips the Kotlin/Native link
-./gradlew :app:testDebugUnitTest       # :app unit tests
-./gradlew check                        # tests + detekt + spotless, every module
-./gradlew detekt                       # smells, complexity, exception handling
-./gradlew spotlessApply                # fix formatting (ktlint)
-./gradlew assembleDebug                # APK at app/build/outputs/apk/debug/app-debug.apk
+./gradlew :core:game:allTests            # game rules on every target (androidHostTest + iosSimulatorArm64)
+./gradlew :core:game:testAndroidHostTest # faster: JVM only, skips the Kotlin/Native link
+./gradlew :app:testDebugUnitTest         # :app unit tests
+./gradlew check                          # tests + detekt + spotless + app launch, every module
+./gradlew detekt                         # smells, complexity, exception handling
+./gradlew spotlessApply                  # fix formatting (ktlint)
+./gradlew assembleDebug                  # APK at app/build/outputs/apk/debug/app-debug.apk
 ```
 
-`:core:testDebugUnitTest` no longer exists — the KMP migration replaced it. Do not run bare
-`./gradlew testDebugUnitTest` either: only `:app` still has that task, so it passes while running
-none of `:core`'s tests.
+**There is no `:core` module.** `:core:allTests`, `:core:testAndroidHostTest` and
+`:core:testDebugUnitTest` all fail — the module was split into `:core:model` / `:core:game` /
+`:core:database` / `:core:ui` / `:core:component` in MC-9. Scope to the one you mean.
+
+Do not run bare `./gradlew testDebugUnitTest` either: only `:app` has that task, so it passes while
+running none of the core tests.
+
+`./gradlew check` includes `:app:checkAppLaunch`, which installs the APK on a connected device and
+fails the build if it does not reach its first frame. It is **not concurrency-safe** — two
+simultaneous runs force-stop each other and produce failures that look like app crashes or a missing
+`TotalTime`. Run one at a time. Several runs have already been lost to this.
 
 The same trap applies to any module-scoped test task: on a module that has no tests yet it is
 `NO-SOURCE` and reports success. `:feature:game:allTests` was MC-17's gate and ran nothing. A gate
