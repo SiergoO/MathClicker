@@ -1,0 +1,8 @@
+-- Deliberately no-op. Nothing queued needs a new column yet: MC-37 renames existing columns
+-- (a migration of its own, gated on this one existing) and MC-39 reuses the already-present,
+-- already-unused `bonusMultiplier` column. Inventing a column here would mean reaching into
+-- :core:model and :core:game to make it mean something, which is out of this task's scope.
+-- This migration exists to prove the mechanism end to end before the first real schema change
+-- rides on it: schema version pinned at 2, verifyMigrations wired, and the driver's default
+-- Callback (AndroidSqliteDriver.Callback) exercised against all three on-device populations —
+-- Room-era, SQLDelight-era, and post-migration — via onUpgrade -> Schema.migrate.
