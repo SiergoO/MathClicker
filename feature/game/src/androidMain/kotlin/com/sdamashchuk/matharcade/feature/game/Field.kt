@@ -136,7 +136,7 @@ fun Field(
                     )
                 }
             }
-            if (columnId < GAME_COLUMN_COUNT) {
+            if (shouldDrawDividerAfterColumn(columnId)) {
                 VerticalDivider()
             }
         }
@@ -217,3 +217,7 @@ fun Field(
 // The dividers between columns cost one gap fewer than there are columns.
 internal fun calculateGameColumnWidth(measuredWidthDp: Int): Int =
     (measuredWidthDp - (GAME_COLUMN_COUNT - 1)) / GAME_COLUMN_COUNT
+
+// A divider sits between columns, not after the last one: GAME_COLUMN_COUNT columns need
+// GAME_COLUMN_COUNT - 1 of them.
+internal fun shouldDrawDividerAfterColumn(columnId: Int): Boolean = columnId < GAME_COLUMN_COUNT - 1

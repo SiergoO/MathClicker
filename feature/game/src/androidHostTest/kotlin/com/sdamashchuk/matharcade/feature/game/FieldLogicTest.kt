@@ -15,4 +15,13 @@ class FieldLogicTest {
         assertEquals(4, GAME_COLUMN_COUNT)
         assertEquals(100, calculateGameColumnWidth(403))
     }
+
+    @Test
+    fun `shouldDrawDividerAfterColumn draws exactly three dividers across four columns`() {
+        // Literal columnIds, not a 0 until GAME_COLUMN_COUNT range, for the same reason as above:
+        // deriving the range from GAME_COLUMN_COUNT would let it drift with the production loop and
+        // never expose the off-by-one this test exists to catch (a trailing divider after column 3).
+        val dividerAfterColumn = listOf(0, 1, 2, 3).map(::shouldDrawDividerAfterColumn)
+        assertEquals(listOf(true, true, true, false), dividerAfterColumn)
+    }
 }
