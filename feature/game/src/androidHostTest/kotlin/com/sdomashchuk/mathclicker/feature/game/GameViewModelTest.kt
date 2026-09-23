@@ -61,17 +61,9 @@ private class FakeGameRepository(
 
     override suspend fun updateField(field: Field) = Unit
 
-    override suspend fun getFieldById(id: Int): Field = unfinishedField ?: Field()
-
     override suspend fun getUnfinishedField(): Field? = unfinishedField
 
     override suspend fun getFieldCount(): Int = 0
-
-    override suspend fun insertTarget(target: Target) = Unit
-
-    override suspend fun insertTargets(targets: List<Target>) = Unit
-
-    override suspend fun updateTarget(target: Target) = Unit
 
     override suspend fun updateTargets(targets: List<Target>) {
         updateTargetsCalls += targets
@@ -82,8 +74,6 @@ private class FakeGameRepository(
     override suspend fun refreshTargets(targets: List<Target>) {
         refreshTargetsCalls += targets
     }
-
-    override suspend fun deleteAllTargets() = Unit
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)

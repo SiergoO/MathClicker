@@ -15,6 +15,9 @@ import org.junit.Before
 import org.junit.Test
 
 class GameRepositoryImplTest {
+    // GameRepository dropped getFieldById (MC-37, no production caller); read straight from the
+    // DAO for the round-trip assertions below, the same way MathClickerDatabaseMigrationTest does.
+    private lateinit var fieldDao: FieldDao
     private lateinit var repository: GameRepositoryImpl
 
     @Before
@@ -22,9 +25,10 @@ class GameRepositoryImplTest {
         val driver = JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY)
         MathClickerDatabase.Schema.create(driver)
         val database = MathClickerDatabase(driver)
+        fieldDao = FieldDao(database.fieldQueries, Dispatchers.Unconfined)
         repository =
             GameRepositoryImpl(
-                FieldDao(database.fieldQueries, Dispatchers.Unconfined),
+                fieldDao,
                 TargetsDao(database.targetsQueries, Dispatchers.Unconfined),
             )
     }
@@ -49,7 +53,7 @@ class GameRepositoryImplTest {
 
             repository.insertField(field)
 
-            assertEquals(field.copy(id = 1), repository.getFieldById(1))
+            assertEquals(field.copy(id = 1), fieldDao.getFieldById(1))
         }
 
     @Test
@@ -76,7 +80,7 @@ class GameRepositoryImplTest {
     fun `updateField rewrites every column of an existing row`() =
         runTest {
             repository.insertField(Field(level = 1, score = 0, lifeCount = 3))
-            val stored = repository.getFieldById(1)
+            val stored = fieldDao.getFieldById(1)
 
             val advanced =
                 stored.copy(
@@ -94,7 +98,7 @@ class GameRepositoryImplTest {
                 )
             repository.updateField(advanced)
 
-            assertEquals(advanced, repository.getFieldById(1))
+            assertEquals(advanced, fieldDao.getFieldById(1))
         }
 
     @Test
@@ -102,7 +106,7 @@ class GameRepositoryImplTest {
         runTest {
             val first = target(id = 1, value = 11, position = 22)
             val second = target(id = 2, value = 33, position = 44)
-            repository.insertTargets(listOf(first, second))
+            repository.refreshTargets(listOf(first, second))
 
             val moved =
                 listOf(
@@ -146,7 +150,7 @@ class GameRepositoryImplTest {
     fun `refreshTargets rolls back the delete when the insert fails partway through`() =
         runTest {
             val original = listOf(target(id = 1, value = 1, position = 1), target(id = 2, value = 2, position = 2))
-            repository.insertTargets(original)
+            repository.refreshTargets(original)
 
             val poisoned =
                 object : AbstractList<Target>() {
@@ -184,7 +188,7 @@ class GameRepositoryImplTest {
                     isActive = true,
                 )
 
-            repository.insertTarget(target)
+            repository.refreshTargets(listOf(target))
 
             assertEquals(target, repository.getTargets().single())
         }

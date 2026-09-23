@@ -10,21 +10,10 @@ class TargetsDao(
     private val queries: TargetsQueries,
     private val dispatcher: CoroutineDispatcher,
 ) {
-    suspend fun insertTarget(target: Target) = withContext(dispatcher) { queries.insert(target) }
-
-    suspend fun insertTargets(targets: List<Target>) =
-        withContext(dispatcher) {
-            queries.transaction { targets.forEach { queries.insert(it) } }
-        }
-
-    suspend fun updateTarget(target: Target) = withContext(dispatcher) { queries.update(target) }
-
     suspend fun updateTargets(targets: List<Target>) =
         withContext(dispatcher) {
             queries.transaction { targets.forEach { queries.update(it) } }
         }
-
-    suspend fun deleteTargets() = withContext(dispatcher) { queries.deleteTargets() }
 
     // Delete and insert must land in one SQL transaction: run as two separate calls, process death
     // between them commits the delete without the insert, leaving an open field with zero targets.

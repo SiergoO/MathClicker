@@ -17,23 +17,9 @@ class GameRepositoryImpl(
         fieldDao.updateField(field)
     }
 
-    override suspend fun getFieldById(id: Int): Field = fieldDao.getFieldById(id)
-
     override suspend fun getUnfinishedField(): Field? = fieldDao.getUnfinishedField()
 
     override suspend fun getFieldCount(): Int = fieldDao.getFieldCount()
-
-    override suspend fun insertTarget(target: Target) {
-        targetsDao.insertTarget(target)
-    }
-
-    override suspend fun insertTargets(targets: List<Target>) {
-        targetsDao.insertTargets(targets)
-    }
-
-    override suspend fun updateTarget(target: Target) {
-        targetsDao.updateTarget(target)
-    }
 
     override suspend fun updateTargets(targets: List<Target>) {
         targetsDao.updateTargets(targets)
@@ -43,9 +29,5 @@ class GameRepositoryImpl(
 
     override suspend fun refreshTargets(targets: List<Target>) {
         targetsDao.refreshTargets(targets)
-    }
-
-    override suspend fun deleteAllTargets() {
-        targetsDao.deleteTargets()
     }
 }

@@ -8,13 +8,13 @@ import com.sdomashchuk.mathclicker.core.game.objectmapper.decrementLifeCount
 import com.sdomashchuk.mathclicker.core.game.objectmapper.decrementValue
 import com.sdomashchuk.mathclicker.core.game.objectmapper.ensureAlive
 import com.sdomashchuk.mathclicker.core.game.objectmapper.ensureVisible
-import com.sdomashchuk.mathclicker.core.game.objectmapper.performOperation
 import com.sdomashchuk.mathclicker.core.game.objectmapper.shortenAppearanceDelay
 import com.sdomashchuk.mathclicker.core.game.objectmapper.updateActionButtons
 import com.sdomashchuk.mathclicker.core.game.objectmapper.updateGameColumnSize
 import com.sdomashchuk.mathclicker.core.game.objectmapper.updateLevel
 import com.sdomashchuk.mathclicker.core.game.objectmapper.updateScore
 import com.sdomashchuk.mathclicker.core.game.objectmapper.updateTargetPositioning
+import com.sdomashchuk.mathclicker.core.game.scoring.performOperation
 import com.sdomashchuk.mathclicker.core.model.Field
 import com.sdomashchuk.mathclicker.core.model.OperationSign
 import com.sdomashchuk.mathclicker.core.model.Target
@@ -207,13 +207,13 @@ class Game(
     private fun recreateTargets(amount: Int): List<Target> =
         List(amount) { id ->
             Target(
-                id + 1,
-                fieldFlow.value.id,
-                id.toGameColumnId(),
-                sessionHelper.getTargetValueByLevel(fieldFlow.value.level),
-                0,
-                sessionHelper.getTargetAppearanceDelayMsById(id),
-                sessionHelper.getTargetLifetimeMsByLevel(fieldFlow.value.level),
+                id = id + 1,
+                relatedFieldId = fieldFlow.value.id,
+                columnId = id.toGameColumnId(),
+                value = sessionHelper.getTargetValueByLevel(fieldFlow.value.level),
+                position = 0,
+                appearanceDelayMs = sessionHelper.getTargetAppearanceDelayMsById(id),
+                lifetimeMs = sessionHelper.getTargetLifetimeMsByLevel(fieldFlow.value.level),
             )
         }
 

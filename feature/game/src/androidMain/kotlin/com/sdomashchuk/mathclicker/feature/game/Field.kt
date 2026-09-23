@@ -40,6 +40,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.toUpperCase
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.sdomashchuk.mathclicker.core.model.GAME_COLUMN_COUNT
 import com.sdomashchuk.mathclicker.core.ui.theme.Red200
 import com.sdomashchuk.mathclicker.core.ui.theme.Red500
 import com.sdomashchuk.mathclicker.core.ui.theme.White
@@ -98,15 +99,14 @@ fun Field(
                 .fillMaxWidth()
                 .fillMaxHeight(0.75f)
                 .onGloballyPositioned { coordinates ->
-                    val gameColumnWidth =
+                    val measuredWidthDp =
                         with(localDensity) {
-                            (
-                                coordinates.size.width
-                                    .toDp()
-                                    .value
-                                    .toInt() - 3
-                            ) / 4
+                            coordinates.size.width
+                                .toDp()
+                                .value
+                                .toInt()
                         }
+                    val gameColumnWidth = calculateGameColumnWidth(measuredWidthDp)
                     val gameColumnHeight =
                         with(localDensity) {
                             coordinates.size.height
@@ -118,7 +118,7 @@ fun Field(
                     onGameColumnSizeMeasured.invoke(gameColumnSize)
                 },
     ) {
-        repeat(4) { columnId ->
+        repeat(GAME_COLUMN_COUNT) { columnId ->
             Box(
                 Modifier
                     .fillMaxHeight()
@@ -136,7 +136,7 @@ fun Field(
                     )
                 }
             }
-            if (columnId < 4) {
+            if (columnId < GAME_COLUMN_COUNT) {
                 VerticalDivider()
             }
         }
@@ -213,3 +213,7 @@ fun Field(
         }
     }
 }
+
+// The dividers between columns cost one gap fewer than there are columns.
+internal fun calculateGameColumnWidth(measuredWidthDp: Int): Int =
+    (measuredWidthDp - (GAME_COLUMN_COUNT - 1)) / GAME_COLUMN_COUNT

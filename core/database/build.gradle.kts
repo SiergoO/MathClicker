@@ -30,7 +30,10 @@ sqldelight {
 kotlin {
     sourceSets {
         commonMain.dependencies {
-            implementation(projects.core.model)
+            // api, not implementation: GameRepository and its DAOs expose Field, Target and
+            // OperationSign on their own public API, so callers need :core:model resolvable
+            // at their own compile time, not just this module's.
+            api(projects.core.model)
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.koin.core)
         }

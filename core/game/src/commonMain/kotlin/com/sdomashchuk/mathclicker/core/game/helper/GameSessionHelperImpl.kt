@@ -1,5 +1,6 @@
 package com.sdomashchuk.mathclicker.core.game.helper
 
+import com.sdomashchuk.mathclicker.core.model.GAME_COLUMN_COUNT
 import com.sdomashchuk.mathclicker.core.model.OperationSign
 import kotlin.random.Random
 
@@ -27,8 +28,6 @@ class SessionHelperImpl(
 
         private const val INITIAL_SUBTRACTION_VALUE_MIN = 1
         private const val INITIAL_SUBTRACTION_VALUE_MAX = 3
-
-        private const val GAME_COLUMN_AMOUNT = 4
     }
 
     override val levelRange = IntRange(LEVEL_MIN, LEVEL_MAX)
@@ -59,8 +58,8 @@ class SessionHelperImpl(
      * @return random target appearance delay in a certain range of values.
      */
     override fun getTargetAppearanceDelayMsById(id: Int): Int {
-        val minThreshold = initialTargetAppearanceDelayMsRange.first * (id / GAME_COLUMN_AMOUNT)
-        val maxThreshold = initialTargetAppearanceDelayMsRange.last * (id / GAME_COLUMN_AMOUNT)
+        val minThreshold = initialTargetAppearanceDelayMsRange.first * (id / GAME_COLUMN_COUNT)
+        val maxThreshold = initialTargetAppearanceDelayMsRange.last * (id / GAME_COLUMN_COUNT)
         return IntRange(minThreshold, maxThreshold).random(random)
     }
 

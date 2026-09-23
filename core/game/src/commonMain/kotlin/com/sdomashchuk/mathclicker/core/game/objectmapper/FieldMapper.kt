@@ -3,13 +3,6 @@ package com.sdomashchuk.mathclicker.core.game.objectmapper
 import com.sdomashchuk.mathclicker.core.model.Field
 import com.sdomashchuk.mathclicker.core.model.OperationSign
 
-internal fun Field.incrementLifeCount(increment: Int): Field {
-    val lifeCount = this.lifeCount + increment
-    return this.copy(
-        lifeCount = lifeCount,
-    )
-}
-
 internal fun Field.decrementLifeCount(decrement: Int): Field {
     val lifeCount = this.lifeCount - decrement
     return this.copy(
