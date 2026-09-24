@@ -123,25 +123,8 @@ class GameViewModel(
                             )
                     }
 
-                    is Action.TargetRevealed -> {
-                        game.targetRevealed(action.id)
-                    }
-
                     is Action.TargetClicked -> {
                         game.targetClicked(action.id)
-                    }
-
-                    is Action.TargetDidBreakout -> {
-                        game.targetDidBreakout(action.id)
-                    }
-
-                    is Action.SaveTargetPosition -> {
-                        game.targetShouldBeSaved(action.id, action.position, action.gameColumnHeightPx)
-                        _state.value =
-                            state.value.copy(
-                                isGamePaused = true,
-                                isGameStarted = false,
-                            )
                     }
 
                     is Action.FireButtonClicked -> {
@@ -210,22 +193,8 @@ class GameViewModel(
 
         object BackToMainMenuClicked : Action()
 
-        data class TargetRevealed(
-            val id: Int,
-        ) : Action()
-
         data class TargetClicked(
             val id: Int,
-        ) : Action()
-
-        data class TargetDidBreakout(
-            val id: Int,
-        ) : Action()
-
-        data class SaveTargetPosition(
-            val id: Int,
-            val position: Int,
-            val gameColumnHeightPx: Int,
         ) : Action()
 
         object FireButtonClicked : Action()

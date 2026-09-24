@@ -14,7 +14,6 @@ import com.sdamashchuk.matharcade.core.game.objectmapper.shortenAppearanceDelay
 import com.sdamashchuk.matharcade.core.game.objectmapper.updateActionButtons
 import com.sdamashchuk.matharcade.core.game.objectmapper.updateLevel
 import com.sdamashchuk.matharcade.core.game.objectmapper.updateScore
-import com.sdamashchuk.matharcade.core.game.objectmapper.updateTargetPositioning
 import com.sdamashchuk.matharcade.core.game.scoring.performOperation
 import com.sdamashchuk.matharcade.core.model.Field
 import com.sdamashchuk.matharcade.core.model.OperationSign
@@ -130,40 +129,6 @@ class Game(
             _stateFlow.value = GameState(updatedField, updatedTargets)
         }
 
-    suspend fun targetRevealed(id: Int) =
-        mutex.withLock {
-            _stateFlow.value = _stateFlow.value.copy(targets = _stateFlow.value.targets.changeVisibility(id, true))
-        }
-
-    suspend fun targetDidBreakout(id: Int) =
-        mutex.withLock {
-            val current = _stateFlow.value
-            // A target can only ever cost one life: if it is already inactive (a previous breakout,
-            // or the UI re-firing for the same fall) this is a no-op rather than a second decrement.
-            val target = current.targets.firstOrNull { it.id == id } ?: return@withLock
-            if (!target.isActive) return@withLock
-            val updatedTargets =
-                current.targets
-                    .changeActiveness(id, false)
-                    .changeVisibility(id, false)
-            val updatedField =
-                current.field
-                    .decrementLifeCount(1)
-                    .closeIfNecessary()
-            _stateFlow.value = GameState(updatedField, updatedTargets)
-        }
-
-    suspend fun targetShouldBeSaved(
-        id: Int,
-        position: Int,
-        gameColumnHeightPx: Int,
-    ) = mutex.withLock {
-        _stateFlow.value =
-            _stateFlow.value.copy(
-                targets = _stateFlow.value.targets.updateTargetPositioning(id, position, gameColumnHeightPx),
-            )
-    }
-
     suspend fun fireButtonClicked() =
         mutex.withLock {
             val current = _stateFlow.value
@@ -185,8 +150,8 @@ class Game(
         }
 
     // The engine's own clock: advances every active target by elapsedMs and resolves whatever that
-    // step causes - reveal, breakout, level-up - in this one locked step, so a caller never needs to
-    // follow it up with targetRevealed/targetDidBreakout the way the UI-driven path still does.
+    // step causes - reveal, breakout, level-up - in this one locked step. This is now the only way
+    // a target falls, is revealed, or breaks out; there is no equivalent UI-driven call left.
     suspend fun tick(elapsedMs: Int) =
         mutex.withLock {
             val current = _stateFlow.value

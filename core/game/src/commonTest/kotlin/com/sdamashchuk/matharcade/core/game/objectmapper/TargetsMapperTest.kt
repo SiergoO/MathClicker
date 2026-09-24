@@ -48,26 +48,6 @@ class TargetsMapperTest {
     }
 
     @Test
-    fun `updateTargetPositioning leaves lifetimeMs untouched across repeated pause-resume saves`() {
-        // Mutation test: if lifetimeMs goes back to being re-derived from itself (MC-27's bug), this
-        // would shrink further on the second call even though the target barely moved, and fail.
-        val original = target(id = 1, value = 10).copy(lifetimeMs = 10000)
-        val targets = listOf(original)
-
-        val afterFirstPause = targets.updateTargetPositioning(id = 1, position = 100, gameColumnHeightPx = 1000)
-        val afterSecondPause =
-            afterFirstPause.updateTargetPositioning(
-                id = 1,
-                position = 110,
-                gameColumnHeightPx = 1000,
-            )
-
-        assertEquals(10000, afterFirstPause.first().lifetimeMs)
-        assertEquals(10000, afterSecondPause.first().lifetimeMs)
-        assertEquals(1100, afterSecondPause.first().fallenMs)
-    }
-
-    @Test
     fun `advance burns the step against appearanceDelayMs while a target is still waiting`() {
         val targets = listOf(target(id = 1, value = 5, isVisible = false).copy(appearanceDelayMs = 500))
 

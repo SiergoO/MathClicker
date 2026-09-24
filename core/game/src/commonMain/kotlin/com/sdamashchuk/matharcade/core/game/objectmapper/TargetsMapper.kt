@@ -82,40 +82,6 @@ internal fun List<Target>.ensureAlive(id: Int): List<Target> =
         }
     }
 
-internal fun List<Target>.updateTargetPositioning(
-    id: Int,
-    position: Int,
-    gameColumnHeightPx: Int,
-): List<Target> =
-    this.map {
-        if (id == it.id) {
-            // lifetimeMs must stay the fall's original total duration: it is the divisor the UI
-            // uses to derive the remaining animation time from the saved position on every resume.
-            // Shrinking it here used to compound across repeated pause/resume cycles until the
-            // remaining duration collapsed to ~0 while the target was nowhere near the bottom,
-            // causing a spurious breakout (MC-27).
-            val progressInPercents = 1f - position.toFloat() / gameColumnHeightPx.toFloat()
-            val updatedAppearance = if (position > 0) 0 else (it.appearanceDelayMs * progressInPercents).toInt()
-            it.copy(
-                fallenMs = (fallenFraction(position, gameColumnHeightPx) * it.lifetimeMs).toInt(),
-                appearanceDelayMs = updatedAppearance,
-            )
-        } else {
-            it
-        }
-    }
-
-// Clamped so a corrupt or overshooting saved position can't push fallenMs outside 0..lifetimeMs.
-private fun fallenFraction(
-    position: Int,
-    gameColumnHeightPx: Int,
-): Float =
-    if (gameColumnHeightPx > 0) {
-        (position.toFloat() / gameColumnHeightPx).coerceIn(0f, 1f)
-    } else {
-        0f
-    }
-
 // Advances every active target by stepMs. A target still waiting out its appearance delay burns
 // the step against appearanceDelayMs first; when the delay is consumed partway through the step,
 // the leftover carries straight into fallenMs instead of being dropped, so a target loses none of

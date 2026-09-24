@@ -25,7 +25,10 @@ import kotlin.test.assertEquals
 // every other source of state change, so a divergence can only come from the race itself. Note
 // this also makes every seed-sensitive output (OperationSign, digit, score) collapse to the same
 // value regardless of seed - fine for the race test below, but see the second test's comment.
-private class RaceSessionHelper : SessionHelper {
+private class RaceSessionHelper(
+    private val amount: Int = 1,
+    private val appearanceDelayMsById: (Int) -> Int = { 0 },
+) : SessionHelper {
     override val levelRange = 1..999
     override val initialTargetValueRange = 1..20
     override val initialTargetLifetimeMsRange = 20000..40000
@@ -36,11 +39,15 @@ private class RaceSessionHelper : SessionHelper {
 
     override fun getTargetValueByLevel(level: Int) = UNKILLABLE_TARGET_VALUE
 
-    override fun getTargetLifetimeMsByLevel(level: Int) = 1000
+    // Well under MAX_TICK_MS: a single BREAKOUT_TICK_MS tick both falls and breaks the target out in
+    // one locked call, the same one-call atomicity the old single targetDidBreakout() call gave this
+    // race - a lifetime that needed several ticks to exhaust would spread the breakout across more
+    // than one mutex acquisition and change what is being raced against fire.
+    override fun getTargetLifetimeMsByLevel(level: Int) = 100
 
-    override fun getTargetAppearanceDelayMsById(id: Int) = 0
+    override fun getTargetAppearanceDelayMsById(id: Int) = appearanceDelayMsById(id)
 
-    override fun getTargetAmountByLevel(level: Int) = 1
+    override fun getTargetAmountByLevel(level: Int) = amount
 
     override fun getOperationDigitByLevel(
         operationSign: OperationSign,
@@ -60,14 +67,27 @@ private const val SETTLE_TIMEOUT_MS = 300L
 
 private const val UNKILLABLE_TARGET_VALUE = 1_000_000
 
-// The measured tear rate is under 1% per trial, so 400 trials leave roughly a 2% chance of a
-// genuinely torn build going green. 2000 puts that below 1e-8 and costs a fraction of a second.
+// Per-trial detection is not uniform across the three readers: injecting a split write measures
+// roughly 100% for the breakout reader, 9% for the fire reader and 0.1% for the level-up one. That
+// last figure is what sets this number - at 0.1% per trial, 2000 trials catch a torn build about
+// 86% of the time on one target and about 98% across allTests' two. Raising it further is cheap if
+// a tear ever slips through, but the honest claim is "very likely", not "certain".
 private const val TEAR_TRIALS = 2000
 
-// Runs the single-target-breakout-vs-fire race on a real Dispatchers.Default scope - the collector
+// Comfortably above RaceSessionHelper's 100ms lifetime (and under MAX_TICK_MS), so the single tick
+// call this drives always completes the fall in the same locked step it starts in.
+private const val BREAKOUT_TICK_MS = 200
+
+// Runs the single-target-tick-vs-fire race on a real Dispatchers.Default scope - the collector
 // launched by start() and the two racing calls genuinely run on different threads, unlike GameTest's
 // virtual-time runTest. Settles by polling rather than a fixed delay: the correct end state is
 // always "one fresh, fully active target", however long the collector takes to get there.
+//
+// Breakout now originates inside tick() under the same mutex fire uses, so the breakout-vs-fire race
+// this test reproduced pre-MC-38 is structurally impossible: whichever of tick()/fireButtonClicked()
+// acquires the lock first fully completes before the other starts. What remains genuinely contended
+// is tick() itself (mutating targets, field, and potentially leveling up) against a concurrent fire
+// press - MC-32's race in its current form.
 private suspend fun raceLevelUpAgainstFire(seed: Long): Pair<Field, List<Target>> {
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     try {
@@ -75,14 +95,12 @@ private suspend fun raceLevelUpAgainstFire(seed: Long): Pair<Field, List<Target>
         game.start()
         game.createField(1)
         game.createTargets()
-        val targetId =
-            game.stateFlow.value.targets
-                .first()
-                .id
-        game.targetRevealed(targetId)
+        // Reveals the sole target (delay 0) without falling far enough to break out on its own
+        // (lifetimeMs 100), so fire has something visible to act on when the race below starts.
+        game.tick(1)
         val startingLevel = game.stateFlow.value.field.level
 
-        scope.launch { game.targetDidBreakout(targetId) }
+        scope.launch { game.tick(BREAKOUT_TICK_MS) }
         scope.launch { game.fireButtonClicked() }
 
         // field and targets publish as one GameState now, so there is no torn instant left to sample
@@ -106,25 +124,33 @@ private suspend fun raceLevelUpAgainstFire(seed: Long): Pair<Field, List<Target>
     }
 }
 
-// Isolates the reader/writer tear MC-42 exists for from the writer/writer race above: a single call
-// to targetDidBreakout that costs the last life writes both the deactivated target and the closed
-// field under one mutex.withLock. A concurrent reader busy-polling stateFlow.value from a second real
+// Isolates the reader/writer tear MC-42 exists for from the writer/writer race above: a single
+// tick() call that costs the last life writes both the deactivated target and the closed field
+// under one mutex.withLock. A concurrent reader busy-polling stateFlow.value from a second real
 // thread - no suspension point in the loop, so nothing yields the window away - must only ever see
 // the target's active flag and the field's closed flag agree; either both still false (untouched) or
 // both true (fully applied), never one ahead of the other. No start(): the level-up this would
-// otherwise trigger is a different transition, already covered above, and would recreate this exact
-// target id and confuse the invariant being checked here.
+// otherwise trigger is a different transition, already covered above. A second target, delayed well
+// past this test's window, keeps the board non-empty so the breakout below doesn't also satisfy
+// tick()'s own all-inactive check - that recreates the target set (id 1 included) as a fresh, active
+// one in the same locked step regardless of start()/isClosed, which would confuse the invariant being
+// checked here with a legitimate, unrelated state change.
 private suspend fun readerSeesTornStateOnLastLifeBreakout(seed: Long): Boolean {
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     try {
-        val game = Game(RaceSessionHelper(), scope, Random(seed))
+        val game =
+            Game(
+                RaceSessionHelper(amount = 2, appearanceDelayMsById = { index -> if (index == 0) 0 else 999_999 }),
+                scope,
+                Random(seed),
+            )
         game.createField(1)
         game.createTargets()
         val targetId =
             game.stateFlow.value.targets
                 .first()
                 .id
-        game.targetRevealed(targetId)
+        game.tick(1)
         game.fieldRestored(
             game.stateFlow.value.field
                 .copy(lifeCount = 1),
@@ -143,7 +169,7 @@ private suspend fun readerSeesTornStateOnLastLifeBreakout(seed: Long): Boolean {
                 }
             }
 
-        game.targetDidBreakout(targetId)
+        game.tick(BREAKOUT_TICK_MS)
         withTimeoutOrNull(SETTLE_TIMEOUT_MS) {
             while (!game.stateFlow.value.field.isClosed) yield()
         }
@@ -154,25 +180,21 @@ private suspend fun readerSeesTornStateOnLastLifeBreakout(seed: Long): Boolean {
     }
 }
 
-// The level-up half of the same tear. activeTargetsAbsent() publishes the bumped field and the
-// regenerated target set; before MC-42 it wrote them as two assignments, so a reader could catch
-// level 2 against the cleared level-1 board - the "new level against the previous target set" the
-// task exists to close. Needs start(), because the collector is what drives the level-up.
-// Invariant: once the level has advanced, a target set must exist to play, so a level above 1 with
-// nothing active is a state that never holds inside the lock. RaceSessionHelper's targets are
-// unkillable and never broken out again, so level 2 with an all-inactive board cannot arise
-// legitimately after the single level-up this drives.
+// The level-up half of the same tear. tick() publishes the bumped field and the regenerated target
+// set in one assignment when the board it just broke out empties - before MC-42 the pre-tick
+// collector path wrote them as two, so a reader could catch level 2 against the cleared level-1
+// board, the "new level against the previous target set" the task exists to close. No start(): with
+// breakout and the level-up it can cause both decided inside tick() itself, the collector has
+// nothing left to drive here. Invariant: once the level has advanced, a target set must exist to
+// play, so a level above 1 with nothing active is a state that never holds inside the lock.
+// RaceSessionHelper's targets are unkillable and never broken out again, so level 2 with an
+// all-inactive board cannot arise legitimately after the single level-up this drives.
 private suspend fun readerSeesTornStateOnLevelUp(seed: Long): Boolean {
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     try {
         val game = Game(RaceSessionHelper(), scope, Random(seed))
-        game.start()
         game.createField(1)
         game.createTargets()
-        val targetId =
-            game.stateFlow.value.targets
-                .first()
-                .id
 
         var torn = false
         val reader =
@@ -186,7 +208,7 @@ private suspend fun readerSeesTornStateOnLevelUp(seed: Long): Boolean {
                 }
             }
 
-        game.targetDidBreakout(targetId)
+        game.tick(BREAKOUT_TICK_MS)
         withTimeoutOrNull(SETTLE_TIMEOUT_MS) {
             while (game.stateFlow.value.field.level < 2) yield()
         }
@@ -212,7 +234,9 @@ private suspend fun readerSeesTornStateOnFirePress(seed: Long): Boolean {
             game.stateFlow.value.targets
                 .first()
                 .id
-        game.targetRevealed(targetId)
+        // Reveals the sole target (delay 0) without falling far enough to break out on its own
+        // (lifetimeMs 100), so fire has something visible to act on.
+        game.tick(1)
         game.fieldRestored(
             game.stateFlow.value.field.copy(
                 score = 0,
@@ -251,13 +275,15 @@ private suspend fun readerSeesTornStateOnFirePress(seed: Long): Boolean {
 }
 
 class GameConcurrencyTest {
-    // Reproduces MC-30 finding 1 directly: the last active target breaking out - a level-up driven
-    // by Game's own collector coroutine - racing a single fire press from a second coroutine, both
-    // on Dispatchers.Default. Correct behaviour has exactly one outcome regardless of which side
-    // wins the race: the level advances by exactly one and the target set is the fresh one-target
-    // set for the new level, never a torn mix of the two, never applied twice.
+    // Reproduces MC-30 finding 1 in its post-MC-38 form: breakout-vs-fire is now structurally
+    // impossible (breakout only ever originates inside tick(), under the same mutex fire uses), so
+    // the contended pair is tick() itself - which can fall a target, break it out, and level up, all
+    // in one locked step - racing a single fire press from a second coroutine, both on
+    // Dispatchers.Default. Correct behaviour has exactly one outcome regardless of which side wins
+    // the race: the level advances by exactly one and the target set is the fresh one-target set for
+    // the new level, never a torn mix of the two, never applied twice.
     @Test
-    fun `a level-up racing a fire press never corrupts the level or loses the target set`() =
+    fun `a tick racing a fire press never corrupts the level or loses the target set`() =
         runBlocking {
             val trials = 400
             // A corrupted trial always burns the full SETTLE_TIMEOUT_MS, so on unlocked code this
@@ -276,7 +302,7 @@ class GameConcurrencyTest {
                 if (!ok) corrupted++
                 if (corrupted >= maxCorruptionsBeforeStopping) break
             }
-            assertEquals(0, corrupted, "level-up vs fire race corrupted $corrupted/$ran trials")
+            assertEquals(0, corrupted, "tick vs fire race corrupted $corrupted/$ran trials")
         }
 
     // A second, pairwise angle on the same race - not a reproducibility check, despite the name

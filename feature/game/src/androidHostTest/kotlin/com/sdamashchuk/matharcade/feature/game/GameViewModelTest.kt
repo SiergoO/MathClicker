@@ -193,9 +193,9 @@ class GameViewModelTest {
             assertTrue(repository.refreshTargetsCalls.isEmpty())
 
             // Clearing the board levels up: FakeSessionHelper hands level 2 a bigger amount, so the
-            // id set actually changes (1,2 -> 1,2,3).
-            game.targetDidBreakout(1)
-            game.targetDidBreakout(2)
+            // id set actually changes (1,2 -> 1,2,3). Both targets share the same 1000ms lifetime and
+            // zero appearance delay, so four 250ms ticks fall and break them out together.
+            repeat(4) { game.tick(250) }
 
             assertTrue(repository.refreshTargetsCalls.isNotEmpty())
             assertEquals(

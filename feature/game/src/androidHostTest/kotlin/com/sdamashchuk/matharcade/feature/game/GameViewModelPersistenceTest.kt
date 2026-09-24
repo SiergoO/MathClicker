@@ -22,6 +22,10 @@ import kotlin.random.Random
 private class PersistenceFakeSessionHelper(
     private val targetAmount: Int = 1,
     private val appearanceDelayMs: Int = 0,
+    // Comfortably above a hundred 1ms ticks, so the fallenMs-only test never crosses into breakout.
+    // Tests that need an actual breakout override this to something a handful of ticks can clear.
+    private val lifetimeMs: Int = 100_000,
+    private val appearanceDelayMsById: (Int) -> Int = { appearanceDelayMs },
 ) : SessionHelper {
     override val levelRange = 1..999
     override val initialTargetValueRange = 1..20
@@ -33,10 +37,9 @@ private class PersistenceFakeSessionHelper(
 
     override fun getTargetValueByLevel(level: Int) = 10
 
-    // Comfortably above a hundred 1ms ticks, so the fallenMs-only test never crosses into breakout.
-    override fun getTargetLifetimeMsByLevel(level: Int) = 100_000
+    override fun getTargetLifetimeMsByLevel(level: Int) = lifetimeMs
 
-    override fun getTargetAppearanceDelayMsById(id: Int) = appearanceDelayMs
+    override fun getTargetAppearanceDelayMsById(id: Int) = appearanceDelayMsById(id)
 
     override fun getTargetAmountByLevel(level: Int) = targetAmount + (level - 1)
 
@@ -161,19 +164,31 @@ class GameViewModelPersistenceTest {
     fun `an isActive change persists`() =
         runTest {
             val repository = PersistenceFakeGameRepository()
-            // A second target keeps the board non-empty, so this is an isActive flip on the same id
-            // set rather than the level-up covered separately below.
-            val game = Game(PersistenceFakeSessionHelper(targetAmount = 2), backgroundScope, Random(3))
+            // A second target - delayed well past this test's window - keeps the board non-empty, so
+            // this is an isActive flip on the same id set rather than the level-up covered separately
+            // below.
+            val game =
+                Game(
+                    PersistenceFakeSessionHelper(
+                        targetAmount = 2,
+                        lifetimeMs = 1000,
+                        appearanceDelayMsById = { index -> if (index == 0) 0 else 999_999 },
+                    ),
+                    backgroundScope,
+                    Random(3),
+                )
             game.start()
             GameViewModel(game, repository)
             testScheduler.runCurrent()
+            // One tick outside the measured window reveals the first target (appearanceDelayMs 0), so
+            // the reveal itself is not what the measured ticks below persist. The breakout they do
+            // cause flips isActive and isVisible together, in one emission - which is the point:
+            // a key change of any size is still one write.
+            game.tick(1)
+            testScheduler.runCurrent()
             repository.clearCalls()
 
-            game.targetDidBreakout(
-                game.stateFlow.value.targets
-                    .first()
-                    .id,
-            )
+            repeat(4) { game.tick(250) } // 1001ms: breaks the first target out
             testScheduler.runCurrent()
 
             assertEquals(1, repository.persistenceCallCount())
@@ -194,11 +209,7 @@ class GameViewModelPersistenceTest {
             testScheduler.runCurrent()
             repository.clearCalls()
 
-            game.targetRevealed(
-                game.stateFlow.value.targets
-                    .first()
-                    .id,
-            )
+            repeat(20) { game.tick(250) } // 5000ms: exactly clears the delay, nothing more
             testScheduler.runCurrent()
 
             assertEquals(1, repository.persistenceCallCount())
@@ -208,22 +219,24 @@ class GameViewModelPersistenceTest {
     fun `a level-up's changed id set persists via refreshTargets`() =
         runTest {
             val repository = PersistenceFakeGameRepository()
-            val game = Game(PersistenceFakeSessionHelper(targetAmount = 1), backgroundScope, Random(5))
+            val game =
+                Game(
+                    PersistenceFakeSessionHelper(targetAmount = 1, lifetimeMs = 1000),
+                    backgroundScope,
+                    Random(5),
+                )
             game.start()
             GameViewModel(game, repository)
             testScheduler.runCurrent()
             repository.clearCalls()
 
-            game.targetDidBreakout(
-                game.stateFlow.value.targets
-                    .first()
-                    .id,
-            )
+            repeat(4) { game.tick(250) } // 1000ms: reveals, falls, and breaks the sole target out
             testScheduler.runCurrent()
 
-            // The breakout itself is one persisted state (isActive flips, same id set - updateTargets),
-            // and the level-up it triggers is a second, distinct one (a new id set - refreshTargets):
-            // both are real, observably different target lists, not a throttle-key false negative.
+            // tick()'s breakout and the level-up it triggers publish as one combined state now (both
+            // decided inside the same locked step), so there is exactly one persisted event here, not
+            // the breakout-then-level-up pair the old collector-driven path produced - and it correctly
+            // takes the refreshTargets path because the id set changes.
             assertEquals(1, repository.refreshTargetsCalls.size)
         }
 

@@ -64,6 +64,13 @@ private class CountingRandom(
     }
 }
 
+private const val TICK_STEP_MS = 250
+
+// Empirically enough 250ms ticks for seed 99's level-1 board to run out the clock: the field closes
+// at lifeCount 0 around the 130th tick and tick()'s own isClosed guard freezes every target in place
+// after that, so any count at or above this lands on the identical terminal state.
+private const val SEED_99_SESSION_TICKS = 200
+
 @OptIn(ExperimentalCoroutinesApi::class)
 class GameTest {
     @Test
@@ -74,14 +81,10 @@ class GameTest {
             game.createField(1)
             game.createTargets()
             testScheduler.runCurrent()
-            val targetId =
-                game.stateFlow.value.targets
-                    .first()
-                    .id
-            game.targetRevealed(targetId)
-            testScheduler.runCurrent()
 
-            game.targetDidBreakout(targetId)
+            // level 1's lifetimeMs is 1000 and appearanceDelayMs is 0, so four 250ms ticks reveal
+            // and then break the sole target out in the same locked step.
+            repeat(4) { game.tick(250) }
             testScheduler.runCurrent()
 
             assertEquals(2, game.stateFlow.value.field.level)
@@ -136,15 +139,10 @@ class GameTest {
             game.createField(1)
             game.createTargets()
             testScheduler.runCurrent()
-            val targetId =
-                game.stateFlow.value.targets
-                    .first()
-                    .id
-            game.targetRevealed(targetId)
-            testScheduler.runCurrent()
 
             // Level up to 2 first: getNextSignAndDigit hardcoding level 1 is invisible at level 1.
-            game.targetDidBreakout(targetId)
+            // Four 250ms ticks reveal and break the sole target out (lifetimeMs 1000, delay 0).
+            repeat(4) { game.tick(250) }
             testScheduler.runCurrent()
             assertEquals(2, game.stateFlow.value.field.level)
 
@@ -156,60 +154,48 @@ class GameTest {
             // let a hardcoded sign in getNextSignAndDigit survive undetected. Seeded specifically to
             // draw SUBTRACTION so a hardcoded DIVISION is also caught - the real-helper determinism
             // test below happens to draw DIVISION at its own call site, so between the two, a
-            // hardcoded sign of either value fails at least one test.
+            // hardcoded sign of either value fails at least one test. Reaching level 2 by ticking
+            // rather than by the old targetRevealed/targetDidBreakout calls draws no extra
+            // randomness: the sole target reveals with no draw, and shortenAppearanceDelay never
+            // fires because it has already broken out (isActive false) by the time the board empties.
             assertEquals(OperationSign.SUBTRACTION, game.stateFlow.value.field.nextOperationSign)
             assertEquals(4, game.stateFlow.value.field.nextOperationDigit)
         }
 
     @Test
-    fun `targetDidBreakout decrements life count and closes the field once it hits zero`() =
+    fun `tick decrements life count per breakout and closes the field once it hits zero`() =
         runTest {
-            val game = Game(FakeSessionHelper(targetAmount = 3), backgroundScope, Random(3))
+            // Staggered appearance delays (0, 500, 1000ms) make each of the three targets break out
+            // on its own tick, so lifeCount can be observed decrementing one at a time up to closure.
+            // Each successor is already visible before its predecessor breaks out (uniform 1000ms
+            // lifetime, 500ms delay gaps), so the board is never briefly empty of visible targets
+            // mid-sequence - if it were, tick()'s edge-triggered shortenAppearanceDelay would consume
+            // the staggering by pulling the next one forward.
+            val game =
+                Game(
+                    FakeSessionHelper(targetAmount = 3, appearanceDelayMsById = { it * 500 }),
+                    backgroundScope,
+                    Random(3),
+                )
             game.start()
             game.createField(1)
             game.createTargets()
             testScheduler.runCurrent()
-            val targets = game.stateFlow.value.targets
 
-            game.targetDidBreakout(targets[0].id)
+            repeat(4) { game.tick(250) } // 1000ms elapsed: the undelayed target breaks out
             testScheduler.runCurrent()
             assertEquals(2, game.stateFlow.value.field.lifeCount)
             assertFalse(game.stateFlow.value.field.isClosed)
 
-            game.targetDidBreakout(targets[1].id)
+            repeat(2) { game.tick(250) } // 1500ms elapsed: the 500ms-delayed target breaks out
             testScheduler.runCurrent()
             assertEquals(1, game.stateFlow.value.field.lifeCount)
             assertFalse(game.stateFlow.value.field.isClosed)
 
-            game.targetDidBreakout(targets[2].id)
+            repeat(2) { game.tick(250) } // 2000ms elapsed: the 1000ms-delayed target breaks out
             testScheduler.runCurrent()
             assertEquals(0, game.stateFlow.value.field.lifeCount)
             assertTrue(game.stateFlow.value.field.isClosed)
-        }
-
-    @Test
-    fun `targetDidBreakout called twice for the same target only decrements life count once`() =
-        runTest {
-            // Guards against MC-27: a burst of recompositions (or any other repeat signal) firing
-            // this for the same fall must not cost more than one life. A second, still-active target
-            // keeps the level from advancing and regenerating ids out from under the repeated call.
-            val game = Game(FakeSessionHelper(targetAmount = 2), backgroundScope, Random(7))
-            game.start()
-            game.createField(1)
-            game.createTargets()
-            testScheduler.runCurrent()
-            val targetId =
-                game.stateFlow.value.targets
-                    .first()
-                    .id
-
-            game.targetDidBreakout(targetId)
-            testScheduler.runCurrent()
-            game.targetDidBreakout(targetId)
-            testScheduler.runCurrent()
-
-            assertEquals(2, game.stateFlow.value.field.lifeCount)
-            assertFalse(game.stateFlow.value.field.isClosed)
         }
 
     @Test
@@ -253,25 +239,21 @@ class GameTest {
             suspend fun runSession(): Pair<Field, List<Target>> {
                 val seed = 99L
                 val game = Game(SessionHelperImpl(random = Random(seed)), backgroundScope, Random(seed))
-                game.start()
                 game.createField(1)
                 game.createTargets()
-                testScheduler.runCurrent()
 
-                val firstTargetId =
-                    game.stateFlow.value.targets
-                        .first()
-                        .id
-                game.targetRevealed(firstTargetId)
-                testScheduler.runCurrent()
-
+                // The first GAME_COLUMN_COUNT targets always have appearanceDelayMs 0 (see
+                // SessionHelperImpl.getTargetAppearanceDelayMsById), so one tick reveals that group
+                // before firing once against it - the same ordering the old targetRevealed +
+                // fireButtonClicked call pair produced.
+                game.tick(TICK_STEP_MS)
                 game.fireButtonClicked()
-                testScheduler.runCurrent()
 
-                game.stateFlow.value.targets
-                    .map { it.id }
-                    .forEach { game.targetDidBreakout(it) }
-                testScheduler.runCurrent()
+                // Fixed step, fixed count: seed 99's level-1 board runs out its own clock (the field
+                // closes at lifeCount 0 partway through), and tick()'s isClosed guard then freezes
+                // every target in place, so this count only needs to reach that frozen state, not
+                // land on it exactly.
+                repeat(SEED_99_SESSION_TICKS - 1) { game.tick(TICK_STEP_MS) }
 
                 return game.stateFlow.value.field to game.stateFlow.value.targets
             }
@@ -285,17 +267,16 @@ class GameTest {
             // Comparing the two runs to each other cannot fail on a range narrow enough that an
             // unseeded draw coincides by chance (getSubtractionDigitByLevel's 1..3 at level 1 agrees
             // roughly one run in four). Pinning exact seed-99 values is what actually catches that.
-            //
-            // nextOperationSign/nextOperationDigit shifted from MC-38's removal of the collector's
-            // visibleTargetsAbsent() branch: that branch used to draw from this same Random between
-            // createTargets() and fireButtonClicked(), so removing it moves every draw after it back
-            // by one - exactly what activeTargetsAbsent's own edge-triggered guard now prevents.
+            // Unlike the old UI-driven path (which forced every target to break out regardless of
+            // elapsed time), the engine's own clock plays this out to a real game over: three of the
+            // eight targets break out before lifeCount reaches zero, and the other five freeze wherever
+            // they were falling once the field closes.
             assertEquals(
                 Field(
                     id = 1,
-                    level = 2,
+                    level = 1,
                     score = 0,
-                    lifeCount = -5,
+                    lifeCount = 0,
                     bonusMultiplier = 0,
                     currentOperationSign = OperationSign.SUBTRACTION,
                     currentOperationDigit = 2,
@@ -311,55 +292,93 @@ class GameTest {
                         id = 1,
                         relatedFieldId = 1,
                         columnId = 0,
-                        value = 13,
-                        fallenMs = 0,
+                        value = 76,
+                        fallenMs = 21250,
                         appearanceDelayMs = 0,
-                        lifetimeMs = 28861,
+                        lifetimeMs = 21223,
+                        isProfitable = false,
+                        isVisible = false,
+                        isActive = false,
                     ),
                     Target(
                         id = 2,
                         relatedFieldId = 1,
                         columnId = 1,
-                        value = 25,
-                        fallenMs = 0,
+                        value = 24,
+                        fallenMs = 30750,
                         appearanceDelayMs = 0,
-                        lifetimeMs = 27622,
+                        lifetimeMs = 31310,
+                        isProfitable = false,
+                        isVisible = true,
+                        isActive = true,
                     ),
                     Target(
                         id = 3,
                         relatedFieldId = 1,
                         columnId = 2,
-                        value = 12,
-                        fallenMs = 0,
+                        value = 24,
+                        fallenMs = 26750,
                         appearanceDelayMs = 0,
-                        lifetimeMs = 39078,
+                        lifetimeMs = 26738,
+                        isProfitable = false,
+                        isVisible = false,
+                        isActive = false,
                     ),
                     Target(
                         id = 4,
                         relatedFieldId = 1,
                         columnId = 3,
-                        value = 24,
-                        fallenMs = 0,
+                        value = 68,
+                        fallenMs = 30750,
                         appearanceDelayMs = 0,
-                        lifetimeMs = 37001,
+                        lifetimeMs = 37629,
+                        isProfitable = false,
+                        isVisible = true,
+                        isActive = true,
                     ),
                     Target(
                         id = 5,
                         relatedFieldId = 1,
                         columnId = 1,
-                        value = 20,
-                        fallenMs = 0,
-                        appearanceDelayMs = 17208,
-                        lifetimeMs = 35309,
+                        value = 6,
+                        fallenMs = 19765,
+                        appearanceDelayMs = 0,
+                        lifetimeMs = 33987,
+                        isVisible = true,
+                        isActive = true,
                     ),
                     Target(
                         id = 6,
                         relatedFieldId = 1,
                         columnId = 2,
-                        value = 23,
-                        fallenMs = 0,
-                        appearanceDelayMs = 16318,
-                        lifetimeMs = 19998,
+                        value = 21,
+                        fallenMs = 16075,
+                        appearanceDelayMs = 0,
+                        lifetimeMs = 27151,
+                        isVisible = true,
+                        isActive = true,
+                    ),
+                    Target(
+                        id = 7,
+                        relatedFieldId = 1,
+                        columnId = 3,
+                        value = 1,
+                        fallenMs = 12310,
+                        appearanceDelayMs = 0,
+                        lifetimeMs = 33382,
+                        isVisible = true,
+                        isActive = true,
+                    ),
+                    Target(
+                        id = 8,
+                        relatedFieldId = 1,
+                        columnId = 0,
+                        value = 18,
+                        fallenMs = 20586,
+                        appearanceDelayMs = 0,
+                        lifetimeMs = 20473,
+                        isVisible = false,
+                        isActive = false,
                     ),
                 ),
                 firstTargets,
@@ -370,22 +389,22 @@ class GameTest {
     fun `start called twice does not leak a collector that outlives stop`() =
         runTest {
             // If start() doesn't cancel the earlier job, stop() only cancels the second one, and the
-            // first keeps collecting: the level-up below would still fire after stop().
+            // first keeps collecting: the level-up below would still fire after stop(). Driven with
+            // targetsRestored rather than a breakout, because tick() now levels up inline regardless
+            // of whether the collector is running - the collector's only remaining trigger is exactly
+            // this kind of externally-supplied, already-empty target list.
             val game = Game(FakeSessionHelper(targetAmount = 1), backgroundScope, Random(5))
             game.start()
             game.start()
             game.createField(1)
             game.createTargets()
             testScheduler.runCurrent()
-            val targetId =
+            val allInactive =
                 game.stateFlow.value.targets
-                    .first()
-                    .id
-            game.targetRevealed(targetId)
-            testScheduler.runCurrent()
+                    .map { it.copy(isActive = false) }
 
             game.stop()
-            game.targetDidBreakout(targetId)
+            game.targetsRestored(allInactive)
             testScheduler.runCurrent()
 
             assertEquals(1, game.stateFlow.value.field.level)
@@ -399,15 +418,12 @@ class GameTest {
             game.createField(1)
             game.createTargets()
             testScheduler.runCurrent()
-            val targetId =
+            val allInactive =
                 game.stateFlow.value.targets
-                    .first()
-                    .id
-            game.targetRevealed(targetId)
-            testScheduler.runCurrent()
+                    .map { it.copy(isActive = false) }
 
             game.stop()
-            game.targetDidBreakout(targetId)
+            game.targetsRestored(allInactive)
             testScheduler.runCurrent()
 
             assertEquals(1, game.stateFlow.value.field.level)
@@ -450,7 +466,8 @@ class GameTest {
                 game.stateFlow.value.targets
                     .first()
                     .id
-            game.targetRevealed(targetId)
+            // fireButtonClicked only operates on visible targets; one tick reveals it (delay 0).
+            game.tick(1)
             testScheduler.runCurrent()
 
             // Random(42) draws SUBTRACTION/3 here (pinned by the seeded-reproducibility test above);
@@ -480,7 +497,8 @@ class GameTest {
     fun `targetClicked retires a target it clears to zero`() =
         runTest {
             // A second, never-revealed target keeps the board non-empty so clearing the first one
-            // does not level up and regenerate the id being asserted on.
+            // does not level up and regenerate the id being asserted on. targetClicked doesn't gate
+            // on visibility, so the first target need not be revealed first.
             val game = Game(FakeSessionHelper(targetAmount = 2, targetValue = 1), backgroundScope, Random(21))
             game.start()
             game.createField(1)
@@ -491,8 +509,6 @@ class GameTest {
                     .sortedBy { it.id }
                     .first()
                     .id
-            game.targetRevealed(targetId)
-            testScheduler.runCurrent()
 
             game.targetClicked(targetId)
             testScheduler.runCurrent()
@@ -537,8 +553,18 @@ class GameTest {
         runTest {
             // A second, never-revealed target stays active throughout so clearing the first one
             // doesn't leave the board fully inactive - that would level up and regenerate the whole
-            // target set out from under the id being asserted on below.
-            val game = Game(FakeSessionHelper(targetAmount = 2, targetValue = 3), backgroundScope, Random(42))
+            // target set out from under the id being asserted on below. Its own delay is far past
+            // this test's window, so the reveal tick below only reveals the first target.
+            val game =
+                Game(
+                    FakeSessionHelper(
+                        targetAmount = 2,
+                        targetValue = 3,
+                        appearanceDelayMsById = { index -> if (index == 0) 0 else 999_999 },
+                    ),
+                    backgroundScope,
+                    Random(42),
+                )
             game.start()
             game.createField(1)
             game.createTargets()
@@ -548,7 +574,8 @@ class GameTest {
                     .sortedBy { it.id }
                     .first()
                     .id
-            game.targetRevealed(targetId)
+            // fireButtonClicked only operates on visible targets; one tick reveals it (delay 0).
+            game.tick(1)
             testScheduler.runCurrent()
 
             // Random(42) draws SUBTRACTION/3 here; against value 3 that is the winning branch that
@@ -573,14 +600,9 @@ class GameTest {
             game.createField(1)
             game.createTargets()
             testScheduler.runCurrent()
-            val targetId =
-                game.stateFlow.value.targets
-                    .first()
-                    .id
-            game.targetRevealed(targetId)
-            testScheduler.runCurrent()
 
-            game.targetDidBreakout(targetId)
+            // Four 250ms ticks reveal and break the sole target out (lifetimeMs 1000, delay 0).
+            repeat(4) { game.tick(250) }
             testScheduler.runCurrent()
             assertEquals(2, game.stateFlow.value.field.level)
 
@@ -591,79 +613,6 @@ class GameTest {
                     .first()
             assertEquals(11, regenerated.value)
             assertEquals(1001, regenerated.lifetimeMs)
-        }
-
-    @Test
-    fun `targetRevealed makes only the targeted target visible`() =
-        runTest {
-            val game = Game(FakeSessionHelper(targetAmount = 2), backgroundScope, Random(14))
-            game.start()
-            game.createField(1)
-            game.createTargets()
-            testScheduler.runCurrent()
-            val targets =
-                game.stateFlow.value.targets
-                    .sortedBy { it.id }
-            val revealedId = targets[0].id
-            val untouchedId = targets[1].id
-
-            game.targetRevealed(revealedId)
-            testScheduler.runCurrent()
-
-            assertTrue(
-                game.stateFlow.value.targets
-                    .first { it.id == revealedId }
-                    .isVisible,
-            )
-            assertFalse(
-                game.stateFlow.value.targets
-                    .first { it.id == untouchedId }
-                    .isVisible,
-            )
-        }
-
-    @Test
-    fun `targetShouldBeSaved clears the appearance delay of a target already falling`() =
-        runTest {
-            // No start() here: the collector's visibleTargetsAbsent() branch zeroes appearanceDelayMs
-            // on every non-visible target, so with it running the delay assertion below passes even
-            // against a mapper that never writes the field at all.
-            val game = Game(FakeSessionHelper(targetAmount = 1, appearanceDelayMs = 500), backgroundScope, Random(15))
-            game.createField(1)
-            game.createTargets()
-            val targetId =
-                game.stateFlow.value.targets
-                    .first()
-                    .id
-
-            game.targetShouldBeSaved(targetId, position = 50, gameColumnHeightPx = 100)
-
-            val saved =
-                game.stateFlow.value.targets
-                    .first { it.id == targetId }
-            // Halfway (50 of 100px) against this target's 1000ms lifetime at level 1.
-            assertEquals(500, saved.fallenMs)
-            assertEquals(0, saved.appearanceDelayMs)
-        }
-
-    @Test
-    fun `targetShouldBeSaved keeps the delay of a target paused before it appears`() =
-        runTest {
-            val game = Game(FakeSessionHelper(targetAmount = 1, appearanceDelayMs = 8000), backgroundScope, Random(15))
-            game.createField(1)
-            game.createTargets()
-            val targetId =
-                game.stateFlow.value.targets
-                    .first()
-                    .id
-
-            game.targetShouldBeSaved(targetId, position = 0, gameColumnHeightPx = 100)
-
-            val saved =
-                game.stateFlow.value.targets
-                    .first { it.id == targetId }
-            assertEquals(0, saved.fallenMs)
-            assertEquals(8000, saved.appearanceDelayMs)
         }
 
     @Test
