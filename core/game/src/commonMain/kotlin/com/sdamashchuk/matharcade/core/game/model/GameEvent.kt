@@ -20,5 +20,11 @@ sealed interface GameEvent {
         val level: Int,
     ) : GameEvent
 
+    // Fired once per qualifying level-up (see Field.updateLevel), never per tick: livesLeft is the
+    // field's lifeCount after the grant, already capped.
+    data class LifeGranted(
+        val livesLeft: Int,
+    ) : GameEvent
+
     data object GameOver : GameEvent
 }

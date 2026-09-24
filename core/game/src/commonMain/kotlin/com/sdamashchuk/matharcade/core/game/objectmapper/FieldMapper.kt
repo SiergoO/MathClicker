@@ -21,10 +21,29 @@ internal fun Field.closeIfNecessary(): Field =
 // helper, because updateLevel is the only place a level is ever incremented.
 private const val LEVEL_MAX = 999
 
-internal fun Field.updateLevel(maxLevel: Int = LEVEL_MAX): Field =
-    this.copy(
-        level = (level + 1).coerceAtMost(maxLevel),
-    )
+// Starting point, not a tuned value (MC-54): three lives with no way to earn one back is a hard
+// ceiling, but the owner hasn't picked a pace for lifting it. 5 is chosen so a bonus is reachable
+// well inside a run - MC-52 already put a no-input level-1 session at ~12s, so this needs real
+// playtesting data, not a guess, before it is treated as final.
+private const val LIFE_BONUS_INTERVAL_LEVELS = 5
+
+// Capped at Field's own starting lifeCount (see Field.kt) rather than an unbounded bank: the grant
+// is a recovery mechanic, not a second growth curve, and staying at or below the start keeps the
+// existing 3-slot life HUD (Field.kt in :feature:game) correct with no further change. Also a
+// starting point, pending the same tuning as the interval above.
+private const val LIFE_BONUS_CAP = 3
+
+// The only place a level is ever incremented (see LEVEL_MAX above), so it is also the only place
+// the every-N-levels life bonus can be granted - restoring a session never calls this, which is
+// what keeps a qualifying level from granting a second time across a restore.
+internal fun Field.updateLevel(maxLevel: Int = LEVEL_MAX): Field {
+    val leveled = copy(level = (level + 1).coerceAtMost(maxLevel))
+    return if (leveled.level % LIFE_BONUS_INTERVAL_LEVELS == 0) {
+        leveled.copy(lifeCount = (leveled.lifeCount + 1).coerceAtMost(LIFE_BONUS_CAP))
+    } else {
+        leveled
+    }
+}
 
 // Saturating, not wrapping. With the streak uncapped (ASK-18) the per-press award grows without a
 // bound of its own, and Int arithmetic that overflows wraps negative - which the old floor at zero

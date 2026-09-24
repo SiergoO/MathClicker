@@ -237,7 +237,14 @@ class Game(
                 _events.tryEmit(GameEvent.TargetBrokeOut(id, current.field.lifeCount - (index + 1)))
             }
             if (leveledUp) {
-                _events.tryEmit(GameEvent.LevelUp(_stateFlow.value.field.level))
+                val leveledField = _stateFlow.value.field
+                _events.tryEmit(GameEvent.LevelUp(leveledField.level))
+                // fieldAfterBreakout, not current.field: a breakout on this same step can already
+                // have decremented lifeCount, and comparing against the pre-tick value would read a
+                // grant that only offset that loss as an increase, or worse, mask a real grant.
+                if (leveledField.lifeCount > fieldAfterBreakout.lifeCount) {
+                    _events.tryEmit(GameEvent.LifeGranted(leveledField.lifeCount))
+                }
             }
             // current.field.isClosed already returned this call early above, so a closed field here
             // is always a fresh transition, not a repeat of one already reported.
@@ -266,6 +273,9 @@ class Game(
                 val updatedField = current.field.updateLevel()
                 _stateFlow.value = GameState(updatedField, recreateTargets(updatedField))
                 _events.tryEmit(GameEvent.LevelUp(updatedField.level))
+                if (updatedField.lifeCount > current.field.lifeCount) {
+                    _events.tryEmit(GameEvent.LifeGranted(updatedField.lifeCount))
+                }
             }
         }
 

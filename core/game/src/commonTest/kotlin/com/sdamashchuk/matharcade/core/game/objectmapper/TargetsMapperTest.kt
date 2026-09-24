@@ -91,4 +91,28 @@ class TargetsMapperTest {
 
         assertEquals(targets, advanced)
     }
+
+    // The property itself lives on :core:model's Target, not this mapper - covered from here
+    // because :core:model has no test source set, the same as Target.position.
+    @Test
+    fun `isTelegraphingBreakout flips on at the final 15 percent of the fall`() {
+        val justBefore = target(id = 1, value = 5).copy(fallenMs = 849, lifetimeMs = 1000)
+        val atTheBoundary = target(id = 1, value = 5).copy(fallenMs = 850, lifetimeMs = 1000)
+        val midFall = target(id = 1, value = 5).copy(fallenMs = 200, lifetimeMs = 1000)
+        val alreadyBrokenOut = target(id = 1, value = 5).copy(fallenMs = 1000, lifetimeMs = 1000)
+
+        assertFalse(justBefore.isTelegraphingBreakout)
+        assertTrue(atTheBoundary.isTelegraphingBreakout)
+        assertFalse(midFall.isTelegraphingBreakout)
+        assertTrue(alreadyBrokenOut.isTelegraphingBreakout)
+    }
+
+    @Test
+    fun `isTelegraphingBreakout is false rather than dividing by zero for a zero or negative lifetime`() {
+        val zeroLifetime = target(id = 1, value = 5).copy(fallenMs = 500, lifetimeMs = 0)
+        val negativeLifetime = target(id = 1, value = 5).copy(fallenMs = 500, lifetimeMs = -100)
+
+        assertFalse(zeroLifetime.isTelegraphingBreakout)
+        assertFalse(negativeLifetime.isTelegraphingBreakout)
+    }
 }

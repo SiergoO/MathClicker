@@ -54,6 +54,16 @@ sealed interface FeedbackEffect {
         override val severity = SEVERITY_LEVEL_UP
     }
 
+    // Outranks a plain LevelUp - gaining a life back is rarer and more consequential than the level
+    // bump it always rides in on - but still reads as good news, unlike the two loss effects above.
+    data class LifeGranted(
+        val livesLeft: Int,
+    ) : FeedbackEffect {
+        override val haptic = HapticFeedbackType.Confirm
+        override val hapticRepeatCount = 1
+        override val severity = SEVERITY_LIFE_GRANTED
+    }
+
     // A single Reject, not TargetBrokeOut's double one, so the last life and the game itself don't
     // feel identical even though both are losses.
     data object GameOver : FeedbackEffect {
@@ -65,6 +75,7 @@ sealed interface FeedbackEffect {
 
 private const val SEVERITY_ZEROED = 1
 private const val SEVERITY_LEVEL_UP = 2
+private const val SEVERITY_LIFE_GRANTED = 3
 private const val SEVERITY_OPERATION_CAP = 8
 private const val SEVERITY_GAME_OVER = 9
 private const val SEVERITY_BROKE_OUT = 10

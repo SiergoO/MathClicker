@@ -49,6 +49,14 @@ class EffectForTest {
         assertEquals(1, effect.hapticRepeatCount)
     }
 
+    @Test
+    fun `LifeGranted maps to a confirm that outranks a plain LevelUp`() {
+        val effect = effectFor(GameEvent.LifeGranted(livesLeft = 3))
+        assertEquals(FeedbackEffect.LifeGranted(livesLeft = 3), effect)
+        assertEquals(HapticFeedbackType.Confirm, effect.haptic)
+        assertTrue(effect.severity > effectFor(GameEvent.LevelUp(level = 3)).severity)
+    }
+
     // M3: mapping GameOver to no effect would make this null or crash on .haptic before reaching
     // the assertion below.
     @Test
@@ -88,6 +96,7 @@ class EffectForTest {
                 GameEvent.OperationResolved(gained = 1, streak = 1),
                 GameEvent.TargetBrokeOut(id = 1, livesLeft = 1),
                 GameEvent.LevelUp(level = 1),
+                GameEvent.LifeGranted(livesLeft = 3),
                 GameEvent.GameOver,
             )
         events.forEach { event -> effectFor(event) }

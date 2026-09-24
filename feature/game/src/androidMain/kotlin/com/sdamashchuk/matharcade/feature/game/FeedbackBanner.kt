@@ -95,6 +95,10 @@ private fun bannerContent(effect: FeedbackEffect): Pair<String, Color> =
             "" to Color.Transparent
         }
 
+        is FeedbackEffect.LifeGranted -> {
+            stringResource(id = R.string.game_feedback_life_gained) to Green200
+        }
+
         FeedbackEffect.GameOver -> {
             "" to Color.Transparent
         }

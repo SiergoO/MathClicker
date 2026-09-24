@@ -11,5 +11,6 @@ internal fun effectFor(event: GameEvent): FeedbackEffect =
         is GameEvent.OperationResolved -> FeedbackEffect.OperationResolved(event.gained, event.streak)
         is GameEvent.TargetBrokeOut -> FeedbackEffect.TargetBrokeOut(event.livesLeft)
         is GameEvent.LevelUp -> FeedbackEffect.LevelUp
+        is GameEvent.LifeGranted -> FeedbackEffect.LifeGranted(event.livesLeft)
         GameEvent.GameOver -> FeedbackEffect.GameOver
     }
