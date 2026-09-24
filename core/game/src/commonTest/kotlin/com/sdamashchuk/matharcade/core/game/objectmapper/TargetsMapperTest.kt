@@ -66,4 +66,49 @@ class TargetsMapperTest {
         assertEquals(10000, afterSecondPause.first().lifetimeMs)
         assertEquals(1100, afterSecondPause.first().fallenMs)
     }
+
+    @Test
+    fun `advance burns the step against appearanceDelayMs while a target is still waiting`() {
+        val targets = listOf(target(id = 1, value = 5, isVisible = false).copy(appearanceDelayMs = 500))
+
+        val advanced = targets.advance(200)
+
+        val updated = advanced.first()
+        assertEquals(300, updated.appearanceDelayMs)
+        assertEquals(0, updated.fallenMs)
+        assertFalse(updated.isVisible)
+    }
+
+    @Test
+    fun `advance carries the spill into fallenMs when a step straddles the delay-fall boundary`() {
+        val targets = listOf(target(id = 1, value = 5, isVisible = false).copy(appearanceDelayMs = 100))
+
+        val advanced = targets.advance(150)
+
+        val updated = advanced.first()
+        assertEquals(0, updated.appearanceDelayMs)
+        assertEquals(50, updated.fallenMs)
+        assertTrue(updated.isVisible)
+    }
+
+    @Test
+    fun `advance adds the full step to fallenMs once a target has no delay left`() {
+        val targets = listOf(target(id = 1, value = 5, isVisible = true).copy(fallenMs = 1000))
+
+        val advanced = targets.advance(200)
+
+        val updated = advanced.first()
+        assertEquals(0, updated.appearanceDelayMs)
+        assertEquals(1200, updated.fallenMs)
+        assertTrue(updated.isVisible)
+    }
+
+    @Test
+    fun `advance leaves an inactive target untouched`() {
+        val targets = listOf(target(id = 1, value = 5, isActive = false).copy(appearanceDelayMs = 100, fallenMs = 0))
+
+        val advanced = targets.advance(200)
+
+        assertEquals(targets, advanced)
+    }
 }

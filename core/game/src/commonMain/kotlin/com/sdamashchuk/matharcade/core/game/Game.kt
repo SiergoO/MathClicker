@@ -2,6 +2,7 @@ package com.sdamashchuk.matharcade.core.game
 
 import com.sdamashchuk.matharcade.core.game.helper.SessionHelper
 import com.sdamashchuk.matharcade.core.game.model.GameState
+import com.sdamashchuk.matharcade.core.game.objectmapper.advance
 import com.sdamashchuk.matharcade.core.game.objectmapper.changeActiveness
 import com.sdamashchuk.matharcade.core.game.objectmapper.changeVisibility
 import com.sdamashchuk.matharcade.core.game.objectmapper.closeIfNecessary
@@ -29,6 +30,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.random.Random
+
+// A frame gap this large (a resumed app, a dropped composition) is treated as a single 250ms step
+// rather than replayed in full, so a stalled clock can't teleport every target straight to the
+// floor the moment it resumes. Not yet read by any caller - the UI still drives the fall - wired
+// up in the commit that replaces that driver with tick().
+internal const val MAX_TICK_MS = 250
 
 class Game(
     private val sessionHelper: SessionHelper,
@@ -175,6 +182,36 @@ class Game(
             _stateFlow.value = GameState(updatedField, updatedTargets)
         }
 
+    // The engine's own clock: advances every active target by elapsedMs and resolves whatever that
+    // step causes - reveal, breakout, level-up - in this one locked step, so a caller never needs to
+    // follow it up with targetRevealed/targetDidBreakout the way the UI-driven path still does.
+    suspend fun tick(elapsedMs: Int) =
+        mutex.withLock {
+            val current = _stateFlow.value
+            if (current.field.isClosed || current.targets.none { it.isActive }) return@withLock
+            val step = elapsedMs.coerceIn(0, MAX_TICK_MS)
+            val hadVisibleActiveTarget = current.targets.any { it.isActive && it.isVisible }
+
+            val advanced = current.targets.advance(step)
+            val brokenOutIds = advanced.filter { it.isActive && it.fallenMs >= it.lifetimeMs }.map { it.id }
+            val (fieldAfterBreakout, targetsAfterBreakout) = resolveBreakouts(advanced, brokenOutIds, current.field)
+
+            // Fired on the edge - a visible active target existed before this step and does not
+            // after - never on the level, or the draw count this makes would depend on frame rate
+            // instead of game events (see shortenAppearanceDelay's own determinism guarantee).
+            val stillWaiting = hadVisibleActiveTarget && targetsAfterBreakout.none { it.isActive && it.isVisible }
+            val targetsAfterShorten =
+                if (stillWaiting) targetsAfterBreakout.shortenAppearanceDelay(random) else targetsAfterBreakout
+
+            _stateFlow.value =
+                if (targetsAfterShorten.none { it.isActive }) {
+                    val leveledField = fieldAfterBreakout.updateLevel()
+                    GameState(leveledField, recreateTargets(leveledField))
+                } else {
+                    GameState(fieldAfterBreakout, targetsAfterShorten)
+                }
+        }
+
     private suspend fun activeTargetsAbsent() =
         mutex.withLock {
             // Re-check under the lock: the collector's own condition (targets.none { it.isActive })
@@ -203,6 +240,21 @@ class Game(
     // regenerated targets in one assignment, which this cannot express.
     private fun createTargetsLocked() {
         _stateFlow.value = _stateFlow.value.copy(targets = recreateTargets(_stateFlow.value.field))
+    }
+
+    // The body of the old targetDidBreakout, minus its "already inactive" guard: that guard is now
+    // structural, since tick only ever offers an id here once - the same locked step that finds
+    // fallenMs >= lifetimeMs is the one that deactivates it, leaving nothing for a repeat to find.
+    private fun resolveBreakouts(
+        targets: List<Target>,
+        brokenOutIds: List<Int>,
+        field: Field,
+    ): Pair<Field, List<Target>> {
+        val updatedTargets =
+            brokenOutIds.fold(targets) { acc, id -> acc.changeActiveness(id, false).changeVisibility(id, false) }
+        val updatedField =
+            brokenOutIds.fold(field) { acc, _ -> acc.decrementLifeCount(1) }.closeIfNecessary()
+        return updatedField to updatedTargets
     }
 
     private fun recreateField(id: Int): Field {

@@ -116,6 +116,28 @@ private fun fallenFraction(
         0f
     }
 
+// Advances every active target by stepMs. A target still waiting out its appearance delay burns
+// the step against appearanceDelayMs first; when the delay is consumed partway through the step,
+// the leftover carries straight into fallenMs instead of being dropped, so a target loses none of
+// its fall at the moment it appears.
+internal fun List<Target>.advance(stepMs: Int): List<Target> =
+    this.map { target ->
+        if (!target.isActive) {
+            target
+        } else {
+            val remainingDelay = target.appearanceDelayMs - stepMs
+            if (remainingDelay > 0) {
+                target.copy(appearanceDelayMs = remainingDelay)
+            } else {
+                target.copy(
+                    appearanceDelayMs = 0,
+                    isVisible = true,
+                    fallenMs = target.fallenMs - remainingDelay,
+                )
+            }
+        }
+    }
+
 internal fun List<Target>.shortenAppearanceDelay(random: Random = Random.Default): List<Target> {
     val nonVisibleAliveTargets =
         this.filter { it.isActive && !it.isVisible }.sortedBy { it.appearanceDelayMs }
