@@ -3,6 +3,7 @@ package com.sdamashchuk.matharcade.core.game
 import com.sdamashchuk.matharcade.core.game.helper.SessionHelper
 import com.sdamashchuk.matharcade.core.game.model.GameState
 import com.sdamashchuk.matharcade.core.game.objectmapper.advance
+import com.sdamashchuk.matharcade.core.game.objectmapper.advanceStreak
 import com.sdamashchuk.matharcade.core.game.objectmapper.changeActiveness
 import com.sdamashchuk.matharcade.core.game.objectmapper.changeVisibility
 import com.sdamashchuk.matharcade.core.game.objectmapper.closeIfNecessary
@@ -10,6 +11,7 @@ import com.sdamashchuk.matharcade.core.game.objectmapper.decrementLifeCount
 import com.sdamashchuk.matharcade.core.game.objectmapper.decrementValue
 import com.sdamashchuk.matharcade.core.game.objectmapper.ensureAlive
 import com.sdamashchuk.matharcade.core.game.objectmapper.ensureVisible
+import com.sdamashchuk.matharcade.core.game.objectmapper.resetStreak
 import com.sdamashchuk.matharcade.core.game.objectmapper.shortenAppearanceDelay
 import com.sdamashchuk.matharcade.core.game.objectmapper.updateActionButtons
 import com.sdamashchuk.matharcade.core.game.objectmapper.updateLevel
@@ -133,19 +135,21 @@ class Game(
         mutex.withLock {
             val current = _stateFlow.value
             val (nextOperationSign, nextOperationDigit) = getNextSignAndDigit()
-            val (afterOperationButtons, resultingScore) =
+            val pressOutcome =
                 current.targets.performOperation(
                     current.field.currentOperationSign,
                     current.field.currentOperationDigit,
                 )
             val updatedTargets =
-                afterOperationButtons
+                pressOutcome.targets
                     .ensureAlive()
                     .ensureVisible()
+            val streakedField = current.field.advanceStreak(pressOutcome.failed)
+            val gained = pressOutcome.totalScore * streakedField.appliedMultiplier
             val updatedField =
-                current.field
+                streakedField
                     .updateActionButtons(nextOperationSign, nextOperationDigit)
-                    .updateScore(resultingScore)
+                    .updateScore(gained)
             _stateFlow.value = GameState(updatedField, updatedTargets)
         }
 
@@ -214,8 +218,10 @@ class Game(
     ): Pair<Field, List<Target>> {
         val updatedTargets =
             brokenOutIds.fold(targets) { acc, id -> acc.changeActiveness(id, false).changeVisibility(id, false) }
+        val fieldAfterLifeLoss = brokenOutIds.fold(field) { acc, _ -> acc.decrementLifeCount(1) }
         val updatedField =
-            brokenOutIds.fold(field) { acc, _ -> acc.decrementLifeCount(1) }.closeIfNecessary()
+            (if (brokenOutIds.isNotEmpty()) fieldAfterLifeLoss.resetStreak() else fieldAfterLifeLoss)
+                .closeIfNecessary()
         return updatedField to updatedTargets
     }
 

@@ -1,5 +1,6 @@
 package com.sdamashchuk.matharcade.core.game.scoring
 
+import com.sdamashchuk.matharcade.core.game.model.PressOutcome
 import com.sdamashchuk.matharcade.core.model.OperationSign
 import com.sdamashchuk.matharcade.core.model.Target
 
@@ -16,9 +17,9 @@ private const val FAILED_DIVISION_VALUE_CAP = 1_000_000
 internal fun List<Target>.performOperation(
     currentOperationSign: OperationSign,
     currentOperationDigit: Int,
-): Pair<List<Target>, Int> {
-    var multiplier = 0
+): PressOutcome {
     var totalScore = 0
+    var pressFailed = false
     val updatedList =
         this.map { target ->
             if (target.isActive && target.isVisible) {
@@ -28,21 +29,20 @@ internal fun List<Target>.performOperation(
                         if (currentOperationSign == OperationSign.DIVISION) {
                             if (currentOperationDigit == 0) {
                                 // Field()'s default digit before a real one is assigned. Treat it as a
-                                // failed split rather than dividing by zero: no penalty multiplication,
-                                // no crash, the target simply survives unchanged.
+                                // failed split rather than dividing by zero: no crash, the target
+                                // simply survives unchanged.
                                 isProfitable = false
-                                multiplier--
+                                pressFailed = true
                                 target.value
                             } else {
                                 val remainder = target.value % currentOperationDigit
                                 if (remainder == 0) {
                                     val result = target.value / currentOperationDigit
                                     totalScore += if (target.isProfitable) target.value - result else 0
-                                    multiplier++
                                     result
                                 } else {
                                     isProfitable = false
-                                    multiplier--
+                                    pressFailed = true
                                     (target.value.toLong() * currentOperationDigit)
                                         .coerceAtMost(FAILED_DIVISION_VALUE_CAP.toLong())
                                         .toInt()
@@ -53,19 +53,17 @@ internal fun List<Target>.performOperation(
                             return@run when {
                                 result > 0 -> {
                                     totalScore += if (target.isProfitable) currentOperationDigit else 0
-                                    multiplier = if (multiplier == 0) 1 else multiplier
                                     result
                                 }
 
                                 result == 0 -> {
                                     totalScore += if (target.isProfitable) currentOperationDigit else 0
-                                    multiplier++
                                     0
                                 }
 
                                 else -> {
                                     isProfitable = false
-                                    multiplier--
+                                    pressFailed = true
                                     target.value + currentOperationDigit
                                 }
                             }
@@ -79,6 +77,5 @@ internal fun List<Target>.performOperation(
                 target
             }
         }
-    val finalScore = totalScore * multiplier
-    return Pair(updatedList, finalScore)
+    return PressOutcome(updatedList, totalScore, pressFailed)
 }

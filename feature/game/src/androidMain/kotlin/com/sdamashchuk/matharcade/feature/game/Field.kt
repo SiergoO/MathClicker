@@ -178,7 +178,7 @@ fun Field(
                 text =
                     stringResource(
                         id = R.string.game_session_combo,
-                        gameState.value.field.bonusMultiplier,
+                        gameState.value.field.appliedMultiplier,
                     ).toUpperCase(Locale.current),
                 style = MaterialTheme.typography.h2,
             )

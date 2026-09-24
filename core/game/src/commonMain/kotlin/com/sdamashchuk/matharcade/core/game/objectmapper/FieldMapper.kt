@@ -42,3 +42,12 @@ internal fun Field.updateActionButtons(
         nextOperationSign = nextOperationSign,
         nextOperationDigit = nextOperationDigit,
     )
+
+// ASK-10: combo is a streak over presses, not targets - a ceiling this far out is an
+// implementation call rather than the owner's, named here so it is one edit to change.
+private const val STREAK_CAP = 10
+
+internal fun Field.advanceStreak(pressFailed: Boolean): Field =
+    this.copy(bonusMultiplier = if (pressFailed) 0 else (bonusMultiplier + 1).coerceAtMost(STREAK_CAP))
+
+internal fun Field.resetStreak(): Field = this.copy(bonusMultiplier = 0)

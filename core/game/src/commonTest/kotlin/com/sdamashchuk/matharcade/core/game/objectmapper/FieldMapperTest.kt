@@ -38,6 +38,32 @@ class FieldMapperTest {
     }
 
     @Test
+    fun `advanceStreak increments a clean press and resets a failed one`() {
+        assertEquals(1, Field(bonusMultiplier = 0).advanceStreak(pressFailed = false).bonusMultiplier)
+        assertEquals(6, Field(bonusMultiplier = 5).advanceStreak(pressFailed = false).bonusMultiplier)
+        assertEquals(0, Field(bonusMultiplier = 5).advanceStreak(pressFailed = true).bonusMultiplier)
+    }
+
+    @Test
+    fun `advanceStreak caps the streak at ten`() {
+        assertEquals(10, Field(bonusMultiplier = 9).advanceStreak(pressFailed = false).bonusMultiplier)
+        assertEquals(10, Field(bonusMultiplier = 10).advanceStreak(pressFailed = false).bonusMultiplier)
+    }
+
+    @Test
+    fun `resetStreak zeroes the streak regardless of its current value`() {
+        assertEquals(0, Field(bonusMultiplier = 7).resetStreak().bonusMultiplier)
+    }
+
+    @Test
+    fun `appliedMultiplier floors a resting streak at one but passes a live streak through`() {
+        // The property itself lives on :core:model's Field, not this mapper - covered from here
+        // because :core:model has no test source set, the same as Target.position.
+        assertEquals(1, Field(bonusMultiplier = 0).appliedMultiplier)
+        assertEquals(4, Field(bonusMultiplier = 4).appliedMultiplier)
+    }
+
+    @Test
     fun `updateActionButtons promotes the pending operation and queues a new one`() {
         val field =
             Field(
