@@ -62,7 +62,10 @@ private class AlwaysDudSessionHelper : SessionHelper {
     override val initialDivisionValueRange = 2..5
     override val initialSubtractionValueRange = 1..3
 
-    override fun getTargetValueByLevel(level: Int) = 5
+    override fun getTargetValueByLevel(
+        level: Int,
+        operationDigit: Int,
+    ) = 5
 
     override fun getTargetLifetimeMsByLevel(level: Int) = 100_000
 
@@ -90,6 +93,12 @@ class GameOperationDrawTest {
     @Test
     fun `10000 seeded draws never offer a board-wide dud`() =
         runTest {
+            // Zero, not a tolerance. MC-60 briefly made this 3-in-10000 by shaping values toward
+            // a residue of the current digit: a lone 1 is below every division digit and every
+            // subtraction digit past level 9, so the bounded redraw could spend all its attempts and
+            // hand over the dud it started with. The exhaustion fallback in getNextSignAndDigit
+            // closes that by construction rather than by luck.
+            var duds = 0
             repeat(10_000) { trial ->
                 val seed = trial.toLong()
                 val sessionHelper = SessionHelperImpl(random = Random(seed))
@@ -112,12 +121,9 @@ class GameOperationDrawTest {
                         visibleActiveTargets.none {
                             it.isReachableBy(field.nextOperationSign, field.nextOperationDigit)
                         }
-                assertTrue(
-                    !dud,
-                    "seed $seed drew a board-wide dud: ${field.nextOperationSign}/${field.nextOperationDigit} " +
-                        "against ${visibleActiveTargets.map { it.value }}",
-                )
+                if (dud) duds++
             }
+            assertEquals(0, duds, "seeded draws produced $duds board-wide duds")
         }
 
     @Test
@@ -150,7 +156,7 @@ class GameOperationDrawTest {
         }
 
     @Test
-    fun `a board every draw fails against still terminates and returns the bounded fallback`() =
+    fun `a board every draw fails against still terminates and returns a valid fallback`() =
         runTest {
             val countingRandom = DrawCountingRandom(Random(7))
             val game = Game(AlwaysDudSessionHelper(), backgroundScope, countingRandom)
@@ -170,14 +176,17 @@ class GameOperationDrawTest {
 
             game.fireButtonClicked()
 
-            // The bound is spent in full, then the last (still invalid) draw is used anyway - a
-            // defined fallback, not a hang and not a silent extra attempt past the stated limit.
+            // The bound is spent in full and no attempt is made past it - but what comes back is a
+            // move, not the last dud. Subtracting the smallest visible value is always valid, so a
+            // board this helper can never satisfy by drawing is still never handed a dead press.
             assertEquals(EXPECTED_DRAW_BOUND, countingRandom.drawCount - drawsBeforeFiring)
             val target =
                 game.stateFlow.value.targets
                     .first()
             val field = game.stateFlow.value.field
-            assertFalse(target.isReachableBy(field.nextOperationSign, field.nextOperationDigit))
+            assertTrue(target.isReachableBy(field.nextOperationSign, field.nextOperationDigit))
+            assertEquals(OperationSign.SUBTRACTION, field.nextOperationSign)
+            assertEquals(target.value, field.nextOperationDigit)
         }
 
     @Test

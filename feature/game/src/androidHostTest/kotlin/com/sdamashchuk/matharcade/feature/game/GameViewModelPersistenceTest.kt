@@ -35,7 +35,10 @@ private class PersistenceFakeSessionHelper(
     override val initialDivisionValueRange = 2..5
     override val initialSubtractionValueRange = 1..3
 
-    override fun getTargetValueByLevel(level: Int) = 10
+    override fun getTargetValueByLevel(
+        level: Int,
+        operationDigit: Int,
+    ) = 10
 
     override fun getTargetLifetimeMsByLevel(level: Int) = lifetimeMs
 

@@ -21,7 +21,10 @@ internal class FakeSessionHelper(
     // existing test runs at - while still diverging at any other level, which is what makes a level
     // argument silently swapped for a literal (createTargets, getNextSignAndDigit, recreateField)
     // observable.
-    override fun getTargetValueByLevel(level: Int) = targetValue + (level - 1)
+    override fun getTargetValueByLevel(
+        level: Int,
+        operationDigit: Int,
+    ) = targetValue + (level - 1)
 
     override fun getTargetLifetimeMsByLevel(level: Int) = 1000 + (level - 1)
 

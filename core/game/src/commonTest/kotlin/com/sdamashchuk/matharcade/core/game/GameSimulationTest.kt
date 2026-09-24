@@ -31,7 +31,10 @@ private class SimulationSessionHelper(
     override val initialDivisionValueRange = 2..5
     override val initialSubtractionValueRange = 1..3
 
-    override fun getTargetValueByLevel(level: Int) = targetValue
+    override fun getTargetValueByLevel(
+        level: Int,
+        operationDigit: Int,
+    ) = targetValue
 
     override fun getTargetLifetimeMsByLevel(level: Int) = lifetimeMs
 
@@ -91,8 +94,10 @@ class GameSimulationTest {
             // Random(99) through SessionHelperImpl and Game's own draws, measured once and pinned:
             // a change to either the difficulty curve or the clock arithmetic moves this number.
             // MC-52 shortened and floored the lifetime/wave-gap curves, which is why this moved down
-            // from the pre-MC-52 30640.
-            assertEquals(12784, elapsedMs)
+            // from the pre-MC-52 30640. MC-60 threads operationDigit into getTargetValueByLevel,
+            // adding one Random draw per target - that reshuffles every later draw off the same
+            // seed, which is why this moved again from 12784.
+            assertEquals(12496, elapsedMs)
         }
 
     // The MC-27 bug class as a JVM assertion for the first time: a target's accumulated fall must

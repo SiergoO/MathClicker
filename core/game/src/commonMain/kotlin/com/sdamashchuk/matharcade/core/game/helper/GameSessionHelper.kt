@@ -11,7 +11,13 @@ interface SessionHelper {
     val initialDivisionValueRange: IntRange
     val initialSubtractionValueRange: IntRange
 
-    fun getTargetValueByLevel(level: Int): Int
+    // operationDigit is the divisor the value is generated against - MC-60: preparation cost is a
+    // relationship between a target and the digit the player is about to press, not a property of
+    // the target alone, so the generator needs to know which digit that is.
+    fun getTargetValueByLevel(
+        level: Int,
+        operationDigit: Int,
+    ): Int
 
     fun getTargetLifetimeMsByLevel(level: Int): Int
 

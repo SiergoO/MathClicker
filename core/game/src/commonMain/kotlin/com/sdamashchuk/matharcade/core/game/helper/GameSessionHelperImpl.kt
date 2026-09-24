@@ -92,14 +92,39 @@ class SessionHelperImpl(
     }
 
     /**
-     * Calculates the target value depending on the level. The higher the level, the higher target value should be.
+     * Calculates the target value depending on the level and the digit the player is about to press
+     * with. The higher the level, the higher the target value; the number of taps needed before
+     * operationDigit succeeds against it (the target's preparation cost) follows the level's own
+     * profile - see desiredPreparationCost.
      * @param level
+     * @param operationDigit the divisor the generated value is shaped against.
      * @return random target value in a certain range of values.
      */
-    override fun getTargetValueByLevel(level: Int): Int {
+    override fun getTargetValueByLevel(
+        level: Int,
+        operationDigit: Int,
+    ): Int {
         val minThreshold = initialTargetValueRange.first + level / 10
         val maxThreshold = initialTargetValueRange.last + level * TARGET_VALUE_LEVEL_SCALE
-        return IntRange(minThreshold, maxThreshold).random(random)
+        if (operationDigit <= 1) {
+            // Nothing to prepare - mod 1 (or an invalid, non-positive digit) is always ready.
+            return IntRange(minThreshold, maxThreshold).random(random)
+        }
+
+        // Reserving headroom equal to the largest possible upward shift (operationDigit - 1) before
+        // drawing the base value is what keeps the shift below from ever crossing maxThreshold - the
+        // failure mode named in the spec for shifting the other direction (mutation M3) is going
+        // below minThreshold, and this is its mirror image for the maximum. coerceAtLeast guards the
+        // pathological case where the digit is wider than the level's own value spread (never
+        // observed for the real digit ranges in 1..999, but the range must never go empty either way).
+        val maxShift = operationDigit - 1
+        val drawUpperBound = (maxThreshold - maxShift).coerceAtLeast(minThreshold)
+        val baseValue = IntRange(minThreshold, drawUpperBound).random(random)
+
+        val desiredCost = desiredPreparationCost(level, operationDigit, random)
+        val currentCost = baseValue % operationDigit
+        val shift = (desiredCost - currentCost + operationDigit) % operationDigit
+        return (baseValue + shift).coerceAtMost(maxThreshold)
     }
 
     /**

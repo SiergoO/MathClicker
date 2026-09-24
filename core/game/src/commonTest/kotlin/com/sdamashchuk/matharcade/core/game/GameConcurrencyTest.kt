@@ -37,7 +37,10 @@ private class RaceSessionHelper(
     override val initialDivisionValueRange = 2..5
     override val initialSubtractionValueRange = 1..3
 
-    override fun getTargetValueByLevel(level: Int) = UNKILLABLE_TARGET_VALUE
+    override fun getTargetValueByLevel(
+        level: Int,
+        operationDigit: Int,
+    ) = UNKILLABLE_TARGET_VALUE
 
     // Well under MAX_TICK_MS: a single BREAKOUT_TICK_MS tick both falls and breaks the target out in
     // one locked call, the same one-call atomicity the old single targetDidBreakout() call gave this

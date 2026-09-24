@@ -328,7 +328,7 @@ class Game(
                 id = id + 1,
                 relatedFieldId = field.id,
                 columnId = id.toGameColumnId(),
-                value = sessionHelper.getTargetValueByLevel(field.level),
+                value = sessionHelper.getTargetValueByLevel(field.level, field.currentOperationDigit),
                 fallenMs = 0,
                 appearanceDelayMs = sessionHelper.getTargetAppearanceDelayMsByIdAndLevel(id, field.level),
                 lifetimeMs = sessionHelper.getTargetLifetimeMsByLevel(field.level),
@@ -339,8 +339,7 @@ class Game(
     // Never offers a sign/digit that would fail against every visible target (MC-50): an empty or
     // fully-hidden board (no visible active target at all) has no dud to avoid, so the first draw is
     // taken unconditionally rather than looping. Otherwise redraws until one succeeds against at
-    // least one visible active target, or MAX_OPERATION_DRAW_ATTEMPTS is spent, whichever comes
-    // first - see that constant for why the bound and its fallback are safe to fall back on.
+    // least one visible active target, or MAX_OPERATION_DRAW_ATTEMPTS is spent.
     private fun getNextSignAndDigit(
         targets: List<Target>,
         level: Int,
@@ -357,6 +356,18 @@ class Game(
             sign = OperationSign.values().random(random)
             digit = sessionHelper.getOperationDigitByLevel(sign, level)
             attempts++
+        }
+        if (visibleActiveTargets.isNotEmpty() && visibleActiveTargets.none { it.succeedsAgainst(sign, digit) }) {
+            // Exhausting the bound used to mean handing over the last draw, dud or not. MC-60 made
+            // that reachable: shaping values toward a residue of the current digit puts lone small
+            // values on the board, and a lone 1 is below every division digit and every subtraction
+            // digit past level 9. Subtracting the smallest visible value always succeeds - it zeroes
+            // that target exactly, and a target's value is never below 1 - so the dud stops being
+            // improbable and becomes impossible while anything is on screen. Off the level's own
+            // digit curve, deliberately: this fires in roughly 3 draws in 10 000, and a player with
+            // no move at all is worse than one handed a generous one.
+            sign = OperationSign.SUBTRACTION
+            digit = visibleActiveTargets.minOf { it.value }
         }
         return Pair(sign, digit)
     }

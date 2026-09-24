@@ -53,6 +53,73 @@ private const val SIMULATION_DIVISIONS = 3
 private const val SIMULATION_TAP_RATE_PER_SECOND = 8
 private const val SIMULATION_TAP_BUDGET_SECONDS = 3
 
+// MC-60: profile is measured against the level's own division digit range (getDivisionDigitByLevel),
+// not a fixed divisor - the spec's own "ready now at ÷5 but not ÷2" example is exactly why a single
+// divisor per level would misrepresent the real board.
+private const val PROFILE_SAMPLE_ITERATIONS = 10_000
+
+// Percentage points. n=10_000 keeps binomial sampling noise for any of these bucket sizes well under
+// 1pp on its own; the real source of slack is clamping - level 1's own division range starts at 2, so
+// a quarter of its draws (digit 2, only costs 0 or 1 exist) can't realize the "2-3 taps" bucket at all
+// and fall back into "1 tap" instead. Measured once against PROFILE_SEED: the largest observed gap
+// from the table was ~3pp (level 1's "1 tap"/"2-3 taps" pair, from that same clamp). 5 is generous
+// against that without being wide enough to pass mutation M1/M2/M5 (see the mutation ledger in
+// MC-60's spec).
+private const val PROFILE_TOLERANCE_PP = 5
+private const val PROFILE_SEED = 4242L
+
+private data class CostBuckets(
+    val readyNow: Int,
+    val oneTap: Int,
+    val twoOrThreeTaps: Int,
+    val fourPlusTaps: Int,
+) {
+    val percentages: List<Int>
+        get() =
+            listOf(readyNow, oneTap, twoOrThreeTaps, fourPlusTaps)
+                .map { it * 100 / (readyNow + oneTap + twoOrThreeTaps + fourPlusTaps) }
+}
+
+// Draws PROFILE_SAMPLE_ITERATIONS (divisor, value) pairs the way a real level-up does - a fresh
+// division digit per target, via the same getDivisionDigitByLevel a target's own currentOperationDigit
+// would come from - and buckets each by real taps-to-prepare (value % divisor, the same arithmetic
+// targetClicked's own decrementValue performs one tap at a time).
+private fun sampleCostBuckets(
+    level: Int,
+    seed: Long,
+): CostBuckets {
+    val seededHelper = SessionHelperImpl(random = Random(seed))
+    var readyNow = 0
+    var oneTap = 0
+    var twoOrThreeTaps = 0
+    var fourPlusTaps = 0
+    repeat(PROFILE_SAMPLE_ITERATIONS) {
+        val divisor = seededHelper.getDivisionDigitByLevel(level)
+        val value = seededHelper.getTargetValueByLevel(level, divisor)
+        when (val cost = value % divisor) {
+            0 -> readyNow++
+            1 -> oneTap++
+            in 2..3 -> twoOrThreeTaps++
+            else -> fourPlusTaps++
+        }
+    }
+    return CostBuckets(readyNow, oneTap, twoOrThreeTaps, fourPlusTaps)
+}
+
+private fun assertProfileMatches(
+    level: Int,
+    expectedPercentages: List<Int>,
+) {
+    val actual = sampleCostBuckets(level, PROFILE_SEED).percentages
+    val labels = listOf("ready now", "1 tap", "2-3 taps", "4+ taps")
+    for (i in actual.indices) {
+        assertTrue(
+            kotlin.math.abs(actual[i] - expectedPercentages[i]) <= PROFILE_TOLERANCE_PP,
+            "level $level ${labels[i]}: expected ~${expectedPercentages[i]}%, measured ${actual[i]}%",
+        )
+    }
+}
+
 private fun failedGrowthCapTarget(value: Int) =
     Target(
         id = 1,
@@ -113,7 +180,7 @@ class SessionHelperImplTest {
 
         repeat(SAMPLE_ITERATIONS) {
             assertTrue(helper.getTargetLifetimeMsByLevel(SAMPLE_LEVEL) in lifetimeRange)
-            assertTrue(helper.getTargetValueByLevel(SAMPLE_LEVEL) in valueRange)
+            assertTrue(helper.getTargetValueByLevel(SAMPLE_LEVEL, operationDigit = 1) in valueRange)
             assertTrue(helper.getTargetAmountByLevel(SAMPLE_LEVEL) in amountRange)
         }
     }
@@ -358,6 +425,91 @@ class SessionHelperImplTest {
             val cap = helper.failedGrowthCap(level)
             val maxDivisor = helper.initialDivisionValueRange.last + level / 5
             assertTrue(cap.toLong() * maxDivisor <= Int.MAX_VALUE)
+        }
+    }
+
+    @Test
+    fun `MC-60 - preparation cost profile matches the level 1 table at generation`() {
+        assertProfileMatches(level = 1, expectedPercentages = listOf(25, 65, 10, 0))
+    }
+
+    @Test
+    fun `MC-60 - preparation cost profile matches the level 10 table at generation`() {
+        assertProfileMatches(level = 10, expectedPercentages = listOf(25, 45, 30, 0))
+    }
+
+    @Test
+    fun `MC-60 - preparation cost profile matches the level 30 table at generation`() {
+        assertProfileMatches(level = 30, expectedPercentages = listOf(30, 30, 30, 10))
+    }
+
+    @Test
+    fun `MC-60 - the ready-now bucket is never emptied out - the rejected every-target-must-prepare design`() {
+        // Named for mutation M5 in the spec: zeroing this bucket is exactly the individually-rigged
+        // version the owner rejected. A tight lower bound, not just "> 0" - the table promises at
+        // least 25% at every tested level, so anything far below that is already a different curve.
+        for (level in listOf(1, 10, 30)) {
+            val buckets = sampleCostBuckets(level, PROFILE_SEED)
+            val readyNowPercent = buckets.readyNow * 100 / PROFILE_SAMPLE_ITERATIONS
+            assertTrue(
+                readyNowPercent >= 20,
+                "level $level: ready-now bucket measured $readyNowPercent%, expected at least 20%",
+            )
+        }
+    }
+
+    @Test
+    fun `MC-60 - getTargetValueByLevel is deterministic for a seeded Random`() {
+        val level = 30
+        val operationDigit = 6
+        val first = SessionHelperImpl(random = Random(PINNED_SEED)).getTargetValueByLevel(level, operationDigit)
+        val second = SessionHelperImpl(random = Random(PINNED_SEED)).getTargetValueByLevel(level, operationDigit)
+        assertEquals(first, second)
+    }
+
+    @Test
+    fun `MC-60 - getTargetValueByLevel is pinned to an exact seeded number at level 1`() {
+        // Literal, not the production formula recomputed - see failedGrowthCap's own pinned tests for
+        // why (a test that re-derives the formula can't catch the formula itself drifting).
+        assertEquals(
+            6,
+            SessionHelperImpl(random = Random(PINNED_SEED)).getTargetValueByLevel(level = 1, operationDigit = 5),
+        )
+    }
+
+    @Test
+    fun `MC-60 - getTargetValueByLevel is pinned to an exact seeded number at level 30`() {
+        assertEquals(
+            105,
+            SessionHelperImpl(random = Random(PINNED_SEED)).getTargetValueByLevel(level = 30, operationDigit = 8),
+        )
+    }
+
+    @Test
+    fun `MC-60 - the generated value never leaves the level's own range after the shift`() {
+        val seededHelper = SessionHelperImpl(random = Random(PINNED_SEED))
+        repeat(SAMPLE_ITERATIONS) {
+            for (level in listOf(1, 10, 30, 55, 999)) {
+                val minThreshold = seededHelper.initialTargetValueRange.first + level / 10
+                val maxThreshold = seededHelper.initialTargetValueRange.last + level * 3
+                val expectedRange = IntRange(minThreshold, maxThreshold)
+                val divisor = seededHelper.getDivisionDigitByLevel(level)
+                val value = seededHelper.getTargetValueByLevel(level, divisor)
+                assertTrue(value in expectedRange, "level $level: value $value left $expectedRange")
+            }
+        }
+    }
+
+    @Test
+    fun `MC-60 - no level from 1 to 999 produces an empty range or an out-of-range value after the shift`() {
+        val seededHelper = SessionHelperImpl(random = Random(PINNED_SEED))
+        for (level in seededHelper.levelRange) {
+            val minThreshold = seededHelper.initialTargetValueRange.first + level / 10
+            val maxThreshold = seededHelper.initialTargetValueRange.last + level * 3
+            val expectedRange = IntRange(minThreshold, maxThreshold)
+            val divisor = seededHelper.getDivisionDigitByLevel(level)
+            val value = seededHelper.getTargetValueByLevel(level, divisor)
+            assertTrue(value in expectedRange, "level $level: value $value left $expectedRange")
         }
     }
 }
