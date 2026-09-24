@@ -1,12 +1,32 @@
 package com.sdamashchuk.matharcade.core.game.helper
 
+import com.sdamashchuk.matharcade.core.game.objectmapper.decrementValue
+import com.sdamashchuk.matharcade.core.game.scoring.performOperation
 import com.sdamashchuk.matharcade.core.model.OperationSign
+import com.sdamashchuk.matharcade.core.model.Target
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 private const val SAMPLE_ITERATIONS = 200
 private const val SAMPLE_LEVEL = 50
+
+private const val SIMULATION_RUNS = 2000
+private const val SIMULATION_DIVISIONS = 3
+private const val SIMULATION_TAP_RATE_PER_SECOND = 8
+private const val SIMULATION_TAP_BUDGET_SECONDS = 3
+
+private fun failedGrowthCapTarget(value: Int) =
+    Target(
+        id = 1,
+        relatedFieldId = 0,
+        columnId = 0,
+        value = value,
+        fallenMs = 0,
+        appearanceDelayMs = 0,
+        lifetimeMs = 0,
+        isVisible = true,
+    )
 
 class SessionHelperImplTest {
     private val helper = SessionHelperImpl()
@@ -107,6 +127,83 @@ class SessionHelperImplTest {
             IntRange(helper.initialTargetAppearanceDelayMsRange.first, helper.initialTargetAppearanceDelayMsRange.last)
         repeat(SAMPLE_ITERATIONS) {
             assertTrue(helper.getTargetAppearanceDelayMsById(4) in nextGroupRange)
+        }
+    }
+
+    @Test
+    fun `the failed growth ceiling rises with level and never dips below that level's own value maximum`() {
+        var previousCap = 0
+        for (level in listOf(1, 5, 10, 30, 50, 200, 500, 999)) {
+            val cap = helper.failedGrowthCap(level)
+            val normalMax = helper.initialTargetValueRange.last + level * 3
+            assertTrue(cap >= normalMax, "level $level: ceiling $cap fell below the normal maximum $normalMax")
+            assertTrue(cap > previousCap, "level $level: ceiling $cap did not grow past $previousCap")
+            previousCap = cap
+        }
+    }
+
+    @Test
+    fun `the failed growth ceiling is pinned to exact values at levels 1 10 30 and 50`() {
+        assertEquals(92, helper.failedGrowthCap(1))
+        assertEquals(200, helper.failedGrowthCap(10))
+        assertEquals(440, helper.failedGrowthCap(30))
+        assertEquals(680, helper.failedGrowthCap(50))
+    }
+
+    @Test
+    fun `a target already at the ceiling stays there after another failed division`() {
+        val level = 1
+        val cap = helper.failedGrowthCap(level)
+        // 7 does not divide 92, so this is a failed division: value * 7 would overshoot the
+        // ceiling by a wide margin without the clamp.
+        val targets = listOf(failedGrowthCapTarget(cap))
+
+        val (updated, _, failed) = targets.performOperation(OperationSign.DIVISION, currentOperationDigit = 7, cap)
+
+        assertTrue(failed)
+        assertEquals(cap, updated.first().value)
+    }
+
+    @Test
+    fun `a target at the failed growth ceiling is recoverable within its own fall - playability simulation`() {
+        // A player who reads the upcoming operation before firing never fires a division that will
+        // fail: they tap the remainder down to a multiple of the digit first (decrementValue, the
+        // same helper targetClicked uses), then fire (performOperation, the same call fireButtonClicked
+        // makes). SIMULATION_RUNS runs per level, SIMULATION_DIVISIONS such divisions with the real
+        // level-scaled digit range, closing whatever is left with plain taps at
+        // SIMULATION_TAP_RATE_PER_SECOND: level 1 closes within 12 taps every run (median 6); level 10
+        // within 12 (median 7); level 30 within 20 (median 10); level 50 within 22 (median 14) - all
+        // under three seconds of tapping, comfortably inside any level's fall.
+        val tapBudget = SIMULATION_TAP_RATE_PER_SECOND * SIMULATION_TAP_BUDGET_SECONDS
+        for (level in listOf(1, 10, 30, 50)) {
+            val cap = helper.failedGrowthCap(level)
+            repeat(SIMULATION_RUNS) {
+                var targets = listOf(failedGrowthCapTarget(cap))
+                var tapsUsed = 0
+                repeat(SIMULATION_DIVISIONS) {
+                    val digit = helper.getDivisionDigitByLevel(level)
+                    val remainder = targets.first().value % digit
+                    if (remainder != 0) {
+                        targets = targets.decrementValue(1, remainder)
+                        tapsUsed += remainder
+                    }
+                    targets = targets.performOperation(OperationSign.DIVISION, digit, cap).targets
+                }
+                tapsUsed += targets.first().value
+                assertTrue(
+                    tapsUsed <= tapBudget,
+                    "level $level: recovering the ceiling took $tapsUsed taps, over the $tapBudget budget",
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `no level from 1 to 999 produces a ceiling that overflows Int when multiplied by its largest divisor`() {
+        for (level in helper.levelRange) {
+            val cap = helper.failedGrowthCap(level)
+            val maxDivisor = helper.initialDivisionValueRange.last + level / 5
+            assertTrue(cap.toLong() * maxDivisor <= Int.MAX_VALUE)
         }
     }
 }

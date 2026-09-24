@@ -158,6 +158,7 @@ class Game(
                 current.targets.performOperation(
                     current.field.currentOperationSign,
                     current.field.currentOperationDigit,
+                    sessionHelper.failedGrowthCap(current.field.level),
                 )
             val updatedTargets =
                 pressOutcome.targets

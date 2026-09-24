@@ -28,6 +28,9 @@ class SessionHelperImpl(
 
         private const val INITIAL_SUBTRACTION_VALUE_MIN = 1
         private const val INITIAL_SUBTRACTION_VALUE_MAX = 3
+
+        private const val TARGET_VALUE_LEVEL_SCALE = 3
+        private const val FAILED_GROWTH_FACTOR = 4
     }
 
     override val levelRange = IntRange(LEVEL_MIN, LEVEL_MAX)
@@ -70,7 +73,7 @@ class SessionHelperImpl(
      */
     override fun getTargetValueByLevel(level: Int): Int {
         val minThreshold = initialTargetValueRange.first + level / 10
-        val maxThreshold = initialTargetValueRange.last + level * 3
+        val maxThreshold = initialTargetValueRange.last + level * TARGET_VALUE_LEVEL_SCALE
         return IntRange(minThreshold, maxThreshold).random(random)
     }
 
@@ -126,4 +129,20 @@ class SessionHelperImpl(
         val maxThreshold = initialSubtractionValueRange.last + level / 3
         return IntRange(minThreshold, maxThreshold).random(random)
     }
+
+    // Ceiling a failed division can raise a target's value to (MC-48). Derived from the same curve
+    // as getTargetValueByLevel rather than kept as a standalone constant, so the two can never drift
+    // apart: FAILED_GROWTH_FACTOR 1 would make the ceiling equal that curve's own maximum, and
+    // anything below 1 would turn a failed division into a gift instead of a debt.
+    //
+    // Playability was checked the way the old flat 1,000,000 ceiling was (SessionHelperImplTest):
+    // a target starting exactly at the ceiling, played well - a player who reads the upcoming
+    // operation before firing never fires a division that will fail, tapping the remainder to a
+    // multiple of the digit first, then closing what's left with plain taps at 8/sec. Three such
+    // tap-adjusted divisions with the real level-scaled digit range, 2000 runs per level: level 1
+    // closes within 12 taps every run (median 6); level 10 within 12 (median 7); level 30 within 20
+    // (median 10); level 50 within 22 (median 14) - all under three seconds of tapping, comfortably
+    // inside any level's fall.
+    override fun failedGrowthCap(level: Int): Int =
+        FAILED_GROWTH_FACTOR * (initialTargetValueRange.last + level * TARGET_VALUE_LEVEL_SCALE)
 }

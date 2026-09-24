@@ -38,4 +38,6 @@ internal class FakeSessionHelper(
     override fun getDivisionDigitByLevel(level: Int) = 2 + (level - 1)
 
     override fun getSubtractionDigitByLevel(level: Int) = 3 + (level - 1)
+
+    override fun failedGrowthCap(level: Int) = 1_000_000 + (level - 1)
 }

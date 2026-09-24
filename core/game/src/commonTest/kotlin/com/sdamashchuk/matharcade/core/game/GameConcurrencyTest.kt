@@ -57,6 +57,8 @@ private class RaceSessionHelper(
     override fun getDivisionDigitByLevel(level: Int) = 1
 
     override fun getSubtractionDigitByLevel(level: Int) = 1
+
+    override fun failedGrowthCap(level: Int) = UNKILLABLE_TARGET_VALUE
 }
 
 // Corrupted trials never reach the settled state polled for below, so they always burn the full

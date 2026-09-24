@@ -46,6 +46,8 @@ private class SimulationSessionHelper(
     override fun getDivisionDigitByLevel(level: Int) = 1
 
     override fun getSubtractionDigitByLevel(level: Int) = 1
+
+    override fun failedGrowthCap(level: Int) = targetValue
 }
 
 // Drives tick() in fixed steps until the field closes, failing loudly instead of hanging if a

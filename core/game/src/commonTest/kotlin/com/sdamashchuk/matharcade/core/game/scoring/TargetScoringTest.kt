@@ -8,6 +8,10 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
+// Growth-cap value used by tests that only care about performOperation's own mechanics, not about
+// which cap a given level produces - see SessionHelperImplTest for the level-scaled ceiling itself.
+private const val TEST_FAILED_GROWTH_CAP = 1_000_000
+
 private fun target(
     id: Int,
     value: Int,
@@ -32,7 +36,12 @@ class TargetScoringTest {
     fun `division rewards an exact split and marks a non-exact one unprofitable in the same batch`() {
         val targets = listOf(target(id = 1, value = 10), target(id = 2, value = 7))
 
-        val (updated, score, failed) = targets.performOperation(OperationSign.DIVISION, currentOperationDigit = 2)
+        val (updated, score, failed) =
+            targets.performOperation(
+                OperationSign.DIVISION,
+                currentOperationDigit = 2,
+                TEST_FAILED_GROWTH_CAP,
+            )
 
         val exact = updated.first { it.id == 1 }
         val inexact = updated.first { it.id == 2 }
@@ -51,7 +60,12 @@ class TargetScoringTest {
     fun `subtraction succeeds for one target while an overshoot on another still fails the press`() {
         val targets = listOf(target(id = 1, value = 10), target(id = 2, value = 2))
 
-        val (updated, score, failed) = targets.performOperation(OperationSign.SUBTRACTION, currentOperationDigit = 5)
+        val (updated, score, failed) =
+            targets.performOperation(
+                OperationSign.SUBTRACTION,
+                currentOperationDigit = 5,
+                TEST_FAILED_GROWTH_CAP,
+            )
 
         val succeeded = updated.first { it.id == 1 }
         val overshot = updated.first { it.id == 2 }
@@ -67,7 +81,12 @@ class TargetScoringTest {
     fun `two exact splits earn the sum of what was removed`() {
         val targets = listOf(target(id = 1, value = 10), target(id = 2, value = 4))
 
-        val (_, score, failed) = targets.performOperation(OperationSign.DIVISION, currentOperationDigit = 2)
+        val (_, score, failed) =
+            targets.performOperation(
+                OperationSign.DIVISION,
+                currentOperationDigit = 2,
+                TEST_FAILED_GROWTH_CAP,
+            )
 
         // 10/2 removes 5 and 4/2 removes 2; neither split fails.
         assertEquals(7, score)
@@ -78,7 +97,12 @@ class TargetScoringTest {
     fun `two successful subtractions each award the operation digit`() {
         val targets = listOf(target(id = 1, value = 10), target(id = 2, value = 8))
 
-        val (_, score, failed) = targets.performOperation(OperationSign.SUBTRACTION, currentOperationDigit = 5)
+        val (_, score, failed) =
+            targets.performOperation(
+                OperationSign.SUBTRACTION,
+                currentOperationDigit = 5,
+                TEST_FAILED_GROWTH_CAP,
+            )
 
         assertEquals(10, score)
         assertFalse(failed)
@@ -88,7 +112,12 @@ class TargetScoringTest {
     fun `division by a zero digit fails the target instead of throwing`() {
         val targets = listOf(target(id = 1, value = 10))
 
-        val (updated, score, failed) = targets.performOperation(OperationSign.DIVISION, currentOperationDigit = 0)
+        val (updated, score, failed) =
+            targets.performOperation(
+                OperationSign.DIVISION,
+                currentOperationDigit = 0,
+                TEST_FAILED_GROWTH_CAP,
+            )
 
         assertEquals(10, updated.first().value)
         assertFalse(updated.first().isProfitable)
@@ -104,8 +133,16 @@ class TargetScoringTest {
         val overshoot = target(id = 1, value = 2)
         val success = target(id = 2, value = 10)
 
-        val forward = listOf(overshoot, success).performOperation(OperationSign.SUBTRACTION, currentOperationDigit = 5)
-        val backward = listOf(success, overshoot).performOperation(OperationSign.SUBTRACTION, currentOperationDigit = 5)
+        val forward =
+            listOf(
+                overshoot,
+                success,
+            ).performOperation(OperationSign.SUBTRACTION, currentOperationDigit = 5, TEST_FAILED_GROWTH_CAP)
+        val backward =
+            listOf(
+                success,
+                overshoot,
+            ).performOperation(OperationSign.SUBTRACTION, currentOperationDigit = 5, TEST_FAILED_GROWTH_CAP)
 
         assertEquals(forward.totalScore, backward.totalScore)
         assertEquals(forward.failed, backward.failed)
@@ -125,10 +162,10 @@ class TargetScoringTest {
             repeat(100) {
                 val sign = if (random.nextBoolean()) OperationSign.DIVISION else OperationSign.SUBTRACTION
                 val digit = random.nextInt(2, 6)
-                targets = targets.performOperation(sign, currentOperationDigit = digit).targets
+                targets = targets.performOperation(sign, currentOperationDigit = digit, TEST_FAILED_GROWTH_CAP).targets
                 val value = targets.first().value
                 assertTrue(value >= 0, "value went negative: $value")
-                assertTrue(value <= 1_000_000, "value exceeded the inflation cap: $value")
+                assertTrue(value <= TEST_FAILED_GROWTH_CAP, "value exceeded the inflation cap: $value")
             }
         }
     }

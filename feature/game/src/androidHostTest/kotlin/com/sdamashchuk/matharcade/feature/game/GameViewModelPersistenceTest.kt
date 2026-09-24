@@ -51,6 +51,11 @@ private class PersistenceFakeSessionHelper(
     override fun getDivisionDigitByLevel(level: Int) = 2
 
     override fun getSubtractionDigitByLevel(level: Int) = 3
+
+    // Mirrors SessionHelperImpl's real shape rather than a round number: a cap below a target's
+    // own value makes a failed division *shrink* it, so a stub of 0 would quietly turn every
+    // failure in this module's tests into a win.
+    override fun failedGrowthCap(level: Int) = 4 * (initialTargetValueRange.last + 3 * level)
 }
 
 private class PersistenceFakeGameRepository : GameRepository {

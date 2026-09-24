@@ -27,4 +27,6 @@ interface SessionHelper {
     fun getDivisionDigitByLevel(level: Int): Int
 
     fun getSubtractionDigitByLevel(level: Int): Int
+
+    fun failedGrowthCap(level: Int): Int
 }
