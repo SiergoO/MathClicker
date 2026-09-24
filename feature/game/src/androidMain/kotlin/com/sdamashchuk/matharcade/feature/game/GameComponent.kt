@@ -5,10 +5,12 @@ import com.arkivanov.essenty.lifecycle.doOnDestroy
 import com.sdamashchuk.matharcade.core.component.viewModel
 import com.sdamashchuk.matharcade.core.database.repository.GameRepository
 import com.sdamashchuk.matharcade.core.game.Game
+import com.sdamashchuk.matharcade.feature.game.model.FeedbackEffect
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
@@ -27,6 +29,7 @@ class GameComponent(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     val state: StateFlow<GameViewModel.State> = viewModel.state
+    val feedback: ReceiveChannel<FeedbackEffect> = viewModel.feedback
 
     init {
         lifecycle.doOnDestroy { scope.cancel() }

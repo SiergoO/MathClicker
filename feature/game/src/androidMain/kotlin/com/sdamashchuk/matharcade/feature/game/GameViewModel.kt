@@ -5,6 +5,7 @@ import com.sdamashchuk.matharcade.core.database.repository.GameRepository
 import com.sdamashchuk.matharcade.core.game.Game
 import com.sdamashchuk.matharcade.core.model.Field
 import com.sdamashchuk.matharcade.core.model.Target
+import com.sdamashchuk.matharcade.feature.game.model.FeedbackEffect
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
@@ -27,10 +28,23 @@ class GameViewModel(
     private val _uiEvents = Channel<UiEvent>(capacity = Channel.UNLIMITED)
     val uiEvents: ReceiveChannel<UiEvent> = _uiEvents
 
+    // A dedicated channel, not routed through _uiEvents: GameComponent forwards uiEvents to
+    // navigation and consumes them itself, but feedback needs to reach the composable that owns
+    // LocalHapticFeedback, so it is exposed and collected there instead (see GameScreen).
+    private val _feedback = Channel<FeedbackEffect>(capacity = Channel.UNLIMITED)
+    val feedback: ReceiveChannel<FeedbackEffect> = _feedback
+
     init {
         handleAction()
         viewModelScope.launch {
             updateSession()
+        }
+        viewModelScope.launch {
+            // One collector for the game session: game.events replays nothing (replay = 0), so a
+            // second subscriber here would just never see anything - this is the only one.
+            game.events.collect { event ->
+                _feedback.trySend(effectFor(event))
+            }
         }
         viewModelScope.launch {
             // A single collector on Game's combined state, not one per half: two collectors each

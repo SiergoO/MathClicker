@@ -3,6 +3,7 @@ package com.sdamashchuk.matharcade.feature.game
 import com.sdamashchuk.matharcade.core.database.repository.GameRepository
 import com.sdamashchuk.matharcade.core.game.Game
 import com.sdamashchuk.matharcade.core.game.helper.SessionHelper
+import com.sdamashchuk.matharcade.core.game.model.GameEvent
 import com.sdamashchuk.matharcade.core.model.Field
 import com.sdamashchuk.matharcade.core.model.OperationSign
 import com.sdamashchuk.matharcade.core.model.Target
@@ -275,5 +276,34 @@ class GameViewModelTest {
 
             assertTrue(game.stateFlow.value.field.level > 1)
             assertEquals(GamePhase.GameOver, viewModel.state.value.phase)
+        }
+
+    // MC-58 M4: dropping the game.events collector in init leaves this channel forever empty while
+    // every other test in this file still passes - this is the one that would have caught it.
+    @Test
+    fun `a target zeroing reaches the feedback channel as the mapped effect`() =
+        runTest {
+            val target =
+                Target(
+                    id = 1,
+                    relatedFieldId = 5,
+                    columnId = 0,
+                    value = 1,
+                    fallenMs = 0,
+                    appearanceDelayMs = 0,
+                    lifetimeMs = 1000,
+                )
+            val repository =
+                FakeGameRepository(
+                    unfinishedField = Field(id = 5, level = 1, isClosed = false),
+                    unfinishedTargets = listOf(target),
+                )
+            val game = Game(FakeSessionHelper(targetAmount = 1), CoroutineScope(Dispatchers.Unconfined))
+            val viewModel = GameViewModel(game, repository)
+
+            game.targetClicked(target.id)
+
+            val received = viewModel.feedback.tryReceive().getOrNull()
+            assertEquals(effectFor(GameEvent.TargetZeroed(id = target.id, awarded = 1)), received)
         }
 }

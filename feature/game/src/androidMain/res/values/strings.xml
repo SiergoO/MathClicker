@@ -11,4 +11,8 @@
     <string name="game_session_score">Score: %d</string>
     <string name="game_session_combo">Combo\n x%d</string>
     <string name="game_level_intro">Level %d</string>
+    <string name="game_feedback_award">+%d</string>
+    <string name="game_feedback_streak">+%1$d x%2$d</string>
+    <string name="game_feedback_miss">Miss</string>
+    <string name="game_feedback_life_lost">-1 Life</string>
 </resources>
