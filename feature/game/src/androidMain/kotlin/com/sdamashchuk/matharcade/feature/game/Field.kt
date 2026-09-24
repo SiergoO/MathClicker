@@ -55,6 +55,10 @@ fun Field(
     onFireClicked: () -> Unit,
     onTick: (elapsedMs: Int) -> Unit,
     onPauseClicked: () -> Unit,
+    // MC-61: the readiness hint's on/off switch, not a property of the game itself. A constant
+    // today; once difficulty/mods exist, that's what supplies this value - TargetButton never sees
+    // why a hint is off, and neither does this composable's own body beyond reading the flag.
+    readinessHintsEnabled: Boolean = true,
 ) {
     var gameColumnSize by remember { mutableStateOf(Size(0, 0)) }
     val localDensity = LocalDensity.current
@@ -151,6 +155,13 @@ fun Field(
                     TargetButton(
                         it,
                         gameColumnSize,
+                        isReady =
+                            shouldShowReadinessHint(
+                                it,
+                                gameState.value.field.currentOperationSign,
+                                gameState.value.field.currentOperationDigit,
+                                hintsEnabled = readinessHintsEnabled,
+                            ),
                         onTargetClicked = onTargetClicked,
                     )
                 }

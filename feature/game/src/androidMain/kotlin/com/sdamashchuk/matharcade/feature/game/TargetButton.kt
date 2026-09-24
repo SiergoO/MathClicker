@@ -4,6 +4,7 @@ import android.util.Size
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
@@ -21,11 +22,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.sdamashchuk.matharcade.core.model.Target
 import com.sdamashchuk.matharcade.core.ui.theme.DarkGray
 import com.sdamashchuk.matharcade.core.ui.theme.Red200
+import com.sdamashchuk.matharcade.core.ui.theme.Red500
 
 // MC-54: telegraphs the final 15% of a fall (Target.isTelegraphingBreakout) so a breakout is never
 // a surprise. Deliberately not colour-coded - isProfitable already owns that channel below, and a
@@ -35,10 +38,18 @@ private const val TELEGRAPH_PULSE_SCALE = 1.15f
 private const val TELEGRAPH_PULSE_MS = 300
 private const val TELEGRAPH_BORDER_WIDTH_DP = 3
 
+// MC-61: readiness hint. isReady is already the policy's own decision (see shouldShowReadinessHint)
+// - this composable only animates the colour, Red200 to Red500 over ~200ms rather than an instant
+// swap, which on a 4-26 target board reads as a flicker whenever the divisor changes and half the
+// board flips at once. Grey (isProfitable) still wins outright: the lerp only ever runs inside the
+// profitable branch below, so an unprofitable target is never mid-fade toward red.
+private const val READINESS_TRANSITION_MS = 200
+
 @Composable
 fun TargetButton(
     target: Target,
     gameColumnSize: Size,
+    isReady: Boolean,
     onTargetClicked: (id: Int) -> Unit,
 ) {
     val targetButtonYOffset = target.position * gameColumnSize.height
@@ -55,6 +66,14 @@ fun TargetButton(
                     ),
                 label = "breakoutTelegraphScale",
             )
+        val readinessFraction by
+            animateFloatAsState(
+                targetValue = if (isReady) 1f else 0f,
+                animationSpec = tween(READINESS_TRANSITION_MS),
+                label = "readinessFraction",
+            )
+        val backgroundColor =
+            if (target.isProfitable) lerp(Red200, Red500, readinessFraction) else Color.LightGray
         Button(
             modifier =
                 Modifier
@@ -63,10 +82,7 @@ fun TargetButton(
                     .offset(0.dp, targetButtonYOffset.dp)
                     .scale(telegraphScale)
                     .clip(CircleShape),
-            colors =
-                ButtonDefaults.buttonColors(
-                    backgroundColor = if (target.isProfitable) Red200 else Color.LightGray,
-                ),
+            colors = ButtonDefaults.buttonColors(backgroundColor = backgroundColor),
             border = if (target.isTelegraphingBreakout) BorderStroke(TELEGRAPH_BORDER_WIDTH_DP.dp, DarkGray) else null,
             onClick = { onTargetClicked.invoke(target.id) },
         ) {
