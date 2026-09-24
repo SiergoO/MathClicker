@@ -64,3 +64,6 @@ lint/tmp/
 # record, and its churn was interleaving with the commits it exists to describe.
 .claude/
 queue.log
+
+# Kotlin build state (session locks and transformed metadata), regenerated on every build
+.kotlin/
