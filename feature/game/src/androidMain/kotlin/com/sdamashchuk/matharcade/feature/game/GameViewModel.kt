@@ -49,9 +49,18 @@ class GameViewModel(
                     state.value.copy(
                         field = field,
                         targetList = if (targets.isNotEmpty()) targets.toImmutableList() else previousTargets,
-                        // isClosed is the engine's own signal, not something a player action drives, so
-                        // it overrides whatever nextPhase computed rather than going through it.
-                        phase = if (field.isClosed) GamePhase.GameOver else state.value.phase,
+                        // Neither branch is a player action, so both bypass nextPhase and are applied
+                        // directly here. isClosed stays first: tick() resolves breakouts before it checks
+                        // for an empty board, so the last life and the last target can be lost in the same
+                        // step, and GameOver must win over the LevelIntro that same step would also trigger.
+                        phase =
+                            if (field.isClosed) {
+                                GamePhase.GameOver
+                            } else if (shouldShowLevelIntro(previousField, field)) {
+                                GamePhase.LevelIntro
+                            } else {
+                                state.value.phase
+                            },
                     )
                 if (fieldChanged) {
                     gameRepository.updateField(field)
@@ -76,7 +85,11 @@ class GameViewModel(
         viewModelScope.launch {
             action.consumeAsFlow().collect { action ->
                 when (action) {
-                    Action.ReadyToPlayButtonClicked, Action.ShowCountDown, Action.StartGame -> {
+                    Action.ReadyToPlayButtonClicked,
+                    Action.ShowCountDown,
+                    Action.StartGame,
+                    Action.LevelIntroFinished,
+                    -> {
                         _state.value = state.value.copy(phase = nextPhase(state.value.phase, action))
                     }
 
@@ -161,6 +174,8 @@ class GameViewModel(
 
         object StartGame : Action()
 
+        object LevelIntroFinished : Action()
+
         object PauseGame : Action()
 
         object RestartGame : Action()
@@ -210,32 +225,54 @@ internal fun shouldPersistTargets(
     return previousTargets.withoutClock() != nextTargets.withoutClock()
 }
 
+// Level-up arrives from two call sites inside Game - tick() and activeTargetsAbsent() - so the
+// trigger is this delta on the field the collector already sees, not either call site directly.
+// previousField.id != 0 excludes the very first emission after a restore, where previousField is
+// still the default Field(level = 1) State() started with: without it, restoring a level-7 session
+// would compare 7 > 1 and fire the intro on launch for a level-up that never happened.
+internal fun shouldShowLevelIntro(
+    previousField: Field,
+    nextField: Field,
+): Boolean = previousField.id != 0 && nextField.level > previousField.level
+
+// Moves the `if (current == X) to else current` shape used below out of nextPhase's own body:
+// each guard counted directly against nextPhase's cyclomatic complexity, and LevelIntroFinished
+// was the one branch that tipped it over detekt's threshold.
+private fun GamePhase.transitionTo(
+    vararg from: GamePhase,
+    to: GamePhase,
+): GamePhase = if (this in from) to else this
+
 // The single source of truth for what an action does to the screen's phase, replacing the
 // isGamePaused/isGameStarted pair whose implicit branch order in GameScreen's old `when` made
-// "not started yet" and "paused" the same state (MC-55). field.isClosed -> GamePhase.GameOver is
-// not here: it is the engine's own signal, not a player action, and is applied directly where the
-// field is collected.
+// "not started yet" and "paused" the same state (MC-55). field.isClosed -> GamePhase.GameOver and
+// shouldShowLevelIntro -> GamePhase.LevelIntro are not here: neither is a player action, and both
+// are applied directly where the field is collected.
 internal fun nextPhase(
     current: GamePhase,
     action: GameViewModel.Action,
 ): GamePhase =
     when (action) {
         GameViewModel.Action.ReadyToPlayButtonClicked -> {
-            if (current == GamePhase.ReadyToPlay || current == GamePhase.Paused) GamePhase.CountingDown else current
+            current.transitionTo(GamePhase.ReadyToPlay, GamePhase.Paused, to = GamePhase.CountingDown)
         }
 
         GameViewModel.Action.ShowCountDown -> {
-            if (current == GamePhase.Playing) GamePhase.CountingDown else current
+            current.transitionTo(GamePhase.Playing, to = GamePhase.CountingDown)
         }
 
         GameViewModel.Action.StartGame -> {
-            if (current == GamePhase.CountingDown) GamePhase.Playing else current
+            current.transitionTo(GamePhase.CountingDown, to = GamePhase.Playing)
+        }
+
+        GameViewModel.Action.LevelIntroFinished -> {
+            current.transitionTo(GamePhase.LevelIntro, to = GamePhase.Playing)
         }
 
         // Only Playing can be paused: there is nothing running to pause from GameOver, and the
         // other phases are already showing their own "not playing yet" screen.
         GameViewModel.Action.PauseGame -> {
-            if (current == GamePhase.Playing) GamePhase.Paused else current
+            current.transitionTo(GamePhase.Playing, to = GamePhase.Paused)
         }
 
         // Both land on Paused regardless of where they started, mirroring the old code's

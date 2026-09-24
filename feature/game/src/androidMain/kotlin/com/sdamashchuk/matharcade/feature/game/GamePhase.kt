@@ -6,8 +6,8 @@ enum class GamePhase {
     Playing,
     Paused,
 
-    // Unused until MC-57 wires the level-up transition; kept here now so GameScreen's when is
-    // exhaustive over the final shape of the enum instead of growing again later.
+    // Entered from Playing on a level-up delta and left after the 800ms LEVEL N announcement
+    // (MC-57). Field is only composed for Playing, so this phase stops the engine by itself.
     LevelIntro,
     GameOver,
 }

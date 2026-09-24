@@ -1,5 +1,6 @@
 package com.sdamashchuk.matharcade.feature.game
 
+import com.sdamashchuk.matharcade.core.model.Field
 import com.sdamashchuk.matharcade.core.model.Target
 import com.sdamashchuk.matharcade.feature.game.GameViewModel.Action
 import org.junit.Assert.assertEquals
@@ -98,6 +99,29 @@ class GameViewModelLogicTest {
     }
 
     @Test
+    fun `shouldShowLevelIntro is true when the level rises on a live field`() {
+        assertTrue(shouldShowLevelIntro(Field(id = 5, level = 3), Field(id = 5, level = 4)))
+    }
+
+    @Test
+    fun `shouldShowLevelIntro is false for the same level`() {
+        assertFalse(shouldShowLevelIntro(Field(id = 5, level = 3), Field(id = 5, level = 3)))
+    }
+
+    // M3: a level rollback must not announce anything - only a rise counts as a level-up.
+    @Test
+    fun `shouldShowLevelIntro is false when the level drops`() {
+        assertFalse(shouldShowLevelIntro(Field(id = 5, level = 5), Field(id = 5, level = 3)))
+    }
+
+    // M1: restoring a level-7 session compares against the default Field(level = 1) the collector
+    // starts with, and previousField.id == 0 is what marks that comparison as not a real level-up.
+    @Test
+    fun `shouldShowLevelIntro is false against the default previousField, even though the level rose`() {
+        assertFalse(shouldShowLevelIntro(Field(), Field(id = 5, level = 7)))
+    }
+
+    @Test
     fun `nextPhase for ReadyToPlayButtonClicked leaves ReadyToPlay and Paused through CountingDown`() {
         assertEquals(GamePhase.CountingDown, nextPhase(GamePhase.ReadyToPlay, Action.ReadyToPlayButtonClicked))
         assertEquals(GamePhase.CountingDown, nextPhase(GamePhase.CountingDown, Action.ReadyToPlayButtonClicked))
@@ -125,6 +149,16 @@ class GameViewModelLogicTest {
         assertEquals(GamePhase.Paused, nextPhase(GamePhase.Paused, Action.StartGame))
         assertEquals(GamePhase.LevelIntro, nextPhase(GamePhase.LevelIntro, Action.StartGame))
         assertEquals(GamePhase.GameOver, nextPhase(GamePhase.GameOver, Action.StartGame))
+    }
+
+    @Test
+    fun `nextPhase for LevelIntroFinished only fires from LevelIntro`() {
+        assertEquals(GamePhase.ReadyToPlay, nextPhase(GamePhase.ReadyToPlay, Action.LevelIntroFinished))
+        assertEquals(GamePhase.CountingDown, nextPhase(GamePhase.CountingDown, Action.LevelIntroFinished))
+        assertEquals(GamePhase.Playing, nextPhase(GamePhase.Playing, Action.LevelIntroFinished))
+        assertEquals(GamePhase.Paused, nextPhase(GamePhase.Paused, Action.LevelIntroFinished))
+        assertEquals(GamePhase.Playing, nextPhase(GamePhase.LevelIntro, Action.LevelIntroFinished))
+        assertEquals(GamePhase.GameOver, nextPhase(GamePhase.GameOver, Action.LevelIntroFinished))
     }
 
     // M1: pausing only ever fires from Playing. GameOver in particular must be refused - there is
@@ -204,6 +238,7 @@ class GameViewModelLogicTest {
                 Action.ReadyToPlayButtonClicked,
                 Action.ShowCountDown,
                 Action.StartGame,
+                Action.LevelIntroFinished,
                 Action.PauseGame,
                 Action.RestartGame,
                 Action.BackToMainMenuClicked,

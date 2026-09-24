@@ -243,4 +243,37 @@ class GameViewModelTest {
 
             assertEquals(GamePhase.GameOver, viewModel.state.value.phase)
         }
+
+    // M4: tick() resolves breakouts (and the last life) before it checks for an empty board, so
+    // losing the last life and clearing the board - a level-up - can land in the same locked step.
+    // GameOver must still win: the collector's `when` is required to check isClosed first.
+    @Test
+    fun `GameOver wins over LevelIntro when the last life and the last target break out together`() =
+        runTest {
+            val soleTarget =
+                Target(
+                    id = 1,
+                    relatedFieldId = 5,
+                    columnId = 0,
+                    value = 10,
+                    fallenMs = 0,
+                    appearanceDelayMs = 0,
+                    lifetimeMs = 1000,
+                )
+            val repository =
+                FakeGameRepository(
+                    unfinishedField = Field(id = 5, level = 1, lifeCount = 1, isClosed = false),
+                    unfinishedTargets = listOf(soleTarget),
+                )
+            val game = Game(FakeSessionHelper(targetAmount = 1), CoroutineScope(Dispatchers.Unconfined))
+
+            val viewModel = GameViewModel(game, repository)
+
+            // The sole target breaking out both zeroes the last life (GameOver) and empties the
+            // board (level-up), in the same locked tick.
+            repeat(4) { game.tick(250) }
+
+            assertTrue(game.stateFlow.value.field.level > 1)
+            assertEquals(GamePhase.GameOver, viewModel.state.value.phase)
+        }
 }

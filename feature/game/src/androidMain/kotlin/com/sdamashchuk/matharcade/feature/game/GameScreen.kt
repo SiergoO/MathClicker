@@ -56,8 +56,11 @@ fun GameScreen(component: GameComponent) {
                     )
                 }
 
-                // MC-57 adds this phase's UI; unreachable until then.
-                GamePhase.LevelIntro -> {}
+                GamePhase.LevelIntro -> {
+                    LevelIntroOverlay(level = gameState.value.field.level) {
+                        component.sendAction(GameViewModel.Action.LevelIntroFinished)
+                    }
+                }
 
                 GamePhase.GameOver -> {
                     GameMenuDialog(

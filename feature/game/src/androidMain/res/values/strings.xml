@@ -10,4 +10,5 @@
     <string name="game_session_level">Level: %d</string>
     <string name="game_session_score">Score: %d</string>
     <string name="game_session_combo">Combo\n x%d</string>
+    <string name="game_level_intro">Level %d</string>
 </resources>
