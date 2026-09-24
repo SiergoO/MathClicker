@@ -8,6 +8,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 private const val TICK_MS = 16
@@ -34,7 +35,10 @@ private class SimulationSessionHelper(
 
     override fun getTargetLifetimeMsByLevel(level: Int) = lifetimeMs
 
-    override fun getTargetAppearanceDelayMsById(id: Int) = appearanceDelayMsById(id)
+    override fun getTargetAppearanceDelayMsByIdAndLevel(
+        id: Int,
+        level: Int,
+    ) = appearanceDelayMsById(id)
 
     override fun getTargetAmountByLevel(level: Int) = targetAmount
 
@@ -86,7 +90,9 @@ class GameSimulationTest {
             assertEquals(0, game.stateFlow.value.field.lifeCount)
             // Random(99) through SessionHelperImpl and Game's own draws, measured once and pinned:
             // a change to either the difficulty curve or the clock arithmetic moves this number.
-            assertEquals(30640, elapsedMs)
+            // MC-52 shortened and floored the lifetime/wave-gap curves, which is why this moved down
+            // from the pre-MC-52 30640.
+            assertEquals(12784, elapsedMs)
         }
 
     // The MC-27 bug class as a JVM assertion for the first time: a target's accumulated fall must
@@ -125,6 +131,33 @@ class GameSimulationTest {
 
             game.tick(250)
             assertEquals(2, game.stateFlow.value.field.lifeCount) // breakout on exactly this tick
+        }
+
+    // MC-52 acceptance criterion, end to end through the real SessionHelperImpl rather than a fake:
+    // a session with no player input at all must outlast a single target's own fall. Pre-MC-52 this
+    // failed hard - the whole opening wave shared delay zero, so a device run with zero input closed
+    // the field in ~28s, faster than any one target's own lifetime. Ticking to exactly the first
+    // target's own lifetimeMs and finding the field still open proves the other three in that wave
+    // were staggered behind it, not stacked on top of it.
+    @Test
+    fun `a no-input session survives longer than its own first target's lifetime`() =
+        runTest {
+            val seed = 99L
+            val game = Game(SessionHelperImpl(random = Random(seed)), backgroundScope, Random(seed))
+            game.createField(1)
+            game.createTargets()
+            val firstTargetLifetimeMs =
+                game.stateFlow.value.targets
+                    .first { it.id == 1 }
+                    .lifetimeMs
+
+            var elapsedMs = 0
+            while (elapsedMs < firstTargetLifetimeMs) {
+                game.tick(TICK_MS)
+                elapsedMs += TICK_MS
+            }
+
+            assertFalse(game.stateFlow.value.field.isClosed)
         }
 
     // MAX_TICK_MS is the belt to the structural brace (a paused composition no longer feeds tick()

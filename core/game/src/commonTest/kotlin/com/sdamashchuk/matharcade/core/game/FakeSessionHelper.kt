@@ -25,7 +25,10 @@ internal class FakeSessionHelper(
 
     override fun getTargetLifetimeMsByLevel(level: Int) = 1000 + (level - 1)
 
-    override fun getTargetAppearanceDelayMsById(id: Int) = appearanceDelayMsById?.invoke(id) ?: appearanceDelayMs
+    override fun getTargetAppearanceDelayMsByIdAndLevel(
+        id: Int,
+        level: Int,
+    ) = appearanceDelayMsById?.invoke(id) ?: appearanceDelayMs
 
     override fun getTargetAmountByLevel(level: Int) = targetAmount + (level - 1)
 

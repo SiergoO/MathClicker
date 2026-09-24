@@ -2,14 +2,51 @@ package com.sdamashchuk.matharcade.core.game.helper
 
 import com.sdamashchuk.matharcade.core.game.objectmapper.decrementValue
 import com.sdamashchuk.matharcade.core.game.scoring.performOperation
+import com.sdamashchuk.matharcade.core.model.GAME_COLUMN_COUNT
 import com.sdamashchuk.matharcade.core.model.OperationSign
 import com.sdamashchuk.matharcade.core.model.Target
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 private const val SAMPLE_ITERATIONS = 200
 private const val SAMPLE_LEVEL = 50
+
+// Mirrors the constants in SessionHelperImpl (private there) so these tests fail when production
+// stops scaling, stops flooring, or reverses direction (MC-52 mutations M1-M5) rather than passing
+// by construction because both sides share one formula.
+private const val LIFETIME_BASE_MS = 9500
+private const val LIFETIME_STEP_MS = 110
+private const val LIFETIME_FLOOR_MS = 3500
+private const val LIFETIME_SPREAD_MS = 2500
+
+private const val WAVE_GAP_BASE_MS = 3800
+private const val WAVE_GAP_STEP_MS = 55
+private const val WAVE_GAP_FLOOR_MS = 1400
+private const val WAVE_GAP_SPREAD_MS = 800
+
+private fun expectedLifetimeRange(level: Int): IntRange {
+    val floor = (LIFETIME_BASE_MS - level * LIFETIME_STEP_MS).coerceAtLeast(LIFETIME_FLOOR_MS)
+    return IntRange(floor, floor + LIFETIME_SPREAD_MS)
+}
+
+private fun expectedWaveGapRange(level: Int): IntRange {
+    val floor = (WAVE_GAP_BASE_MS - level * WAVE_GAP_STEP_MS).coerceAtLeast(WAVE_GAP_FLOOR_MS)
+    return IntRange(floor, floor + WAVE_GAP_SPREAD_MS)
+}
+
+// Captured once from a real run against Random(PINNED_SEED) and hardcoded, the same way
+// failedGrowthCap's own pinned test works: proof the formula, not just its range, is unchanged.
+private const val PINNED_SEED = 2024L
+private const val PINNED_LIFETIME_LEVEL_1 = 11216
+private const val PINNED_LIFETIME_LEVEL_10 = 10226
+private const val PINNED_LIFETIME_LEVEL_30 = 8026
+private const val PINNED_LIFETIME_LEVEL_55 = 5326
+private val PINNED_WAVE_DELAYS_LEVEL_1 = listOf(0, 1094, 2076, 3078, 3817, 5221, 5994, 7758)
+private val PINNED_WAVE_DELAYS_LEVEL_10 = listOf(0, 970, 1830, 2706, 3322, 4602, 5251, 6891)
+private val PINNED_WAVE_DELAYS_LEVEL_30 = listOf(0, 695, 1280, 1881, 2222, 3227, 3601, 4966)
+private val PINNED_WAVE_DELAYS_LEVEL_55 = listOf(0, 508, 904, 1317, 1472, 2290, 2475, 3655)
 
 private const val SIMULATION_RUNS = 2000
 private const val SIMULATION_DIVISIONS = 3
@@ -37,8 +74,8 @@ class SessionHelperImplTest {
         // properties, so none of them can notice a constant changing — a ten-fold rise in starting
         // target value would leave the suite green. This test is the only thing pinning the balance.
         assertEquals(1..20, helper.initialTargetValueRange)
-        assertEquals(20000..40000, helper.initialTargetLifetimeMsRange)
-        assertEquals(10000..20000, helper.initialTargetAppearanceDelayMsRange)
+        assertEquals(9500..12000, helper.initialTargetLifetimeMsRange)
+        assertEquals(3800..4600, helper.initialTargetAppearanceDelayMsRange)
         assertEquals(6..10, helper.initialTargetAmountRange)
         assertEquals(2..5, helper.initialDivisionValueRange)
         assertEquals(1..3, helper.initialSubtractionValueRange)
@@ -62,11 +99,7 @@ class SessionHelperImplTest {
 
     @Test
     fun `lifetime and target value and target amount all scale with level per the difficulty curve`() {
-        val lifetimeRange =
-            IntRange(
-                helper.initialTargetLifetimeMsRange.first - SAMPLE_LEVEL * 15,
-                helper.initialTargetLifetimeMsRange.last - SAMPLE_LEVEL * 30,
-            )
+        val lifetimeRange = expectedLifetimeRange(SAMPLE_LEVEL)
         val valueRange =
             IntRange(
                 helper.initialTargetValueRange.first + SAMPLE_LEVEL / 10,
@@ -119,15 +152,136 @@ class SessionHelperImplTest {
     }
 
     @Test
-    fun `appearance delay is zero for the first column group and scaled for the next`() {
-        assertEquals(0, helper.getTargetAppearanceDelayMsById(0))
-        assertEquals(0, helper.getTargetAppearanceDelayMsById(3))
-
-        val nextGroupRange =
-            IntRange(helper.initialTargetAppearanceDelayMsRange.first, helper.initialTargetAppearanceDelayMsRange.last)
-        repeat(SAMPLE_ITERATIONS) {
-            assertTrue(helper.getTargetAppearanceDelayMsById(4) in nextGroupRange)
+    fun `only the very first target gets zero delay - every level not just level one`() {
+        // Pre-MC-52, every id in the first wave (0..GAME_COLUMN_COUNT - 1) got delay zero: the
+        // whole opening wave fell at once, which a device run measured closing a fresh session in
+        // ~28s with no input at all (MC-52 spec). Only id 0 is allowed that now - every other wave's
+        // own first id is offset by that wave's own gap, covered separately below.
+        for (level in listOf(1, 10, 30, 55, 999)) {
+            assertEquals(0, helper.getTargetAppearanceDelayMsByIdAndLevel(0, level))
         }
+    }
+
+    @Test
+    fun `MC-52 - every non-leading id in a wave is staggered - never sharing the wave's own zero`() {
+        // Structural, not probabilistic: a positionInWave above zero always multiplies a wave gap
+        // that can never drop below WAVE_GAP_FLOOR_MS, so this can't land on zero by an unlucky draw
+        // (mutation M1 - the stagger term removed - is what makes it zero again).
+        repeat(SAMPLE_ITERATIONS) {
+            for (level in listOf(1, 10, 30, 55, 999)) {
+                for (id in 1 until GAME_COLUMN_COUNT) {
+                    assertTrue(helper.getTargetAppearanceDelayMsByIdAndLevel(id, level) > 0)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `MC-52 - the four targets of level one's opening wave enter as a strict staircase`() {
+        // level 1's wave gap floor (3745ms) comfortably clears the margin the staircase needs to stay
+        // strictly ordered id 0 through 3 regardless of the random draw - see getTargetAppearanceDelayMsByIdAndLevel's
+        // own reasoning. Not true at every level: once the wave gap curve is at its floor (level 44+)
+        // position 2 and 3 can theoretically tie or invert, which is why this is pinned to level 1
+        // rather than asserted generally.
+        repeat(SAMPLE_ITERATIONS) {
+            val delays = (0 until GAME_COLUMN_COUNT).map { id -> helper.getTargetAppearanceDelayMsByIdAndLevel(id, 1) }
+            assertEquals(delays.sorted(), delays)
+            assertEquals(delays.toSet().size, delays.size)
+        }
+    }
+
+    @Test
+    fun `the second wave's first target is delayed by exactly one wave gap`() {
+        val waveGapRange = expectedWaveGapRange(SAMPLE_LEVEL)
+        repeat(SAMPLE_ITERATIONS) {
+            assertTrue(helper.getTargetAppearanceDelayMsByIdAndLevel(GAME_COLUMN_COUNT, SAMPLE_LEVEL) in waveGapRange)
+        }
+    }
+
+    @Test
+    fun `no level from 1 to 999 produces an empty range for the lifetime or wave-gap curve`() {
+        // The class of failure LEVEL_MAX exists for: pre-MC-52, getTargetLifetimeMsByLevel's own
+        // min-max thresholds crossed past level 1334 and IntRange.random() threw. Flooring the
+        // minimum before adding the spread (mutation M5 undoes exactly this) makes the range
+        // structurally unable to go empty at any level - proven here by actually calling both curves
+        // at every level in range rather than only reasoning about the formula.
+        var previousLifetimeFloor = Int.MAX_VALUE
+        var previousWaveGapFloor = Int.MAX_VALUE
+        for (level in helper.levelRange) {
+            val lifetimeRange = expectedLifetimeRange(level)
+            val waveGapRange = expectedWaveGapRange(level)
+
+            assertTrue(helper.getTargetLifetimeMsByLevel(level) in lifetimeRange)
+            assertTrue(helper.getTargetAppearanceDelayMsByIdAndLevel(GAME_COLUMN_COUNT, level) in waveGapRange)
+
+            // Never gentler than the level below it (mutation M5): both floors are non-increasing.
+            assertTrue(lifetimeRange.first <= previousLifetimeFloor)
+            assertTrue(waveGapRange.first <= previousWaveGapFloor)
+            previousLifetimeFloor = lifetimeRange.first
+            previousWaveGapFloor = waveGapRange.first
+        }
+    }
+
+    @Test
+    fun `lifetime is pinned to an exact seeded number at level 1`() {
+        assertEquals(
+            PINNED_LIFETIME_LEVEL_1,
+            SessionHelperImpl(random = Random(PINNED_SEED)).getTargetLifetimeMsByLevel(1),
+        )
+    }
+
+    @Test
+    fun `lifetime is pinned to an exact seeded number at level 10`() {
+        assertEquals(
+            PINNED_LIFETIME_LEVEL_10,
+            SessionHelperImpl(random = Random(PINNED_SEED)).getTargetLifetimeMsByLevel(10),
+        )
+    }
+
+    @Test
+    fun `lifetime is pinned to an exact seeded number at level 30`() {
+        assertEquals(
+            PINNED_LIFETIME_LEVEL_30,
+            SessionHelperImpl(random = Random(PINNED_SEED)).getTargetLifetimeMsByLevel(30),
+        )
+    }
+
+    @Test
+    fun `lifetime is pinned to an exact seeded number at level 55`() {
+        assertEquals(
+            PINNED_LIFETIME_LEVEL_55,
+            SessionHelperImpl(random = Random(PINNED_SEED)).getTargetLifetimeMsByLevel(55),
+        )
+    }
+
+    private fun waveDelays(
+        level: Int,
+        seed: Long = PINNED_SEED,
+    ): List<Int> {
+        val seededHelper = SessionHelperImpl(random = Random(seed))
+        return (0 until GAME_COLUMN_COUNT * 2).map { id ->
+            seededHelper.getTargetAppearanceDelayMsByIdAndLevel(id, level)
+        }
+    }
+
+    @Test
+    fun `wave timing across two waves is pinned to exact seeded numbers at level 1`() {
+        assertEquals(PINNED_WAVE_DELAYS_LEVEL_1, waveDelays(level = 1))
+    }
+
+    @Test
+    fun `wave timing across two waves is pinned to exact seeded numbers at level 10`() {
+        assertEquals(PINNED_WAVE_DELAYS_LEVEL_10, waveDelays(level = 10))
+    }
+
+    @Test
+    fun `wave timing across two waves is pinned to exact seeded numbers at level 30`() {
+        assertEquals(PINNED_WAVE_DELAYS_LEVEL_30, waveDelays(level = 30))
+    }
+
+    @Test
+    fun `wave timing across two waves is pinned to exact seeded numbers at level 55`() {
+        assertEquals(PINNED_WAVE_DELAYS_LEVEL_55, waveDelays(level = 55))
     }
 
     @Test

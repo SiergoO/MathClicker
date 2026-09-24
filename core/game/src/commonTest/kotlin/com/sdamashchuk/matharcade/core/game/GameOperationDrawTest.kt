@@ -66,7 +66,10 @@ private class AlwaysDudSessionHelper : SessionHelper {
 
     override fun getTargetLifetimeMsByLevel(level: Int) = 100_000
 
-    override fun getTargetAppearanceDelayMsById(id: Int) = 0
+    override fun getTargetAppearanceDelayMsByIdAndLevel(
+        id: Int,
+        level: Int,
+    ) = 0
 
     override fun getTargetAmountByLevel(level: Int) = 1
 

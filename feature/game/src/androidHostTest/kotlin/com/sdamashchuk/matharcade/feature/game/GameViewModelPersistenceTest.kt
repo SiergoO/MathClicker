@@ -39,7 +39,10 @@ private class PersistenceFakeSessionHelper(
 
     override fun getTargetLifetimeMsByLevel(level: Int) = lifetimeMs
 
-    override fun getTargetAppearanceDelayMsById(id: Int) = appearanceDelayMsById(id)
+    override fun getTargetAppearanceDelayMsByIdAndLevel(
+        id: Int,
+        level: Int,
+    ) = appearanceDelayMsById(id)
 
     override fun getTargetAmountByLevel(level: Int) = targetAmount + (level - 1)
 

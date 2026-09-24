@@ -15,7 +15,10 @@ interface SessionHelper {
 
     fun getTargetLifetimeMsByLevel(level: Int): Int
 
-    fun getTargetAppearanceDelayMsById(id: Int): Int
+    fun getTargetAppearanceDelayMsByIdAndLevel(
+        id: Int,
+        level: Int,
+    ): Int
 
     fun getTargetAmountByLevel(level: Int): Int
 

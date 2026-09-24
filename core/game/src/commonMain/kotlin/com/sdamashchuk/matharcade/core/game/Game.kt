@@ -310,7 +310,7 @@ class Game(
                 columnId = id.toGameColumnId(),
                 value = sessionHelper.getTargetValueByLevel(field.level),
                 fallenMs = 0,
-                appearanceDelayMs = sessionHelper.getTargetAppearanceDelayMsById(id),
+                appearanceDelayMs = sessionHelper.getTargetAppearanceDelayMsByIdAndLevel(id, field.level),
                 lifetimeMs = sessionHelper.getTargetLifetimeMsByLevel(field.level),
             )
         }

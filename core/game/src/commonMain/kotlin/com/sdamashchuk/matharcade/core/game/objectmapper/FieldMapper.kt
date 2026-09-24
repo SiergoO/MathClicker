@@ -15,8 +15,9 @@ internal fun Field.closeIfNecessary(): Field =
         isClosed = lifeCount <= 0,
     )
 
-// Mirrors SessionHelperImpl's LEVEL_MAX: past level 1334 getTargetLifetimeMsByLevel's min/max
-// thresholds cross and IntRange.random() throws on an empty range. Enforced here, not on the
+// Mirrors SessionHelperImpl's LEVEL_MAX. MC-52 floored the lifetime and wave-gap curves, so neither
+// can cross into an empty range at any level any more; this cap is now needed only for the value and
+// target-amount curves, which still climb without a ceiling of their own. Enforced here, not on the
 // helper, because updateLevel is the only place a level is ever incremented.
 private const val LEVEL_MAX = 999
 

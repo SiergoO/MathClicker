@@ -35,7 +35,10 @@ private class FakeSessionHelper(
 
     override fun getTargetLifetimeMsByLevel(level: Int) = 1000
 
-    override fun getTargetAppearanceDelayMsById(id: Int) = 0
+    override fun getTargetAppearanceDelayMsByIdAndLevel(
+        id: Int,
+        level: Int,
+    ) = 0
 
     // Level-dependent so a level-up actually changes the id set recreateTargets hands out -
     // a constant amount would make every level produce the same 1..amount ids.

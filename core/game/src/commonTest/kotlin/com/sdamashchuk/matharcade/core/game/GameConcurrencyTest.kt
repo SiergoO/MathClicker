@@ -45,7 +45,10 @@ private class RaceSessionHelper(
     // than one mutex acquisition and change what is being raced against fire.
     override fun getTargetLifetimeMsByLevel(level: Int) = 100
 
-    override fun getTargetAppearanceDelayMsById(id: Int) = appearanceDelayMsById(id)
+    override fun getTargetAppearanceDelayMsByIdAndLevel(
+        id: Int,
+        level: Int,
+    ) = appearanceDelayMsById(id)
 
     override fun getTargetAmountByLevel(level: Int) = amount
 

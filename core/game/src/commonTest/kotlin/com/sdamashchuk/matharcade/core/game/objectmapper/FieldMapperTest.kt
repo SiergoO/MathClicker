@@ -28,8 +28,7 @@ class FieldMapperTest {
 
     @Test
     fun `updateLevel clamps at 999 and does not advance past it`() {
-        // Level 999 is SessionHelperImpl's own declared levelRange.last, chosen for a large margin
-        // below level 1334, where getTargetLifetimeMsByLevel's threshold range goes empty and throws.
+        // Level 999 is SessionHelperImpl's own declared levelRange.last.
         var field = Field(level = 999)
 
         repeat(500) { field = field.updateLevel() }

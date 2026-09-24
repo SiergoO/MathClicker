@@ -14,11 +14,23 @@ class SessionHelperImpl(
         private const val INITIAL_TARGET_VALUE_MIN = 1
         private const val INITIAL_TARGET_VALUE_MAX = 20
 
-        private const val INITIAL_TARGET_LIFETIME_MS_MIN = 20000
-        private const val INITIAL_TARGET_LIFETIME_MS_MAX = 40000
+        // MC-52: base minus a linear step, floored, then a fixed spread added on top of the floored
+        // minimum rather than the raw base - that ordering is what keeps the resulting range from
+        // ever going empty at any level in 1..999 (SessionHelperImplTest pins this as a property,
+        // not a number: the pre-MC-52 curve crossed at level 1334, which is why LEVEL_MAX exists).
+        private const val LIFETIME_BASE_MS = 9500
+        private const val LIFETIME_STEP_MS = 110
+        private const val LIFETIME_FLOOR_MS = 3500
+        private const val LIFETIME_SPREAD_MS = 2500
 
-        private const val INITIAL_TARGET_APPEARANCE_DELAY_MS_MIN = 10000
-        private const val INITIAL_TARGET_APPEARANCE_DELAY_MS_MAX = 20000
+        // Wave gap, not a per-target delay: getTargetAppearanceDelayMsByIdAndLevel spends this once
+        // per id/GAME_COLUMN_COUNT group, then subdivides it again within the group (see that
+        // function) so the four targets sharing a wave don't all land on the same instant - the bug
+        // a device run caught (game over in ~28s with zero input, MC-52 spec).
+        private const val WAVE_GAP_BASE_MS = 3800
+        private const val WAVE_GAP_STEP_MS = 55
+        private const val WAVE_GAP_FLOOR_MS = 1400
+        private const val WAVE_GAP_SPREAD_MS = 800
 
         private const val INITIAL_TARGET_AMOUNT_MIN = 6
         private const val INITIAL_TARGET_AMOUNT_MAX = 10
@@ -35,35 +47,48 @@ class SessionHelperImpl(
 
     override val levelRange = IntRange(LEVEL_MIN, LEVEL_MAX)
     override val initialTargetValueRange = IntRange(INITIAL_TARGET_VALUE_MIN, INITIAL_TARGET_VALUE_MAX)
-    override val initialTargetLifetimeMsRange = IntRange(INITIAL_TARGET_LIFETIME_MS_MIN, INITIAL_TARGET_LIFETIME_MS_MAX)
-    override val initialTargetAppearanceDelayMsRange =
-        IntRange(INITIAL_TARGET_APPEARANCE_DELAY_MS_MIN, INITIAL_TARGET_APPEARANCE_DELAY_MS_MAX)
+    override val initialTargetLifetimeMsRange = IntRange(LIFETIME_BASE_MS, LIFETIME_BASE_MS + LIFETIME_SPREAD_MS)
+    override val initialTargetAppearanceDelayMsRange = IntRange(WAVE_GAP_BASE_MS, WAVE_GAP_BASE_MS + WAVE_GAP_SPREAD_MS)
     override val initialTargetAmountRange = IntRange(INITIAL_TARGET_AMOUNT_MIN, INITIAL_TARGET_AMOUNT_MAX)
     override val initialDivisionValueRange = IntRange(INITIAL_DIVISION_VALUE_MIN, INITIAL_DIVISION_VALUE_MAX)
     override val initialSubtractionValueRange = IntRange(INITIAL_SUBTRACTION_VALUE_MIN, INITIAL_SUBTRACTION_VALUE_MAX)
 
     /**
      * Calculates the target lifetime depending on the level. The higher the level, the less time the target should be
-     * visible during the level.
+     * visible during the level, down to a floor it never falls below.
      * @param level
      * @return random target lifetime in a certain range of values.
      */
     override fun getTargetLifetimeMsByLevel(level: Int): Int {
-        val minThreshold = initialTargetLifetimeMsRange.first - level * 15
-        val maxThreshold = initialTargetLifetimeMsRange.last - level * 30
-        return IntRange(minThreshold, maxThreshold).random(random)
+        val floor = (LIFETIME_BASE_MS - level * LIFETIME_STEP_MS).coerceAtLeast(LIFETIME_FLOOR_MS)
+        return IntRange(floor, floor + LIFETIME_SPREAD_MS).random(random)
+    }
+
+    // The gap between waves of GAME_COLUMN_COUNT targets, same floor-then-spread shape as the
+    // lifetime curve above and for the same reason: tightens with level down to a floor it can never
+    // cross, so the range this feeds getTargetAppearanceDelayMsByIdAndLevel from can never go empty.
+    private fun getWaveGapMsByLevel(level: Int): Int {
+        val floor = (WAVE_GAP_BASE_MS - level * WAVE_GAP_STEP_MS).coerceAtLeast(WAVE_GAP_FLOOR_MS)
+        return IntRange(floor, floor + WAVE_GAP_SPREAD_MS).random(random)
     }
 
     /**
-     * Calculates the target appearance delay depending on the level. Resulting value depends on the number of
-     * game columns for the sequential appearance of the targets in groups.
+     * Calculates the target appearance delay depending on the level. Targets are grouped into waves of
+     * GAME_COLUMN_COUNT, and staggered within their own wave rather than all landing on the wave's start:
+     * a whole wave sharing one delay (the pre-MC-52 shape) let the first wave alone close out a session
+     * with zero player input in ~28s on device, faster than any single target's own fall.
+     * @param id
      * @param level
-     * @return random target appearance delay in a certain range of values.
+     * @return target appearance delay, randomized once per call by the wave gap it is built from.
      */
-    override fun getTargetAppearanceDelayMsById(id: Int): Int {
-        val minThreshold = initialTargetAppearanceDelayMsRange.first * (id / GAME_COLUMN_COUNT)
-        val maxThreshold = initialTargetAppearanceDelayMsRange.last * (id / GAME_COLUMN_COUNT)
-        return IntRange(minThreshold, maxThreshold).random(random)
+    override fun getTargetAppearanceDelayMsByIdAndLevel(
+        id: Int,
+        level: Int,
+    ): Int {
+        val waveGapMs = getWaveGapMsByLevel(level)
+        val wave = id / GAME_COLUMN_COUNT
+        val positionInWave = id % GAME_COLUMN_COUNT
+        return wave * waveGapMs + positionInWave * (waveGapMs / GAME_COLUMN_COUNT)
     }
 
     /**
