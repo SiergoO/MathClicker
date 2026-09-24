@@ -20,8 +20,9 @@ sealed interface GameEvent {
         val level: Int,
     ) : GameEvent
 
-    // Fired once per qualifying level-up (see Field.updateLevel), never per tick: livesLeft is the
-    // field's lifeCount after the grant, already capped.
+    // livesLeft is the field's lifeCount after the grant, already capped. Fired only by Game.grantLife
+    // - MC-76 removed the every-N-levels trigger MC-54 wired through updateLevel, but this event (and
+    // the feedback path that renders it) stays alive for whatever future event ends up granting one.
     data class LifeGranted(
         val livesLeft: Int,
     ) : GameEvent

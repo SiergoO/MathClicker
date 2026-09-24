@@ -52,48 +52,33 @@ class FieldMapperTest {
         assertEquals(999, field.level)
     }
 
-    // 5 and 3 are FieldMapper's own LIFE_BONUS_INTERVAL_LEVELS and LIFE_BONUS_CAP, used as literals
-    // here the same way LEVEL_MAX's 999 already is above - both are private to FieldMapper.
+    // MC-76: updateLevel no longer touches lifeCount at all - the every-N-levels grant MC-54 wired
+    // through here is gone, levels 5 and 10 included, which used to qualify.
     @Test
-    fun `updateLevel grants a life only on the levels that are a multiple of the interval`() {
-        val qualifyingLevels = setOf(5, 10)
-
+    fun `updateLevel never changes lifeCount including on a former qualifying level`() {
         (1..11).forEach { startingLevel ->
-            val before = Field(level = startingLevel, lifeCount = 0)
+            val before = Field(level = startingLevel, lifeCount = 1)
             val after = before.updateLevel()
 
-            if (after.level in qualifyingLevels) {
-                assertEquals(1, after.lifeCount, "level ${after.level} should have granted a life")
-            } else {
-                assertEquals(0, after.lifeCount, "level ${after.level} should not have granted a life")
-            }
+            assertEquals(1, after.lifeCount, "level ${after.level} should not have changed lifeCount")
         }
     }
 
+    // 3 is FieldMapper's own LIFE_BONUS_CAP, used as a literal here the same way LEVEL_MAX's 999
+    // already is above - both are private to FieldMapper.
     @Test
-    fun `updateLevel never lets a granted life push lifeCount past the cap`() {
-        var field = Field(level = 4, lifeCount = 3)
-
-        field = field.updateLevel() // level 5: qualifies, but already at the cap
-
-        assertEquals(3, field.lifeCount)
-
-        field = field.copy(level = 9).updateLevel() // level 10: qualifies again, repeated grant
-
-        assertEquals(3, field.lifeCount)
+    fun `grantLife adds one life below the cap but is a no-op at it`() {
+        assertEquals(2, Field(lifeCount = 1).grantLife().lifeCount)
+        assertEquals(3, Field(lifeCount = 2).grantLife().lifeCount)
+        assertEquals(3, Field(lifeCount = 3).grantLife().lifeCount)
     }
 
     @Test
-    fun `updateLevel grant stacks below the cap but never crosses it`() {
-        var field = Field(level = 4, lifeCount = 1)
+    fun `repeated grantLife calls never push lifeCount past the cap`() {
+        var field = Field(lifeCount = 1)
 
-        field = field.updateLevel() // level 5: 1 -> 2
-        assertEquals(2, field.lifeCount)
+        repeat(5) { field = field.grantLife() }
 
-        field = field.copy(level = 9).updateLevel() // level 10: 2 -> 3
-        assertEquals(3, field.lifeCount)
-
-        field = field.copy(level = 14).updateLevel() // level 15: capped at 3
         assertEquals(3, field.lifeCount)
     }
 

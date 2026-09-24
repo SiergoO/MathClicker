@@ -35,29 +35,22 @@ internal fun Field.closeIfNecessary(nowMs: Long): Field {
 // helper, because updateLevel is the only place a level is ever incremented.
 private const val LEVEL_MAX = 999
 
-// Starting point, not a tuned value (MC-54): three lives with no way to earn one back is a hard
-// ceiling, but the owner hasn't picked a pace for lifting it. 5 is chosen so a bonus is reachable
-// well inside a run - MC-52 already put a no-input level-1 session at ~12s, so this needs real
-// playtesting data, not a guess, before it is treated as final.
-private const val LIFE_BONUS_INTERVAL_LEVELS = 5
-
 // Capped at Field's own starting lifeCount (see Field.kt) rather than an unbounded bank: the grant
 // is a recovery mechanic, not a second growth curve, and staying at or below the start keeps the
-// existing 3-slot life HUD (Field.kt in :feature:game) correct with no further change. Also a
-// starting point, pending the same tuning as the interval above.
+// existing 3-slot life HUD (Field.kt in :feature:game) correct with no further change.
 private const val LIFE_BONUS_CAP = 3
 
-// The only place a level is ever incremented (see LEVEL_MAX above), so it is also the only place
-// the every-N-levels life bonus can be granted - restoring a session never calls this, which is
-// what keeps a qualifying level from granting a second time across a restore.
-internal fun Field.updateLevel(maxLevel: Int = LEVEL_MAX): Field {
-    val leveled = copy(level = (level + 1).coerceAtMost(maxLevel))
-    return if (leveled.level % LIFE_BONUS_INTERVAL_LEVELS == 0) {
-        leveled.copy(lifeCount = (leveled.lifeCount + 1).coerceAtMost(LIFE_BONUS_CAP))
-    } else {
-        leveled
-    }
-}
+// The only place a level is ever incremented (see LEVEL_MAX above). Restoring a session never calls
+// this. MC-54's every-N-levels life bonus lived here too until MC-76 removed the trigger - leveling
+// up is now purely a level change, and grantLife below is the only way lifeCount recovers.
+internal fun Field.updateLevel(maxLevel: Int = LEVEL_MAX): Field = copy(level = (level + 1).coerceAtMost(maxLevel))
+
+// The mechanism MC-54's automatic grant used to drive, kept after MC-76 removed the every-N-levels
+// trigger: the owner wants the ability to hand back a life for whatever random event eventually
+// wants one, without re-deciding the cap semantics. coerceAtMost, not a guard that refuses the call
+// outright, so a no-op grant is still a well-defined Field - Game.grantLife is what turns "no-op"
+// into "no event emitted".
+internal fun Field.grantLife(cap: Int = LIFE_BONUS_CAP): Field = copy(lifeCount = (lifeCount + 1).coerceAtMost(cap))
 
 // Saturating, not wrapping. With the streak uncapped (ASK-18) the per-press award grows without a
 // bound of its own, and Int arithmetic that overflows wraps negative - which the old floor at zero

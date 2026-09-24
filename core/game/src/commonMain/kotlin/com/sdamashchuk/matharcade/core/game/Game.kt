@@ -13,6 +13,7 @@ import com.sdamashchuk.matharcade.core.game.objectmapper.decrementLifeCount
 import com.sdamashchuk.matharcade.core.game.objectmapper.decrementValue
 import com.sdamashchuk.matharcade.core.game.objectmapper.ensureAlive
 import com.sdamashchuk.matharcade.core.game.objectmapper.ensureVisible
+import com.sdamashchuk.matharcade.core.game.objectmapper.grantLife
 import com.sdamashchuk.matharcade.core.game.objectmapper.resetStreak
 import com.sdamashchuk.matharcade.core.game.objectmapper.shortenAppearanceDelay
 import com.sdamashchuk.matharcade.core.game.objectmapper.updateActionButtons
@@ -244,19 +245,26 @@ class Game(
                 _events.tryEmit(GameEvent.TargetBrokeOut(id, current.field.lifeCount - (index + 1)))
             }
             if (leveledUp) {
-                val leveledField = _stateFlow.value.field
-                _events.tryEmit(GameEvent.LevelUp(leveledField.level))
-                // fieldAfterBreakout, not current.field: a breakout on this same step can already
-                // have decremented lifeCount, and comparing against the pre-tick value would read a
-                // grant that only offset that loss as an increase, or worse, mask a real grant.
-                if (leveledField.lifeCount > fieldAfterBreakout.lifeCount) {
-                    _events.tryEmit(GameEvent.LifeGranted(leveledField.lifeCount))
-                }
+                _events.tryEmit(GameEvent.LevelUp(_stateFlow.value.field.level))
             }
             // current.field.isClosed already returned this call early above, so a closed field here
             // is always a fresh transition, not a repeat of one already reported.
             if (_stateFlow.value.field.isClosed) {
                 _events.tryEmit(GameEvent.GameOver)
+            }
+        }
+
+    // No caller today - MC-76 removed the every-N-levels trigger MC-54 wired through updateLevel,
+    // but kept the grant itself as the mechanism a future random event calls. Mutex-guarded like
+    // every other public entry point above; a call that would exceed the cap is a pure no-op and
+    // must not emit LifeGranted, or the feedback layer would tell a full-lives player they gained one.
+    suspend fun grantLife() =
+        mutex.withLock {
+            val current = _stateFlow.value.field
+            val granted = current.grantLife()
+            if (granted.lifeCount > current.lifeCount) {
+                _stateFlow.value = _stateFlow.value.copy(field = granted)
+                _events.tryEmit(GameEvent.LifeGranted(granted.lifeCount))
             }
         }
 
@@ -280,9 +288,6 @@ class Game(
                 val updatedField = current.field.updateLevel()
                 _stateFlow.value = GameState(updatedField, recreateTargets(updatedField))
                 _events.tryEmit(GameEvent.LevelUp(updatedField.level))
-                if (updatedField.lifeCount > current.field.lifeCount) {
-                    _events.tryEmit(GameEvent.LifeGranted(updatedField.lifeCount))
-                }
             }
         }
 
