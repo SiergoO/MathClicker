@@ -189,7 +189,7 @@ class GameStreakTest {
         }
 
     @Test
-    fun `the streak caps at ten and a press past the cap still scores at ten`() =
+    fun `the streak has no ceiling and keeps paying past ten`() =
         runTest {
             val game = Game(FakeSessionHelper(targetAmount = 1, targetValue = 1000), backgroundScope, Random(1))
             game.createField(1)
@@ -217,12 +217,48 @@ class GameStreakTest {
             }
 
             repeat(11) { fireClean() }
-            assertEquals(10, game.stateFlow.value.field.bonusMultiplier)
+            assertEquals(11, game.stateFlow.value.field.bonusMultiplier)
 
             fireClean()
 
-            assertEquals(10, game.stateFlow.value.field.bonusMultiplier)
-            assertEquals(75, game.stateFlow.value.field.score)
+            // Each press scores 1 raw, multiplied by the streak it lands on, so twelve clean presses
+            // are 1+2+...+12. Under the old ceiling of ten this was 75.
+            assertEquals(12, game.stateFlow.value.field.bonusMultiplier)
+            assertEquals(78, game.stateFlow.value.field.score)
+        }
+
+    @Test
+    fun `a press whose award overflows Int saturates instead of wrapping`() =
+        runTest {
+            val game = Game(FakeSessionHelper(targetAmount = 1), backgroundScope, Random(1))
+            game.createField(1)
+            game.targetsRestored(
+                listOf(
+                    Target(
+                        id = 1,
+                        relatedFieldId = 1,
+                        columnId = 0,
+                        value = 1_000_000,
+                        fallenMs = 0,
+                        appearanceDelayMs = 0,
+                        lifetimeMs = 100_000,
+                        isVisible = true,
+                    ),
+                ),
+            )
+            // A subtraction scores its own digit, so this press is worth 100 000 raw against a
+            // streak of three million - about 3e11, well past what an Int holds.
+            game.fieldRestored(
+                game.stateFlow.value.field.copy(
+                    currentOperationSign = OperationSign.SUBTRACTION,
+                    currentOperationDigit = 100_000,
+                    bonusMultiplier = 3_000_000,
+                ),
+            )
+
+            game.fireButtonClicked()
+
+            assertEquals(Int.MAX_VALUE, game.stateFlow.value.field.score)
         }
 
     @Test

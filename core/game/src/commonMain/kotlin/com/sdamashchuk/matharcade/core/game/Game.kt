@@ -145,7 +145,12 @@ class Game(
                     .ensureAlive()
                     .ensureVisible()
             val streakedField = current.field.advanceStreak(pressOutcome.failed)
-            val gained = pressOutcome.totalScore * streakedField.appliedMultiplier
+            // In Long: totalScore is bounded by the board, but appliedMultiplier is not, so the
+            // product is the first place an uncapped streak can overflow.
+            val gained =
+                (pressOutcome.totalScore.toLong() * streakedField.appliedMultiplier)
+                    .coerceAtMost(Int.MAX_VALUE.toLong())
+                    .toInt()
             val updatedField =
                 streakedField
                     .updateActionButtons(nextOperationSign, nextOperationDigit)

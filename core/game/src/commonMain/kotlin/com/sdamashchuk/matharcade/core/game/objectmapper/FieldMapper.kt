@@ -25,12 +25,15 @@ internal fun Field.updateLevel(maxLevel: Int = LEVEL_MAX): Field =
         level = (level + 1).coerceAtMost(maxLevel),
     )
 
-internal fun Field.updateScore(scoreToAdd: Int): Field {
-    val finalScore = (this.score + scoreToAdd).let { if (it < 0) 0 else it }
-    return this.copy(
-        score = finalScore,
+// Saturating, not wrapping. With the streak uncapped (ASK-18) the per-press award grows without a
+// bound of its own, and Int arithmetic that overflows wraps negative - which the old floor at zero
+// would then have turned into a score of 0. Silently erasing the run of the one player good enough
+// to reach the ceiling is the worst possible failure for a score chase, so the sum is taken in Long
+// and clamped. The floor at zero stays for a negative award, which nothing produces today.
+internal fun Field.updateScore(scoreToAdd: Int): Field =
+    this.copy(
+        score = (this.score.toLong() + scoreToAdd).coerceIn(0L, Int.MAX_VALUE.toLong()).toInt(),
     )
-}
 
 internal fun Field.updateActionButtons(
     nextOperationSign: OperationSign,
@@ -43,11 +46,10 @@ internal fun Field.updateActionButtons(
         nextOperationDigit = nextOperationDigit,
     )
 
-// ASK-10: combo is a streak over presses, not targets - a ceiling this far out is an
-// implementation call rather than the owner's, named here so it is one edit to change.
-private const val STREAK_CAP = 10
-
+// Uncapped by decision (ASK-18): a long clean run is meant to be worth chasing, and a ceiling is
+// exactly the point at which a score chase stops rewarding the players who are best at it. The
+// arithmetic that an unbounded streak would otherwise overflow is saturated in updateScore.
 internal fun Field.advanceStreak(pressFailed: Boolean): Field =
-    this.copy(bonusMultiplier = if (pressFailed) 0 else (bonusMultiplier + 1).coerceAtMost(STREAK_CAP))
+    this.copy(bonusMultiplier = if (pressFailed) 0 else bonusMultiplier + 1)
 
 internal fun Field.resetStreak(): Field = this.copy(bonusMultiplier = 0)

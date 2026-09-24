@@ -45,9 +45,20 @@ class FieldMapperTest {
     }
 
     @Test
-    fun `advanceStreak caps the streak at ten`() {
+    fun `advanceStreak has no ceiling`() {
         assertEquals(10, Field(bonusMultiplier = 9).advanceStreak(pressFailed = false).bonusMultiplier)
-        assertEquals(10, Field(bonusMultiplier = 10).advanceStreak(pressFailed = false).bonusMultiplier)
+        assertEquals(11, Field(bonusMultiplier = 10).advanceStreak(pressFailed = false).bonusMultiplier)
+        assertEquals(1001, Field(bonusMultiplier = 1000).advanceStreak(pressFailed = false).bonusMultiplier)
+    }
+
+    @Test
+    fun `updateScore saturates instead of wrapping negative`() {
+        // The reason the streak can be uncapped at all. Wrapping would land on a negative sum, which
+        // the floor below then turns into a score of 0 - erasing the run of the only player good
+        // enough to get there.
+        assertEquals(Int.MAX_VALUE, Field(score = Int.MAX_VALUE - 1).updateScore(100).score)
+        assertEquals(Int.MAX_VALUE, Field(score = Int.MAX_VALUE).updateScore(Int.MAX_VALUE).score)
+        assertEquals(0, Field(score = 10).updateScore(-100).score)
     }
 
     @Test
