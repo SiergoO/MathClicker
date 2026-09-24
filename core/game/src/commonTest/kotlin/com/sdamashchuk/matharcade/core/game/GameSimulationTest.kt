@@ -186,6 +186,68 @@ class GameSimulationTest {
             assertEquals(3, game.stateFlow.value.field.lifeCount)
         }
 
+    // MC-71: gameTimeMs moves by the exact same clamped step targets.advance() consumes, not the
+    // raw elapsedMs passed in - proven over many small ticks and one oversized one in the same run,
+    // so a mutant that clamped only one of the two would fail here.
+    @Test
+    fun `gameTimeMs accumulates by exactly the clamped step over many ticks including an oversized one`() =
+        runTest {
+            val game = Game(SimulationSessionHelper(lifetimeMs = 1_000_000), backgroundScope, Random(6))
+            game.createField(1)
+            game.createTargets()
+
+            repeat(10) { game.tick(TICK_MS) }
+            assertEquals((TICK_MS * 10).toLong(), game.stateFlow.value.field.gameTimeMs)
+
+            game.tick(30_000) // far past MAX_TICK_MS
+
+            assertEquals((TICK_MS * 10 + MAX_TICK_MS).toLong(), game.stateFlow.value.field.gameTimeMs)
+        }
+
+    // tick()'s own isClosed guard returns before step is even computed - this proves that early
+    // return covers the clock too, not just the targets. A single-target board would close with
+    // nothing left active either way (targets.none { it.isActive } alone already halts it), so this
+    // needs a fourth target still active and mid-fall at the moment the other three's simultaneous
+    // breakout empties lifeCount to zero - the case a guard that dropped isClosed and kept only the
+    // active-target check would still miss.
+    @Test
+    fun `gameTimeMs does not advance once the field is closed`() =
+        runTest {
+            val game =
+                Game(
+                    SimulationSessionHelper(
+                        targetAmount = 4,
+                        lifetimeMs = 1000,
+                        appearanceDelayMsById = { index -> if (index < 3) 0 else 50_000 },
+                    ),
+                    backgroundScope,
+                    Random(7),
+                )
+            game.createField(1)
+            game.createTargets()
+            val stillDelayedId =
+                game.stateFlow.value.targets
+                    .first { it.appearanceDelayMs > 0 }
+                    .id
+
+            // 1000ms: the three undelayed targets break out together, closing the field. That same
+            // step's edge-triggered shortenAppearanceDelay (see tick()) would otherwise reveal the
+            // fourth target early since it is the only one left waiting - staying below that reveal
+            // threshold is not the point here, so the delay itself is not asserted, only isActive.
+            repeat(4) { game.tick(250) }
+            assertTrue(game.stateFlow.value.field.isClosed)
+            assertTrue(
+                game.stateFlow.value.targets
+                    .first { it.id == stillDelayedId }
+                    .isActive,
+            )
+            val gameTimeMsAtClose = game.stateFlow.value.field.gameTimeMs
+
+            game.tick(TICK_MS)
+
+            assertEquals(gameTimeMsAtClose, game.stateFlow.value.field.gameTimeMs)
+        }
+
     // The thing the audit called inexpressible: exactly the targets whose individual delay has
     // elapsed by a fixed point in time are visible, and no others.
     @Test

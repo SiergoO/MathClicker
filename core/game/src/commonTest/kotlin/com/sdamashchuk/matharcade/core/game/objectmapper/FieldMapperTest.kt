@@ -135,6 +135,12 @@ class FieldMapperTest {
     }
 
     @Test
+    fun `advanceClock adds stepMs onto whatever gameTimeMs already carries`() {
+        assertEquals(250L, Field(gameTimeMs = 0).advanceClock(250).gameTimeMs)
+        assertEquals(5250L, Field(gameTimeMs = 5000).advanceClock(250).gameTimeMs)
+    }
+
+    @Test
     fun `updateActionButtons promotes the pending operation and queues a new one`() {
         val field =
             Field(

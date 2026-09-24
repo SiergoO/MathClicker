@@ -10,6 +10,11 @@ internal fun Field.decrementLifeCount(decrement: Int): Field {
     )
 }
 
+// The only place gameTimeMs ever moves. stepMs is Game.tick()'s own step, already clamped to
+// MAX_TICK_MS there - clamping again here would be the same rule in two places, which is exactly
+// what the design doc asks not to do.
+internal fun Field.advanceClock(stepMs: Int): Field = copy(gameTimeMs = gameTimeMs + stepMs)
+
 // nowMs comes from Game's own injected Clock rather than being read here, the same reason
 // getNextSignAndDigit takes Game's Random instead of drawing its own - two engines seeded alike
 // (GameSimulationTest, GameTest) must play out identically, wall-clock time included. isClosed is

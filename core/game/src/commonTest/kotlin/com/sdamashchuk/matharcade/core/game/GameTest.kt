@@ -385,6 +385,10 @@ class GameTest {
                     nextOperationDigit = 2,
                     isClosed = true,
                     finishedAt = 0L,
+                    // MC-71: 50 of the 200 250ms ticks land before the field closes and freezes the
+                    // clock with the rest - the same terminal instant GameSimulationTest's pinned
+                    // 12496 elapsedMs reaches at 16ms steps, off by the coarser step size here.
+                    gameTimeMs = 12500L,
                 ),
                 firstField,
             )
@@ -730,6 +734,33 @@ class GameTest {
             testScheduler.runCurrent()
 
             assertEquals(restoredField, game.stateFlow.value.field)
+        }
+
+    // MC-71's named risk: a restored session must keep ticking forward from the clock it was saved
+    // with, not from zero - a mutant that dropped gameTimeMs from fieldRestored's copy (or reset it
+    // some other way) would fail this by landing on 250, not 5250.
+    @Test
+    fun `a restored session resumes ticking from its saved gameTimeMs rather than zero`() =
+        runTest {
+            val game = Game(FakeSessionHelper(targetAmount = 1), backgroundScope, Random(20))
+            game.fieldRestored(Field(id = 1, level = 1, lifeCount = 3, gameTimeMs = 5000, isClosed = false))
+            val soleTarget =
+                Target(
+                    id = 1,
+                    relatedFieldId = 1,
+                    columnId = 0,
+                    value = 10,
+                    fallenMs = 0,
+                    appearanceDelayMs = 0,
+                    lifetimeMs = 1_000_000,
+                )
+            game.targetsRestored(listOf(soleTarget))
+            testScheduler.runCurrent()
+
+            game.tick(250)
+            testScheduler.runCurrent()
+
+            assertEquals(5250L, game.stateFlow.value.field.gameTimeMs)
         }
 
     @Test

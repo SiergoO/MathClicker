@@ -70,7 +70,7 @@ class MathArcadeDatabaseMigrationTest {
 
             MathArcadeDatabase.Schema.migrate(driver, oldVersion = 1, newVersion = MathArcadeDatabase.Schema.version)
 
-            assertEquals(4L, MathArcadeDatabase.Schema.version)
+            assertEquals(5L, MathArcadeDatabase.Schema.version)
             val database = MathArcadeDatabase(driver)
             val restoredField = FieldDao(database.fieldQueries, Dispatchers.Unconfined).getFieldById(1)
             assertEquals(
@@ -164,6 +164,32 @@ class MathArcadeDatabaseMigrationTest {
             assertEquals(0, restoredField.score)
             assertTrue(restoredField.isClosed)
             assertNull(restoredField.finishedAt)
+        }
+
+    // MC-71: gameTimeMs did not exist before this version, so an install upgrading straight from 1
+    // has nothing to recover it from - 0 is the only honest default (see 4.sqm), the same reasoning
+    // MC-53 already applied to finishedAt, just non-null here instead of left null. score and level
+    // are asserted alongside it to prove the ALTER TABLE didn't disturb the columns already there.
+    @Test
+    fun `migrating from version 1 adds a zero gameTimeMs without disturbing existing columns`() =
+        runTest {
+            val driver = JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY)
+            driver.execute(null, "PRAGMA user_version = 1", 0)
+            driver.execute(null, preMigrationFieldTable, 0)
+            driver.execute(null, preMigrationTargetsTable, 0)
+            insertField(driver, id = 1, gameColumnHeightPx = 480, isClosed = 1)
+
+            MathArcadeDatabase.Schema.migrate(driver, oldVersion = 1, newVersion = MathArcadeDatabase.Schema.version)
+
+            val restoredField =
+                FieldDao(
+                    MathArcadeDatabase(driver).fieldQueries,
+                    Dispatchers.Unconfined,
+                ).getFieldById(1)
+            assertEquals(1, restoredField.level)
+            assertEquals(0, restoredField.score)
+            assertTrue(restoredField.isClosed)
+            assertEquals(0L, restoredField.gameTimeMs)
         }
 
     // relatedFieldId is never queried, so several field rows with differing geometry all feed the

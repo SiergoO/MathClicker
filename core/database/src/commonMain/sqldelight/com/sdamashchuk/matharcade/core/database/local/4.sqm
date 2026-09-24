@@ -1,0 +1,12 @@
+-- MC-71: the engine's monotonic play-time axis (see Field.kt) needs somewhere to survive a
+-- restore - the whole point of the column, since a session restored to gameTimeMs 0 is what MC-72
+-- would turn into every target's absolute schedule landing in the past on the first tick.
+--
+-- Defaulted to 0, not backfilled from any target's fallenMs/appearanceDelayMs: nothing reads this
+-- column yet (MC-71 changes no observable behaviour), and a session that keeps playing after this
+-- migration starts advancing it from 0 the same way a freshly created field already does - there is
+-- no "wrong" value to have picked, only an unread one until MC-72 lands.
+--
+-- ADD COLUMN only, no rebuild: minSdk 24's SQLite has always supported ALTER TABLE ... ADD COLUMN,
+-- and a NOT NULL column needs nothing else to add safely in place as long as it carries a DEFAULT.
+ALTER TABLE `field` ADD COLUMN `gameTimeMs` INTEGER NOT NULL DEFAULT 0;

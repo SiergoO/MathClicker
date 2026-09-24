@@ -15,6 +15,11 @@ data class Field(
     // FieldMapper). Null for a still-open run and, permanently, for any run that closed before
     // MC-53 added this column - there is no date to recover for those.
     val finishedAt: Long? = null,
+    // The engine's own monotonic play-time axis, advanced only by Game.tick(). Not wall-clock time
+    // - finishedAt above is - and must never be read from a device clock: two engines seeded alike
+    // must reach identical gameTimeMs too. Long: 999 levels of tens of seconds each outlives Int's
+    // ~24-day range.
+    val gameTimeMs: Long = 0,
 ) {
     // Computed here rather than in the engine's mapper: the HUD renders this number, and a label
     // should not have to import :core:game to lay itself out (the same reason Target.position

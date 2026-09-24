@@ -49,6 +49,7 @@ class GameRepositoryImplTest {
                     nextOperationDigit = 9,
                     isClosed = true,
                     finishedAt = 1_726_000_000_000L,
+                    gameTimeMs = 45_000L,
                 )
 
             repository.insertField(field)
@@ -93,6 +94,7 @@ class GameRepositoryImplTest {
                     nextOperationSign = OperationSign.SUBTRACTION,
                     nextOperationDigit = 2,
                     isClosed = true,
+                    gameTimeMs = 8_500L,
                 )
             repository.updateField(advanced)
 

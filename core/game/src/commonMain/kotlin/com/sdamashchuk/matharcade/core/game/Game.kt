@@ -4,6 +4,7 @@ import com.sdamashchuk.matharcade.core.game.helper.SessionHelper
 import com.sdamashchuk.matharcade.core.game.model.GameEvent
 import com.sdamashchuk.matharcade.core.game.model.GameState
 import com.sdamashchuk.matharcade.core.game.objectmapper.advance
+import com.sdamashchuk.matharcade.core.game.objectmapper.advanceClock
 import com.sdamashchuk.matharcade.core.game.objectmapper.advanceStreak
 import com.sdamashchuk.matharcade.core.game.objectmapper.changeActiveness
 import com.sdamashchuk.matharcade.core.game.objectmapper.changeVisibility
@@ -212,7 +213,8 @@ class Game(
 
             val advanced = current.targets.advance(step)
             val brokenOutIds = advanced.filter { it.isActive && it.fallenMs >= it.lifetimeMs }.map { it.id }
-            val (fieldAfterBreakout, targetsAfterBreakout) = resolveBreakouts(advanced, brokenOutIds, current.field)
+            val (fieldAfterBreakout, targetsAfterBreakout) =
+                resolveBreakouts(advanced, brokenOutIds, current.field.advanceClock(step))
 
             // Fired on the edge - a visible active target existed before this step and does not
             // after - never on the level, or the draw count this makes would depend on frame rate

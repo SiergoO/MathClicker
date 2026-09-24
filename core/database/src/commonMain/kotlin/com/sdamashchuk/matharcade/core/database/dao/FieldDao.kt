@@ -28,6 +28,7 @@ class FieldDao(
                 nextOperationDigit = field.nextOperationDigit.toLong(),
                 isClosed = field.isClosed,
                 finishedAt = field.finishedAt,
+                gameTimeMs = field.gameTimeMs,
             )
         }
 
@@ -44,6 +45,7 @@ class FieldDao(
                 nextOperationDigit = field.nextOperationDigit.toLong(),
                 isClosed = field.isClosed,
                 finishedAt = field.finishedAt,
+                gameTimeMs = field.gameTimeMs,
                 id = field.id.toLong(),
             )
         }
@@ -78,4 +80,5 @@ private fun LocalField.toDomainModel() =
         nextOperationDigit = nextOperationDigit.toInt(),
         isClosed = isClosed,
         finishedAt = finishedAt,
+        gameTimeMs = gameTimeMs,
     )
