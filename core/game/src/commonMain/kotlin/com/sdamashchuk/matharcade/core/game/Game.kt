@@ -33,8 +33,7 @@ import kotlin.random.Random
 
 // A frame gap this large (a resumed app, a dropped composition) is treated as a single 250ms step
 // rather than replayed in full, so a stalled clock can't teleport every target straight to the
-// floor the moment it resumes. Not yet read by any caller - the UI still drives the fall - wired
-// up in the commit that replaces that driver with tick().
+// floor the moment it resumes. Read from Field's withFrameNanos loop, the sole driver of tick().
 internal const val MAX_TICK_MS = 250
 
 class Game(
@@ -62,11 +61,10 @@ class Game(
             scope.launch {
                 // Filtered to target changes only, same as the pre-MC-42 _targetsFlow.collect: a
                 // combined state also emits on field-only changes (gameColumnSizeMeasured, a
-                // non-scoring targetClicked, ...) that this collector's guards below have no reason
+                // non-scoring targetClicked, ...) that this collector's guard below has no reason
                 // to re-evaluate. Without this filter a field-only change would replay the same
-                // (unchanged) target list through visibleTargetsAbsent()/activeTargetsAbsent(), which
-                // is at best a wasted lock acquisition and at worst a second shortenAppearanceDelay
-                // pass over targets that already appeared.
+                // (unchanged) target list through activeTargetsAbsent(), which is at best a wasted
+                // lock acquisition.
                 stateFlow
                     .map { it.targets }
                     .distinctUntilChanged()
@@ -79,9 +77,13 @@ class Game(
                         // (targetsRestored(emptyList()) is otherwise a no-op MutableStateFlow never emits
                         // a value equal to its current one), so nothing in production ever hands this
                         // collector an empty list to recover from. Keep the cheap guard.
-                        if (targets.isNotEmpty() && targets.none { it.isVisible }) {
-                            visibleTargetsAbsent()
-                        }
+                        //
+                        // The visibleTargetsAbsent() branch that used to sit here is gone: tick() now
+                        // runs every frame, and while no target is visible - true for the whole board at
+                        // the start of every level - distinctUntilChanged above would pass on every
+                        // single frame, replaying shortenAppearanceDelay() (and its Random draw) 60-120
+                        // times a second instead of once per game event. tick()'s own stillWaiting
+                        // computation does this correctly, fired on the edge instead of the level.
                         if (targets.isNotEmpty() && targets.none { it.isActive }) {
                             activeTargetsAbsent()
                         }
@@ -227,11 +229,6 @@ class Game(
                 val updatedField = current.field.updateLevel()
                 _stateFlow.value = GameState(updatedField, recreateTargets(updatedField))
             }
-        }
-
-    private suspend fun visibleTargetsAbsent() =
-        mutex.withLock {
-            _stateFlow.value = _stateFlow.value.copy(targets = _stateFlow.value.targets.shortenAppearanceDelay(random))
         }
 
     // Only ever called from inside a mutex.withLock block above - never acquires the lock itself,

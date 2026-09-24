@@ -43,6 +43,8 @@ class GameViewModel(
                 val previousTargets = state.value.targetList
                 val fieldChanged = field != previousField
                 val targetsChanged = targets.isNotEmpty() && targets != previousTargets
+                // Every one of these frames needs the UI to see it, so this assignment stays
+                // unconditional; only the persistence below is throttled.
                 _state.value =
                     state.value.copy(
                         field = field,
@@ -51,7 +53,7 @@ class GameViewModel(
                 if (fieldChanged) {
                     gameRepository.updateField(field)
                 }
-                if (targetsChanged) {
+                if (targetsChanged && shouldPersistTargets(previousTargets, targets)) {
                     val previousIds = previousTargets.map { it.id }.toSet()
                     if (shouldRefreshTargets(previousIds, targets.map { it.id }.toSet())) {
                         gameRepository.refreshTargets(targets)
@@ -93,6 +95,7 @@ class GameViewModel(
                     }
 
                     Action.PauseGame -> {
+                        persistTargetsNow()
                         _state.value =
                             state.value.copy(
                                 isGamePaused = true,
@@ -106,10 +109,12 @@ class GameViewModel(
                                 isGamePaused = true,
                                 isGameStarted = false,
                             )
+                        persistTargetsNow()
                         updateSession()
                     }
 
                     Action.BackToMainMenuClicked -> {
+                        persistTargetsNow()
                         _uiEvents.trySend(UiEvent.NavigateToMainMenuScreen)
                         _state.value =
                             state.value.copy(
@@ -142,9 +147,26 @@ class GameViewModel(
                     is Action.FireButtonClicked -> {
                         game.fireButtonClicked()
                     }
+
+                    is Action.Tick -> {
+                        game.tick(action.elapsedMs)
+                    }
+
+                    Action.PersistTargetsNow -> {
+                        persistTargetsNow()
+                    }
                 }
             }
         }
+    }
+
+    // Positions reach disk exactly on pause and on ON_STOP, not on every frame: writes unconditionally
+    // (the throttle in the collector above exists to skip this call, not to skip inside it) so a
+    // background/kill right after a fall that never triggered shouldPersistTargets isn't lost.
+    private suspend fun persistTargetsNow() {
+        val targets = state.value.targetList
+        if (targets.isEmpty()) return
+        gameRepository.updateTargets(targets)
     }
 
     private suspend fun updateSession() {
@@ -207,6 +229,12 @@ class GameViewModel(
         ) : Action()
 
         object FireButtonClicked : Action()
+
+        data class Tick(
+            val elapsedMs: Int,
+        ) : Action()
+
+        object PersistTargetsNow : Action()
     }
 
     data class State(
@@ -228,3 +256,14 @@ internal fun shouldRefreshTargets(
     previousIds: Set<Int>,
     nextIds: Set<Int>,
 ) = previousIds != nextIds
+
+// fallenMs and appearanceDelayMs both tick down on every tick(), so a target mid-fall or mid-delay
+// changes on every frame regardless of anything the player did; excluding only one of the two still
+// persists once per frame for as long as the other is moving.
+internal fun shouldPersistTargets(
+    previousTargets: List<Target>,
+    nextTargets: List<Target>,
+): Boolean {
+    fun List<Target>.withoutClock() = map { it.copy(fallenMs = 0, appearanceDelayMs = 0) }
+    return previousTargets.withoutClock() != nextTargets.withoutClock()
+}

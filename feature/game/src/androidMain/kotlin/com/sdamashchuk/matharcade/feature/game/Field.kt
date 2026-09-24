@@ -22,11 +22,13 @@ import androidx.compose.material.Divider
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -48,14 +50,23 @@ import com.sdamashchuk.matharcade.core.ui.theme.White
 @Composable
 fun Field(
     gameState: State<GameViewModel.State>,
-    onTargetRevealed: (id: Int) -> Unit,
     onTargetClicked: (id: Int) -> Unit,
-    onTargetDidBreakout: (id: Int) -> Unit,
-    onTargetPositionSave: (id: Int, position: Int, gameColumnHeightPx: Int) -> Unit,
     onFireClicked: () -> Unit,
+    onTick: (elapsedMs: Int) -> Unit,
 ) {
     var gameColumnSize by remember { mutableStateOf(Size(0, 0)) }
     val localDensity = LocalDensity.current
+
+    LaunchedEffect(Unit) {
+        var previousFrameNanos = withFrameNanos { it }
+        while (true) {
+            withFrameNanos { frameNanos ->
+                val elapsedMs = ((frameNanos - previousFrameNanos) / 1_000_000L).toInt()
+                previousFrameNanos = frameNanos
+                onTick(elapsedMs)
+            }
+        }
+    }
 
     Row(
         modifier =
@@ -127,10 +138,7 @@ fun Field(
                     TargetButton(
                         it,
                         gameColumnSize,
-                        onTargetRevealed = onTargetRevealed,
                         onTargetClicked = onTargetClicked,
-                        onTargetDidBreakout = onTargetDidBreakout,
-                        onTargetPositionSave = onTargetPositionSave,
                     )
                 }
             }

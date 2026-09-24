@@ -50,6 +50,20 @@ private class FakeSessionHelper(
     override fun getSubtractionDigitByLevel(level: Int) = 3 + (level - 1)
 }
 
+// Counts every draw made through the delegate, so a test can assert "no random consumed" instead
+// of inferring it from an unaffected outcome - the direct kill for a re-added visibleTargetsAbsent().
+private class CountingRandom(
+    private val delegate: Random,
+) : Random() {
+    var drawCount = 0
+        private set
+
+    override fun nextBits(bitCount: Int): Int {
+        drawCount++
+        return delegate.nextBits(bitCount)
+    }
+}
+
 @OptIn(ExperimentalCoroutinesApi::class)
 class GameTest {
     @Test
@@ -80,21 +94,38 @@ class GameTest {
         }
 
     @Test
-    fun `no visible targets shortens every appearance delay to zero`() =
+    fun `tick with the collector live decrements staggered appearance delays without drawing from random`() =
         runTest {
-            // Equal delays make the outcome independent of shortenAppearanceDelay's own random
-            // sample count: whichever subset is picked, subtracting the shared delay zeroes them all.
-            val game = Game(FakeSessionHelper(targetAmount = 3, appearanceDelayMs = 500), backgroundScope, Random(2))
+            // No target ever becomes visible in this window (the shortest delay is well past the
+            // total elapsed time below), so the collector sees "no visible target" on every one of
+            // these ticks - exactly the state a re-added visibleTargetsAbsent() branch would fire on,
+            // every single time, off this same Random.
+            val countingRandom = CountingRandom(Random(8))
+            val delays = listOf(5000, 6000, 7000)
+            val sessionHelper = FakeSessionHelper(targetAmount = 3, appearanceDelayMsById = { delays[it] })
+            val game = Game(sessionHelper, backgroundScope, countingRandom)
             game.start()
             game.createField(1)
-
             game.createTargets()
             testScheduler.runCurrent()
+            val drawsBeforeTicking = countingRandom.drawCount
 
+            repeat(1000) {
+                game.tick(1)
+                testScheduler.runCurrent()
+            }
+
+            assertEquals(
+                listOf(4000, 5000, 6000),
+                game.stateFlow.value.targets
+                    .sortedBy { it.id }
+                    .map { it.appearanceDelayMs },
+            )
             assertTrue(
                 game.stateFlow.value.targets
-                    .all { it.appearanceDelayMs == 0 },
+                    .none { it.isVisible },
             )
+            assertEquals(drawsBeforeTicking, countingRandom.drawCount)
         }
 
     @Test
@@ -254,6 +285,11 @@ class GameTest {
             // Comparing the two runs to each other cannot fail on a range narrow enough that an
             // unseeded draw coincides by chance (getSubtractionDigitByLevel's 1..3 at level 1 agrees
             // roughly one run in four). Pinning exact seed-99 values is what actually catches that.
+            //
+            // nextOperationSign/nextOperationDigit shifted from MC-38's removal of the collector's
+            // visibleTargetsAbsent() branch: that branch used to draw from this same Random between
+            // createTargets() and fireButtonClicked(), so removing it moves every draw after it back
+            // by one - exactly what activeTargetsAbsent's own edge-triggered guard now prevents.
             assertEquals(
                 Field(
                     id = 1,
@@ -263,8 +299,8 @@ class GameTest {
                     bonusMultiplier = 0,
                     currentOperationSign = OperationSign.SUBTRACTION,
                     currentOperationDigit = 2,
-                    nextOperationSign = OperationSign.DIVISION,
-                    nextOperationDigit = 5,
+                    nextOperationSign = OperationSign.SUBTRACTION,
+                    nextOperationDigit = 1,
                     isClosed = true,
                 ),
                 firstField,
@@ -353,27 +389,6 @@ class GameTest {
             testScheduler.runCurrent()
 
             assertEquals(1, game.stateFlow.value.field.level)
-        }
-
-    @Test
-    fun `no visible targets with unequal delays shortens only the seeded subset`() =
-        runTest {
-            // Unequal delays make the two branches of shortenAppearanceDelay diverge, so this is only
-            // pinnable once the injected Random reaches it - the workaround above sidesteps that.
-            val delays = listOf(100, 200, 300, 400)
-            val sessionHelper = FakeSessionHelper(targetAmount = 4, appearanceDelayMsById = { delays[it] })
-            val game = Game(sessionHelper, backgroundScope, Random(6))
-            game.start()
-            game.createField(1)
-            game.createTargets()
-            testScheduler.runCurrent()
-
-            assertEquals(
-                listOf(0, 0, 0, 100),
-                game.stateFlow.value.targets
-                    .sortedBy { it.id }
-                    .map { it.appearanceDelayMs },
-            )
         }
 
     @Test
@@ -700,43 +715,5 @@ class GameTest {
             testScheduler.runCurrent()
 
             assertEquals(restoredTargets, game.stateFlow.value.targets)
-        }
-
-    @Test
-    fun `a field-only change does not replay the target list through the collector`() =
-        runTest {
-            // Guards the distinctUntilChanged filter in start(). A combined state flow also emits on
-            // field-only changes; without the filter such an emission replays an unchanged target
-            // list through visibleTargetsAbsent(), which runs a second shortenAppearanceDelay pass
-            // and silently rewrites appearance delays the player is already waiting out. Seed 5 is
-            // one of the seeds where the extra pass actually changes the delays - with the filter
-            // removed this test goes red, with it in place the delays are untouched.
-            val game =
-                Game(
-                    FakeSessionHelper(targetAmount = 4, appearanceDelayMsById = { listOf(100, 200, 300, 400)[it] }),
-                    backgroundScope,
-                    Random(5),
-                )
-            game.start()
-            game.createField(1)
-            game.createTargets()
-            testScheduler.runCurrent()
-            val delaysBefore =
-                game.stateFlow.value.targets
-                    .map { it.id to it.appearanceDelayMs }
-
-            // Any field-only mutator works here; fieldRestored is the one left after
-            // gameColumnSizeMeasured was deleted (MC-38/MC-43) - it touches only the field half.
-            val fieldOnlyChange =
-                game.stateFlow.value.field
-                    .copy(score = 5)
-            game.fieldRestored(fieldOnlyChange)
-            testScheduler.runCurrent()
-
-            assertEquals(
-                delaysBefore,
-                game.stateFlow.value.targets
-                    .map { it.id to it.appearanceDelayMs },
-            )
         }
 }

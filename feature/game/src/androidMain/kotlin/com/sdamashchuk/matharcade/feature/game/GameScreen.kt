@@ -8,6 +8,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.Lifecycle
 import com.sdamashchuk.matharcade.core.ui.theme.MathArcadeTheme
 
 @Composable
@@ -47,27 +48,22 @@ fun GameScreen(component: GameComponent) {
                 else -> {
                     Field(
                         gameState,
-                        onTargetRevealed = { id -> component.sendAction(GameViewModel.Action.TargetRevealed(id)) },
                         onTargetClicked = { id -> component.sendAction(GameViewModel.Action.TargetClicked(id)) },
-                        onTargetDidBreakout = { id ->
-                            component.sendAction(GameViewModel.Action.TargetDidBreakout(id))
-                        },
-                        onTargetPositionSave = { id, position, gameColumnHeightPx ->
-                            component.sendAction(
-                                GameViewModel.Action.SaveTargetPosition(
-                                    id,
-                                    position,
-                                    gameColumnHeightPx,
-                                ),
-                            )
-                        },
                         onFireClicked = { component.sendAction(GameViewModel.Action.FireButtonClicked) },
+                        onTick = { component.sendAction(GameViewModel.Action.Tick(it)) },
                     )
                 }
             }
         }
         BackHandler {
             component.sendAction(GameViewModel.Action.PauseGame)
+        }
+        // Hoisted here rather than per-TargetButton: one observer for the whole screen, and it
+        // observes in every branch above (paused, game-over, countdown), not only the running one.
+        OnLifecycleEvent { _, event ->
+            if (event == Lifecycle.Event.ON_STOP) {
+                component.sendAction(GameViewModel.Action.PersistTargetsNow)
+            }
         }
     }
 }
