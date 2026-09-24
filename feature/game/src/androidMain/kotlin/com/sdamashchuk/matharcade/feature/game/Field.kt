@@ -105,16 +105,15 @@ fun Field(
         )
         // Fixed width, not weight(1f): Level and Score stay centred on each other regardless of
         // this button's presence.
-        Text(
+        Box(
             modifier =
                 Modifier
                     .width(56.dp)
-                    .align(Alignment.CenterVertically)
-                    .clickable(onClick = onPauseClicked),
-            textAlign = TextAlign.Center,
-            text = stringResource(id = R.string.pause_button).toUpperCase(Locale.current),
-            style = MaterialTheme.typography.body1,
-        )
+                    .align(Alignment.CenterVertically),
+            contentAlignment = Alignment.Center,
+        ) {
+            PauseButton(onClick = onPauseClicked)
+        }
     }
     Divider()
     Row(
