@@ -64,9 +64,11 @@ class GameViewModel(
                         field = field,
                         targetList = if (targets.isNotEmpty()) targets.toImmutableList() else previousTargets,
                         // Neither branch is a player action, so both bypass nextPhase and are applied
-                        // directly here. isClosed stays first: tick() resolves breakouts before it checks
-                        // for an empty board, so the last life and the last target can be lost in the same
-                        // step, and GameOver must win over the LevelIntro that same step would also trigger.
+                        // directly here. isClosed stays first regardless: GameOver must always win over
+                        // LevelIntro. MC-59 means the engine itself no longer levels up a field that
+                        // closes on the same step (see Game.tick's and activeTargetsAbsent's isClosed
+                        // guards), so the two can no longer actually land together - this ordering is
+                        // now a defensive invariant rather than a reachable race.
                         phase =
                             if (field.isClosed) {
                                 GamePhase.GameOver

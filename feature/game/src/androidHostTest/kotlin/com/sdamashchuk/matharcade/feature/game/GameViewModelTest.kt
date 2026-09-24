@@ -248,9 +248,13 @@ class GameViewModelTest {
             assertEquals(GamePhase.GameOver, viewModel.state.value.phase)
         }
 
-    // M4: tick() resolves breakouts (and the last life) before it checks for an empty board, so
-    // losing the last life and clearing the board - a level-up - can land in the same locked step.
-    // GameOver must still win: the collector's `when` is required to check isClosed first.
+    // MC-57 M4 originally staged a level-up and a GameOver landing in the same locked tick (tick()
+    // resolves breakouts, including the field closing, before it checks for an empty board) to prove
+    // GameOver wins the collector's `when`. MC-59 closed that combination off at the engine level - a
+    // field that closes on the same step never levels up any more (see Game.tick's isClosed guard) -
+    // so the two can no longer actually land together. The phase assertion stands on its own as a
+    // regression pin for the isClosed-first ordering; the level assertion now pins the opposite of
+    // what it used to: MC-59's fix, not the defect it existed to encode.
     @Test
     fun `GameOver wins over LevelIntro when the last life and the last target break out together`() =
         runTest {
@@ -274,10 +278,10 @@ class GameViewModelTest {
             val viewModel = GameViewModel(game, repository)
 
             // The sole target breaking out both zeroes the last life (GameOver) and empties the
-            // board (level-up), in the same locked tick.
+            // board, in the same locked tick.
             repeat(4) { game.tick(250) }
 
-            assertTrue(game.stateFlow.value.field.level > 1)
+            assertEquals(1, game.stateFlow.value.field.level)
             assertEquals(GamePhase.GameOver, viewModel.state.value.phase)
         }
 

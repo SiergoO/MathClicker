@@ -161,6 +161,133 @@ class GameTest {
         }
 
     @Test
+    fun `the field closing on the tick that empties the board keeps the level where it was`() =
+        runTest {
+            val game = Game(FakeSessionHelper(targetAmount = 1), backgroundScope, Random(25))
+            game.start()
+            game.fieldRestored(Field(id = 1, level = 3, lifeCount = 1, isClosed = false))
+            val soleTarget =
+                Target(
+                    id = 1,
+                    relatedFieldId = 1,
+                    columnId = 0,
+                    value = 10,
+                    fallenMs = 0,
+                    appearanceDelayMs = 0,
+                    lifetimeMs = 1000,
+                )
+            game.targetsRestored(listOf(soleTarget))
+            testScheduler.runCurrent()
+
+            // The sole target breaking out both zeroes the last life (closing the field) and
+            // empties the board - what would otherwise be a level-up - in the same locked tick.
+            repeat(4) { game.tick(250) }
+            testScheduler.runCurrent()
+
+            assertTrue(game.stateFlow.value.field.isClosed)
+            assertEquals(3, game.stateFlow.value.field.level)
+        }
+
+    @Test
+    fun `the field closing on the tick that empties the board does not recreate targets`() =
+        runTest {
+            val game = Game(FakeSessionHelper(targetAmount = 1), backgroundScope, Random(26))
+            game.start()
+            game.fieldRestored(Field(id = 1, level = 3, lifeCount = 1, isClosed = false))
+            val soleTarget =
+                Target(
+                    id = 1,
+                    relatedFieldId = 1,
+                    columnId = 0,
+                    value = 10,
+                    fallenMs = 0,
+                    appearanceDelayMs = 0,
+                    lifetimeMs = 1000,
+                )
+            game.targetsRestored(listOf(soleTarget))
+            testScheduler.runCurrent()
+
+            repeat(4) { game.tick(250) }
+            testScheduler.runCurrent()
+
+            // A fresh set would carry a new id range built off the (wrongly bumped) level; the
+            // dead session must keep publishing the one broken-out target it actually has.
+            assertEquals(
+                listOf(1),
+                game.stateFlow.value.targets
+                    .map { it.id },
+            )
+            assertFalse(
+                game.stateFlow.value.targets
+                    .first()
+                    .isActive,
+            )
+        }
+
+    @Test
+    fun `a field already closed keeps its level when the last active target is tapped to zero`() =
+        runTest {
+            val game = Game(FakeSessionHelper(targetAmount = 1, targetValue = 1), backgroundScope, Random(27))
+            game.start()
+            game.fieldRestored(Field(id = 1, level = 4, lifeCount = 0, isClosed = true))
+            val soleTarget =
+                Target(
+                    id = 1,
+                    relatedFieldId = 1,
+                    columnId = 0,
+                    value = 1,
+                    fallenMs = 0,
+                    appearanceDelayMs = 0,
+                    lifetimeMs = 1000,
+                )
+            game.targetsRestored(listOf(soleTarget))
+            testScheduler.runCurrent()
+
+            // Not every breakout that closes the field also empties the board (other targets can
+            // still be active); this reaches the same dead-session state through targetClicked's
+            // own retirement path instead of a breakout, exercising activeTargetsAbsent() rather
+            // than tick().
+            game.targetClicked(soleTarget.id)
+            testScheduler.runCurrent()
+
+            assertEquals(4, game.stateFlow.value.field.level)
+        }
+
+    @Test
+    fun `a field already closed does not recreate targets when the last active target is tapped to zero`() =
+        runTest {
+            val game = Game(FakeSessionHelper(targetAmount = 1, targetValue = 1), backgroundScope, Random(28))
+            game.start()
+            game.fieldRestored(Field(id = 1, level = 4, lifeCount = 0, isClosed = true))
+            val soleTarget =
+                Target(
+                    id = 1,
+                    relatedFieldId = 1,
+                    columnId = 0,
+                    value = 1,
+                    fallenMs = 0,
+                    appearanceDelayMs = 0,
+                    lifetimeMs = 1000,
+                )
+            game.targetsRestored(listOf(soleTarget))
+            testScheduler.runCurrent()
+
+            game.targetClicked(soleTarget.id)
+            testScheduler.runCurrent()
+
+            assertEquals(
+                listOf(1),
+                game.stateFlow.value.targets
+                    .map { it.id },
+            )
+            assertFalse(
+                game.stateFlow.value.targets
+                    .first()
+                    .isActive,
+            )
+        }
+
+    @Test
     fun `seeded random reproduces the same field across separate game instances`() =
         runTest {
             val sessionHelper = FakeSessionHelper()

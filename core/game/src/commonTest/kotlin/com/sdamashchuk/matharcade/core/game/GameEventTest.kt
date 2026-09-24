@@ -258,12 +258,13 @@ class GameEventTest {
             assertTrue(game.stateFlow.value.field.isClosed)
             assertEquals(3 - 40, game.stateFlow.value.field.lifeCount)
 
-            // This same tick also emits LevelUp and GameOver (all 40 targets went inactive and
-            // lifeCount fell well past zero), so 42 events compete for the buffer's 32 slots: the
-            // oldest 10 - TargetBrokeOut for ids 1..10 - are the ones DROP_OLDEST discards.
+            // This same tick also empties the board (all 40 targets went inactive), but MC-59 means
+            // a field this closed does not level up - so only 41 events (40 TargetBrokeOut + this
+            // GameOver) compete for the buffer's 32 slots: the oldest 9 - TargetBrokeOut for ids
+            // 1..9 - are the ones DROP_OLDEST discards.
             val brokeOutIds = events.filterIsInstance<GameEvent.TargetBrokeOut>().map { it.id }
-            assertEquals((11..40).toList(), brokeOutIds)
-            assertEquals(1, events.filterIsInstance<GameEvent.LevelUp>().size)
+            assertEquals((10..40).toList(), brokeOutIds)
+            assertEquals(0, events.filterIsInstance<GameEvent.LevelUp>().size)
             assertEquals(1, events.filterIsInstance<GameEvent.GameOver>().size)
         }
 

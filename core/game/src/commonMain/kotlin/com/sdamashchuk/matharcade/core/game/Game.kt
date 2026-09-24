@@ -216,7 +216,12 @@ class Game(
             val targetsAfterShorten =
                 if (stillWaiting) targetsAfterBreakout.shortenAppearanceDelay(random) else targetsAfterBreakout
 
-            val leveledUp = targetsAfterShorten.none { it.isActive }
+            // fieldAfterBreakout can already be closed here - the breakout that emptied the board
+            // is also the one that cost the last life. A closed field must not level up or get a
+            // fresh target set for a session that is already over (MC-59), so the board is instead
+            // published exactly as resolveBreakouts left it: the just-broken-out targets, inactive,
+            // not a recreated set.
+            val leveledUp = targetsAfterShorten.none { it.isActive } && !fieldAfterBreakout.isClosed
             _stateFlow.value =
                 if (leveledUp) {
                     val leveledField = fieldAfterBreakout.updateLevel()
@@ -249,7 +254,12 @@ class Game(
             // actually acquiring the mutex. Without this, a stale trigger would level up a board
             // that is no longer empty.
             val current = _stateFlow.value
-            if (current.targets.none { it.isActive }) {
+            // A closed field must not level up here either (MC-59): tick() can close the field on
+            // a step that leaves other targets still active (not every breakout empties the board),
+            // and one of those can then reach zero through targetClicked - reaching this branch for
+            // a session that is already over. Leave the state exactly as it is; there is nothing to
+            // recreate for a dead session.
+            if (current.targets.none { it.isActive } && !current.field.isClosed) {
                 // The level bump and the regenerated targets are published in the one assignment
                 // below, not two: a reader between separate writes here is exactly the torn state
                 // MC-42 exists to close (level+1 against the still-inactive target set).
