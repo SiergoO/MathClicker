@@ -8,6 +8,7 @@ import com.sdamashchuk.matharcade.core.model.OperationSign
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -69,7 +70,7 @@ class MathArcadeDatabaseMigrationTest {
 
             MathArcadeDatabase.Schema.migrate(driver, oldVersion = 1, newVersion = MathArcadeDatabase.Schema.version)
 
-            assertEquals(3L, MathArcadeDatabase.Schema.version)
+            assertEquals(4L, MathArcadeDatabase.Schema.version)
             val database = MathArcadeDatabase(driver)
             val restoredField = FieldDao(database.fieldQueries, Dispatchers.Unconfined).getFieldById(1)
             assertEquals(
@@ -137,6 +138,32 @@ class MathArcadeDatabaseMigrationTest {
             val database = MathArcadeDatabase(driver)
             val restored = TargetsDao(database.targetsQueries, Dispatchers.Unconfined).getTargets()
             assertTrue(restored.all { it.fallenMs == 0 })
+        }
+
+    // MC-53: finishedAt did not exist before this version, so an install upgrading straight from
+    // 1 to the current schema has nothing to recover it from - null, not a fabricated migration-time
+    // stamp, is the only honest value. score and level (what MC-59 needs untouched) are asserted
+    // alongside it to prove the new column's ALTER TABLE didn't disturb them.
+    @Test
+    fun `migrating from version 1 adds a null finishedAt without disturbing existing columns`() =
+        runTest {
+            val driver = JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY)
+            driver.execute(null, "PRAGMA user_version = 1", 0)
+            driver.execute(null, preMigrationFieldTable, 0)
+            driver.execute(null, preMigrationTargetsTable, 0)
+            insertField(driver, id = 1, gameColumnHeightPx = 480, isClosed = 1)
+
+            MathArcadeDatabase.Schema.migrate(driver, oldVersion = 1, newVersion = MathArcadeDatabase.Schema.version)
+
+            val restoredField =
+                FieldDao(
+                    MathArcadeDatabase(driver).fieldQueries,
+                    Dispatchers.Unconfined,
+                ).getFieldById(1)
+            assertEquals(1, restoredField.level)
+            assertEquals(0, restoredField.score)
+            assertTrue(restoredField.isClosed)
+            assertNull(restoredField.finishedAt)
         }
 
     // relatedFieldId is never queried, so several field rows with differing geometry all feed the

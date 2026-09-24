@@ -10,10 +10,19 @@ internal fun Field.decrementLifeCount(decrement: Int): Field {
     )
 }
 
-internal fun Field.closeIfNecessary(): Field =
-    this.copy(
-        isClosed = lifeCount <= 0,
+// nowMs comes from Game's own injected Clock rather than being read here, the same reason
+// getNextSignAndDigit takes Game's Random instead of drawing its own - two engines seeded alike
+// (GameSimulationTest, GameTest) must play out identically, wall-clock time included. isClosed is
+// checked, not just lifeCount <= 0: resolveBreakouts calls this on every breakout, and a field that
+// was already closed (lifeCount already <= 0 from an earlier call) must keep its original
+// finishedAt rather than have a later, unrelated call overwrite it.
+internal fun Field.closeIfNecessary(nowMs: Long): Field {
+    val newlyClosed = !isClosed && lifeCount <= 0
+    return this.copy(
+        isClosed = isClosed || lifeCount <= 0,
+        finishedAt = if (newlyClosed) nowMs else finishedAt,
     )
+}
 
 // Mirrors SessionHelperImpl's LEVEL_MAX. MC-52 floored the lifetime and wave-gap curves, so neither
 // can cross into an empty range at any level any more; this cap is now needed only for the value and

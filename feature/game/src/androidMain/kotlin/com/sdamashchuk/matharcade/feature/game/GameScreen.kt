@@ -18,7 +18,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.Lifecycle
 import com.sdamashchuk.matharcade.core.ui.theme.MathArcadeTheme
 import com.sdamashchuk.matharcade.feature.game.model.FeedbackEffect
@@ -120,8 +119,10 @@ fun GameScreen(component: GameComponent) {
                     }
 
                     GamePhase.GameOver -> {
-                        GameMenuDialog(
-                            headerText = stringResource(id = R.string.game_over),
+                        ResultsScreen(
+                            field = gameState.value.field,
+                            recentResults = gameState.value.recentResults,
+                            bestResult = gameState.value.bestResult,
                             onRestartClicked = { component.sendAction(GameViewModel.Action.RestartGame) },
                             onBackToMainMenuClicked = {
                                 component.sendAction(

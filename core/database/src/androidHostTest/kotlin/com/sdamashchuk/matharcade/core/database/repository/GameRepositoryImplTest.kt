@@ -11,6 +11,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -47,6 +48,7 @@ class GameRepositoryImplTest {
                     nextOperationSign = OperationSign.DIVISION,
                     nextOperationDigit = 9,
                     isClosed = true,
+                    finishedAt = 1_726_000_000_000L,
                 )
 
             repository.insertField(field)
@@ -95,6 +97,76 @@ class GameRepositoryImplTest {
             repository.updateField(advanced)
 
             assertEquals(advanced, fieldDao.getFieldById(1))
+        }
+
+    // M1: best computed over the returned page instead of all history. The highest score here is
+    // the oldest run, id 1 - it is pushed out of getRecentClosedFields' window by ids 2..11, so a
+    // best derived from that window alone would report a lower score than the true best.
+    @Test
+    fun `getBestClosedField is taken over all history, not just the recent window`() =
+        runTest {
+            repository.insertField(Field(score = 999, level = 1, isClosed = true))
+            (2..11).forEach { repository.insertField(Field(score = it, level = 1, isClosed = true)) }
+
+            assertEquals(999, repository.getBestClosedField()?.score)
+            assertEquals(10, repository.getRecentClosedFields().size)
+            assertTrue(repository.getRecentClosedFields().none { it.score == 999 })
+        }
+
+    // M2: LIMIT 10 dropped. M1 (best over the window) is also re-proven here from the list's own
+    // side: 11 closed rows must still cap at exactly 10.
+    @Test
+    fun `getRecentClosedFields excludes unfinished runs and caps at ten`() =
+        runTest {
+            repository.insertField(Field(isClosed = false))
+            repeat(11) { repository.insertField(Field(isClosed = true)) }
+
+            val recent = repository.getRecentClosedFields()
+
+            assertEquals(10, recent.size)
+            assertTrue(recent.all { it.isClosed })
+        }
+
+    // M3: ordering reversed (oldest first). Score climbs with id below, so id DESC and score DESC
+    // agree here - a wrong direction is caught by the first element's score, not just its id.
+    @Test
+    fun `getRecentClosedFields orders the most recent run first`() =
+        runTest {
+            (1..3).forEach { repository.insertField(Field(score = it * 10, isClosed = true)) }
+
+            val recent = repository.getRecentClosedFields()
+
+            assertEquals(listOf(30, 20, 10), recent.map { it.score })
+        }
+
+    // Tied scores break on level, pinned rather than left to whatever SQLite's default tie order
+    // happens to be.
+    @Test
+    fun `getBestClosedField breaks a tied score by the higher level`() =
+        runTest {
+            repository.insertField(Field(score = 100, level = 3, isClosed = true))
+            repository.insertField(Field(score = 100, level = 8, isClosed = true))
+
+            assertEquals(8, repository.getBestClosedField()?.level)
+        }
+
+    @Test
+    fun `getRecentClosedFields and getBestClosedField report nothing for empty history`() =
+        runTest {
+            assertTrue(repository.getRecentClosedFields().isEmpty())
+            assertNull(repository.getBestClosedField())
+        }
+
+    // M4: a null date treated as zero rather than unknown. Nothing coerces finishedAt away from
+    // null here - default insertField never sets it - and both queries must read it back that way
+    // without throwing.
+    @Test
+    fun `a null finishedAt survives both queries without throwing`() =
+        runTest {
+            repository.insertField(Field(score = 50, isClosed = true))
+
+            assertNull(repository.getRecentClosedFields().single().finishedAt)
+            assertNull(repository.getBestClosedField()?.finishedAt)
         }
 
     @Test

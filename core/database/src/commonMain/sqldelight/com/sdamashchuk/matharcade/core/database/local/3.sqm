@@ -1,0 +1,9 @@
+-- MC-53: field rows are the run history (isClosed = 1 marks a finished run), but nothing recorded
+-- when a run finished, so "the last ten" and "when" had no answer. finishedAt is nullable and only
+-- ever added, never backfilled: a run that closed before this column existed has no knowable date,
+-- and inventing one would put a lie into a results screen that exists to show the player real
+-- history (see Field.sq's getRecentClosedFields/getBestClosedField, the two queries this is for).
+--
+-- ADD COLUMN only, no rebuild: unlike 2.sqm's DROP COLUMN, minSdk 24's SQLite has always supported
+-- ALTER TABLE ... ADD COLUMN, and a nullable column needs nothing else to add safely in place.
+ALTER TABLE `field` ADD COLUMN `finishedAt` INTEGER;

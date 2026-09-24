@@ -11,6 +11,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.time.Clock
+import kotlin.time.Instant
 
 // Counts every draw made through the delegate, so a test can assert "no random consumed" instead
 // of inferring it from an unaffected outcome - the direct kill for a re-added visibleTargetsAbsent().
@@ -325,9 +327,17 @@ class GameTest {
             // The fake above proves Game's own Random is seeded; this proves the session as a
             // whole is, by routing the same seed through the production SessionHelperImpl - the
             // six call sites this task fixes - instead of a fake that never drew from it.
+            // Fixed rather than Clock.System: two calls to runSession() below are otherwise a real
+            // clock apart, which would put a different finishedAt on the field seed 99 closes -
+            // breaking the very reproducibility this test exists to pin.
+            val fixedClock =
+                object : Clock {
+                    override fun now() = Instant.fromEpochMilliseconds(0)
+                }
+
             suspend fun runSession(): Pair<Field, List<Target>> {
                 val seed = 99L
-                val game = Game(SessionHelperImpl(random = Random(seed)), backgroundScope, Random(seed))
+                val game = Game(SessionHelperImpl(random = Random(seed)), backgroundScope, Random(seed), fixedClock)
                 game.createField(1)
                 game.createTargets()
 
@@ -374,6 +384,7 @@ class GameTest {
                     nextOperationSign = OperationSign.SUBTRACTION,
                     nextOperationDigit = 2,
                     isClosed = true,
+                    finishedAt = 0L,
                 ),
                 firstField,
             )

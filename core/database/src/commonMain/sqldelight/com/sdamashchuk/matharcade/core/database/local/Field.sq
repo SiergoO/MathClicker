@@ -1,15 +1,15 @@
-CREATE TABLE IF NOT EXISTS "field" (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `level` INTEGER NOT NULL, `score` INTEGER NOT NULL, `lifeCount` INTEGER NOT NULL, `bonusMultiplier` INTEGER NOT NULL, `currentOperationSign` TEXT NOT NULL, `currentOperationDigit` INTEGER NOT NULL, `nextOperationSign` TEXT NOT NULL, `nextOperationDigit` INTEGER NOT NULL, `isClosed` INTEGER AS kotlin.Boolean NOT NULL);
+CREATE TABLE IF NOT EXISTS "field" (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `level` INTEGER NOT NULL, `score` INTEGER NOT NULL, `lifeCount` INTEGER NOT NULL, `bonusMultiplier` INTEGER NOT NULL, `currentOperationSign` TEXT NOT NULL, `currentOperationDigit` INTEGER NOT NULL, `nextOperationSign` TEXT NOT NULL, `nextOperationDigit` INTEGER NOT NULL, `isClosed` INTEGER AS kotlin.Boolean NOT NULL, `finishedAt` INTEGER);
 
 -- id is nullable here even though the column is NOT NULL: SQLDelight treats an INTEGER PRIMARY
 -- KEY as a rowid alias and lets an explicit NULL bind trigger SQLite's autoincrement, matching
 -- Room's 0-means-"generate" default on this column.
 insertField:
-INSERT OR IGNORE INTO field (id, level, score, lifeCount, bonusMultiplier, currentOperationSign, currentOperationDigit, nextOperationSign, nextOperationDigit, isClosed)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+INSERT OR IGNORE INTO field (id, level, score, lifeCount, bonusMultiplier, currentOperationSign, currentOperationDigit, nextOperationSign, nextOperationDigit, isClosed, finishedAt)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 updateField:
 UPDATE OR IGNORE field
-SET level = ?, score = ?, lifeCount = ?, bonusMultiplier = ?, currentOperationSign = ?, currentOperationDigit = ?, nextOperationSign = ?, nextOperationDigit = ?, isClosed = ?
+SET level = ?, score = ?, lifeCount = ?, bonusMultiplier = ?, currentOperationSign = ?, currentOperationDigit = ?, nextOperationSign = ?, nextOperationDigit = ?, isClosed = ?, finishedAt = ?
 WHERE id = ?;
 
 getFieldById:
@@ -20,3 +20,14 @@ SELECT * FROM field WHERE isClosed = 0;
 
 getFieldCount:
 SELECT COUNT(id) FROM field;
+
+-- Ordered by id, not finishedAt: id is monotonic and every row has one, while a pre-MC-53 row has
+-- no finishedAt at all - sorting by it would scatter that history to one end instead of keeping it
+-- in place among the rows around it.
+getRecentClosedFields:
+SELECT * FROM field WHERE isClosed = 1 ORDER BY id DESC LIMIT 10;
+
+-- Over all history, not the recent window above: a best run must not stop being the record just
+-- because it scrolled past the last ten. Tied scores break on level, not left to insertion order.
+getBestClosedField:
+SELECT * FROM field WHERE isClosed = 1 ORDER BY score DESC, level DESC LIMIT 1;

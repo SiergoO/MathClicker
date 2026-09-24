@@ -11,6 +11,10 @@ data class Field(
     val nextOperationSign: OperationSign = OperationSign.DIVISION,
     val nextOperationDigit: Int = 0,
     val isClosed: Boolean = false,
+    // Epoch milliseconds set once, when closeIfNecessary() first closes the field (see
+    // FieldMapper). Null for a still-open run and, permanently, for any run that closed before
+    // MC-53 added this column - there is no date to recover for those.
+    val finishedAt: Long? = null,
 ) {
     // Computed here rather than in the engine's mapper: the HUD renders this number, and a label
     // should not have to import :core:game to lay itself out (the same reason Target.position

@@ -27,6 +27,7 @@ class FieldDao(
                 nextOperationSign = field.nextOperationSign.sign,
                 nextOperationDigit = field.nextOperationDigit.toLong(),
                 isClosed = field.isClosed,
+                finishedAt = field.finishedAt,
             )
         }
 
@@ -42,6 +43,7 @@ class FieldDao(
                 nextOperationSign = field.nextOperationSign.sign,
                 nextOperationDigit = field.nextOperationDigit.toLong(),
                 isClosed = field.isClosed,
+                finishedAt = field.finishedAt,
                 id = field.id.toLong(),
             )
         }
@@ -53,6 +55,14 @@ class FieldDao(
         withContext(dispatcher) { queries.getUnfinishedField().executeAsOneOrNull()?.toDomainModel() }
 
     suspend fun getFieldCount(): Int = withContext(dispatcher) { queries.getFieldCount().executeAsOne().toInt() }
+
+    // Newest first, capped at 10 (see Field.sq); the best among them is a separate query below
+    // because it has to read past this window, not just this page.
+    suspend fun getRecentClosedFields(): List<Field> =
+        withContext(dispatcher) { queries.getRecentClosedFields().executeAsList().map { it.toDomainModel() } }
+
+    suspend fun getBestClosedField(): Field? =
+        withContext(dispatcher) { queries.getBestClosedField().executeAsOneOrNull()?.toDomainModel() }
 }
 
 private fun LocalField.toDomainModel() =
@@ -67,4 +77,5 @@ private fun LocalField.toDomainModel() =
         nextOperationSign = OperationSign.values().first { it.sign == nextOperationSign },
         nextOperationDigit = nextOperationDigit.toInt(),
         isClosed = isClosed,
+        finishedAt = finishedAt,
     )

@@ -25,10 +25,11 @@ import com.sdamashchuk.matharcade.core.ui.theme.Red700
 import com.sdamashchuk.matharcade.core.ui.theme.White
 import com.sdamashchuk.matharcade.feature.game.model.FeedbackEffect
 
-// Both already have a screen of their own - LevelIntroOverlay for one, GameMenuDialog for the
-// other - so a banner here is a second announcement on top of the first. GameOver was verified
-// doing exactly that on device: red "Game Over" from the banner, black "Game Over" from the dialog,
-// at the same time. They keep their haptic; only the text is suppressed.
+// Both already have a screen of their own - LevelIntroOverlay for one, ResultsScreen (MC-53,
+// formerly GameMenuDialog) for the other - so a banner here is a second announcement on top of the
+// first. GameOver was verified doing exactly that on device: red "Game Over" from the banner,
+// black "Game Over" from the results screen's own header, at the same time. They keep their
+// haptic; only the text is suppressed.
 private val silentEffects = setOf(FeedbackEffect.LevelUp, FeedbackEffect.GameOver)
 
 private const val FADE_MS = 150

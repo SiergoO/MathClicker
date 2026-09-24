@@ -36,6 +36,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.random.Random
+import kotlin.time.Clock
 
 // A frame gap this large (a resumed app, a dropped composition) is treated as a single 250ms step
 // rather than replayed in full, so a stalled clock can't teleport every target straight to the
@@ -54,6 +55,10 @@ class Game(
     private val sessionHelper: SessionHelper,
     private val scope: CoroutineScope,
     private val random: Random = Random.Default,
+    // Injected the same way random is: two engines seeded alike must reach identical state,
+    // finishedAt included, which reading Clock.System directly inside closeIfNecessary could not
+    // guarantee across two separate calls a real clock advances between.
+    private val clock: Clock = Clock.System,
 ) {
     private val _stateFlow: MutableStateFlow<GameState> = MutableStateFlow(GameState(Field(), listOf()))
     val stateFlow: StateFlow<GameState> = _stateFlow.asStateFlow()
@@ -300,7 +305,7 @@ class Game(
         val fieldAfterLifeLoss = brokenOutIds.fold(field) { acc, _ -> acc.decrementLifeCount(1) }
         val updatedField =
             (if (brokenOutIds.isNotEmpty()) fieldAfterLifeLoss.resetStreak() else fieldAfterLifeLoss)
-                .closeIfNecessary()
+                .closeIfNecessary(clock.now().toEpochMilliseconds())
         return updatedField to updatedTargets
     }
 

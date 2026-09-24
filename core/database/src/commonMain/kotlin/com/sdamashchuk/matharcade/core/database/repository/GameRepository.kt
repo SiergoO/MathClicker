@@ -12,6 +12,10 @@ interface GameRepository {
 
     suspend fun getFieldCount(): Int
 
+    suspend fun getRecentClosedFields(): List<Field>
+
+    suspend fun getBestClosedField(): Field?
+
     suspend fun updateTargets(targets: List<Target>)
 
     suspend fun getTargets(): List<Target>

@@ -10,6 +10,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.time.Clock
+import kotlin.time.Instant
 
 private const val TICK_MS = 16
 
@@ -219,8 +221,15 @@ class GameSimulationTest {
     fun `two identical seeded simulations produce identical state and identical elapsed time`() =
         runTest {
             val seed = 55L
+            // A real Clock.System advances between the two calls below by however long the first
+            // simulation took to run, which would put a different finishedAt on each field - the
+            // fixed instant is what keeps "identical seed, identical state" true of that column too.
+            val fixedClock =
+                object : Clock {
+                    override fun now() = Instant.fromEpochMilliseconds(0)
+                }
 
-            fun newGame() = Game(SessionHelperImpl(random = Random(seed)), backgroundScope, Random(seed))
+            fun newGame() = Game(SessionHelperImpl(random = Random(seed)), backgroundScope, Random(seed), fixedClock)
 
             val first = newGame()
             first.createField(1)

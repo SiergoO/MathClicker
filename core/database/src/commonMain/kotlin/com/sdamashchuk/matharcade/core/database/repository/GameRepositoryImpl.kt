@@ -21,6 +21,10 @@ class GameRepositoryImpl(
 
     override suspend fun getFieldCount(): Int = fieldDao.getFieldCount()
 
+    override suspend fun getRecentClosedFields(): List<Field> = fieldDao.getRecentClosedFields()
+
+    override suspend fun getBestClosedField(): Field? = fieldDao.getBestClosedField()
+
     override suspend fun updateTargets(targets: List<Target>) {
         targetsDao.updateTargets(targets)
     }

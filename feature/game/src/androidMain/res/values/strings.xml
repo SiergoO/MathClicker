@@ -16,4 +16,11 @@
     <string name="game_feedback_miss">Miss</string>
     <string name="game_feedback_life_lost">-1 Life</string>
     <string name="game_feedback_life_gained">+1 Life</string>
+
+    <string name="results_new_record">New Record!</string>
+    <string name="results_short_of_best">%d short of your best</string>
+    <string name="results_header_date">Date</string>
+    <string name="results_header_level">Level</string>
+    <string name="results_header_score">Score</string>
+    <string name="results_no_date">—</string>
 </resources>

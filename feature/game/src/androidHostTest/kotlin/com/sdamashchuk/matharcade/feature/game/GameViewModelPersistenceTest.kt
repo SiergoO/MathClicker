@@ -92,6 +92,10 @@ private class PersistenceFakeGameRepository : GameRepository {
     override suspend fun refreshTargets(targets: List<Target>) {
         refreshTargetsCalls += targets
     }
+
+    override suspend fun getRecentClosedFields(): List<Field> = emptyList()
+
+    override suspend fun getBestClosedField(): Field? = null
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)

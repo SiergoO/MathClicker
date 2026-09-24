@@ -6,6 +6,7 @@ import com.sdamashchuk.matharcade.core.game.Game
 import com.sdamashchuk.matharcade.core.model.Field
 import com.sdamashchuk.matharcade.core.model.Target
 import com.sdamashchuk.matharcade.feature.game.model.FeedbackEffect
+import com.sdamashchuk.matharcade.feature.game.model.ResultsSummary
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
@@ -57,6 +58,7 @@ class GameViewModel(
                 val previousTargets = state.value.targetList
                 val fieldChanged = field != previousField
                 val targetsChanged = targets.isNotEmpty() && targets != previousTargets
+                val justClosed = field.isClosed && !previousField.isClosed
                 // Every one of these frames needs the UI to see it, so this assignment stays
                 // unconditional; only the persistence below is throttled.
                 _state.value =
@@ -88,6 +90,12 @@ class GameViewModel(
                     } else {
                         gameRepository.updateTargets(targets)
                     }
+                }
+                // After updateField above, not before: the just-finished run has to be on disk
+                // before either query below can see it, or it would neither appear in the recent
+                // list nor be eligible to be the best.
+                if (justClosed) {
+                    loadResults()
                 }
             }
         }
@@ -155,6 +163,17 @@ class GameViewModel(
         gameRepository.updateTargets(targets)
     }
 
+    // getBestClosedField reads all history, not gameRepository's own recent window - a best
+    // outside the last ten must still be found (see GameRepository.getBestClosedField's own
+    // contract, and resultsSummaryOf below which is what turns this into the near-miss delta).
+    private suspend fun loadResults() {
+        _state.value =
+            state.value.copy(
+                recentResults = gameRepository.getRecentClosedFields().toImmutableList(),
+                bestResult = gameRepository.getBestClosedField(),
+            )
+    }
+
     private suspend fun updateSession() {
         with(gameRepository) {
             val unfinishedField = getUnfinishedField()
@@ -215,12 +234,27 @@ class GameViewModel(
         val targetList: ImmutableList<Target> = persistentListOf(),
         val field: Field = Field(),
         val phase: GamePhase = GamePhase.ReadyToPlay,
+        val recentResults: ImmutableList<Field> = persistentListOf(),
+        val bestResult: Field? = null,
     )
 
     sealed class UiEvent {
         object NavigateToMainMenuScreen : UiEvent()
     }
 }
+
+// The near-miss delta the results screen exists for (see the MC-53 spec): always against best,
+// never against recentResults' own first entry, which is only the most recent run and can be a
+// worse score than a best sitting further back in history.
+internal fun resultsSummaryOf(
+    current: Field,
+    best: Field?,
+): ResultsSummary =
+    when {
+        best == null -> ResultsSummary.NoHistory(current.score)
+        current.score >= best.score -> ResultsSummary.NewRecord(current.score)
+        else -> ResultsSummary.ShortOfBest(current.score, best.score - current.score)
+    }
 
 // A level-up hands the engine an entirely new id set, so an UPDATE alone would silently drop the
 // grown rows or leave the shrunk ones behind as ghosts (MC-34). Only the cheaper UPDATE is safe

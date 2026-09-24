@@ -5,14 +5,30 @@ import com.sdamashchuk.matharcade.core.model.OperationSign
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class FieldMapperTest {
     @Test
     fun `closeIfNecessary closes the field once lifeCount drops to zero or below`() {
-        assertTrue(Field(lifeCount = 0).closeIfNecessary().isClosed)
-        assertTrue(Field(lifeCount = -1).closeIfNecessary().isClosed)
-        assertFalse(Field(lifeCount = 1).closeIfNecessary().isClosed)
+        assertTrue(Field(lifeCount = 0).closeIfNecessary(nowMs = 1L).isClosed)
+        assertTrue(Field(lifeCount = -1).closeIfNecessary(nowMs = 1L).isClosed)
+        assertFalse(Field(lifeCount = 1).closeIfNecessary(nowMs = 1L).isClosed)
+    }
+
+    @Test
+    fun `closeIfNecessary stamps finishedAt only when it actually closes the field`() {
+        assertEquals(1234L, Field(lifeCount = 0).closeIfNecessary(nowMs = 1234L).finishedAt)
+        assertNull(Field(lifeCount = 1).closeIfNecessary(nowMs = 1234L).finishedAt)
+    }
+
+    // resolveBreakouts calls this on every breakout, not just the one that empties the last life -
+    // an already-closed field must never have its recorded date overwritten by a later, unrelated call.
+    @Test
+    fun `closeIfNecessary never overwrites a finishedAt the field already carries`() {
+        val alreadyClosed = Field(lifeCount = 0, isClosed = true, finishedAt = 1000L)
+
+        assertEquals(1000L, alreadyClosed.closeIfNecessary(nowMs = 5000L).finishedAt)
     }
 
     @Test

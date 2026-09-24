@@ -65,6 +65,10 @@ private class FakeSessionHelper(
 private class FakeGameRepository(
     private val unfinishedField: Field?,
     private val unfinishedTargets: List<Target>,
+    // Deliberately distinct from each other in every test that sets them, so a wiring mistake that
+    // reads one where the other belongs (M5) fails instead of passing on coincidentally equal data.
+    private val recentClosedFields: List<Field> = emptyList(),
+    private val bestClosedField: Field? = null,
 ) : GameRepository {
     val refreshTargetsCalls = mutableListOf<List<Target>>()
     val updateTargetsCalls = mutableListOf<List<Target>>()
@@ -86,6 +90,10 @@ private class FakeGameRepository(
     override suspend fun refreshTargets(targets: List<Target>) {
         refreshTargetsCalls += targets
     }
+
+    override suspend fun getRecentClosedFields(): List<Field> = recentClosedFields
+
+    override suspend fun getBestClosedField(): Field? = bestClosedField
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -286,6 +294,44 @@ class GameViewModelTest {
 
             assertEquals(1, game.stateFlow.value.field.level)
             assertEquals(GamePhase.GameOver, viewModel.state.value.phase)
+        }
+
+    // M5: the delta computed against the most recent run rather than the best. bestResult and
+    // recentResults are wired from two separate repository calls (getBestClosedField,
+    // getRecentClosedFields); this pins that bestResult is never derived from recentResults'
+    // own first entry, which here is a worse score than the true best.
+    @Test
+    fun `the field closing loads bestResult from getBestClosedField, not from the recent window's own first entry`() =
+        runTest {
+            val existingTargets =
+                (1..3).map { id ->
+                    Target(
+                        id = id,
+                        relatedFieldId = 5,
+                        columnId = id - 1,
+                        value = 10,
+                        fallenMs = 0,
+                        appearanceDelayMs = 0,
+                        lifetimeMs = 1000,
+                    )
+                }
+            val trueBest = Field(id = 1, score = 999, level = 9, isClosed = true)
+            val mostRecent = Field(id = 12, score = 40, level = 2, isClosed = true)
+            val repository =
+                FakeGameRepository(
+                    unfinishedField = Field(id = 5, level = 1, isClosed = false),
+                    unfinishedTargets = existingTargets,
+                    recentClosedFields = listOf(mostRecent, trueBest),
+                    bestClosedField = trueBest,
+                )
+            val game = Game(FakeSessionHelper(targetAmount = 3), CoroutineScope(Dispatchers.Unconfined))
+
+            val viewModel = GameViewModel(game, repository)
+            repeat(4) { game.tick(250) }
+
+            assertEquals(GamePhase.GameOver, viewModel.state.value.phase)
+            assertEquals(trueBest, viewModel.state.value.bestResult)
+            assertEquals(listOf(mostRecent, trueBest), viewModel.state.value.recentResults)
         }
 
     // MC-58 M4: dropping the game.events collector in init leaves this channel forever empty while
