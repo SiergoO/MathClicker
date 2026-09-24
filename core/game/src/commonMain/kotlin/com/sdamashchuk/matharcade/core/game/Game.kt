@@ -1,6 +1,7 @@
 package com.sdamashchuk.matharcade.core.game
 
 import com.sdamashchuk.matharcade.core.game.helper.SessionHelper
+import com.sdamashchuk.matharcade.core.game.model.GameEvent
 import com.sdamashchuk.matharcade.core.game.model.GameState
 import com.sdamashchuk.matharcade.core.game.objectmapper.advance
 import com.sdamashchuk.matharcade.core.game.objectmapper.advanceStreak
@@ -22,8 +23,12 @@ import com.sdamashchuk.matharcade.core.model.OperationSign
 import com.sdamashchuk.matharcade.core.model.Target
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -44,6 +49,19 @@ class Game(
 ) {
     private val _stateFlow: MutableStateFlow<GameState> = MutableStateFlow(GameState(Field(), listOf()))
     val stateFlow: StateFlow<GameState> = _stateFlow.asStateFlow()
+
+    // StateFlow conflates, so a UI collector provably drops intermediate events (two targets
+    // zeroed in the same frame would look identical to one). tryEmit is used at every call site
+    // below, never emit: emit suspends, and tick runs inside the mutex on the frame path where
+    // blocking on a slow subscriber is exactly what this buffer exists to avoid. DROP_OLDEST over
+    // SUSPEND is the same reasoning from the other side - a full buffer must never stall tick.
+    private val _events =
+        MutableSharedFlow<GameEvent>(
+            replay = 0,
+            extraBufferCapacity = 32,
+            onBufferOverflow = BufferOverflow.DROP_OLDEST,
+        )
+    val events: SharedFlow<GameEvent> = _events.asSharedFlow()
 
     // Every read-then-write of _stateFlow - including the mutators that only touch one half of it -
     // happens inside this lock, so a caller (Main) and the collector below (Default) can never
@@ -117,18 +135,19 @@ class Game(
     suspend fun targetClicked(id: Int) =
         mutex.withLock {
             val current = _stateFlow.value
+            val previousValue = current.targets.first { it.id == id }.value
             val updatedTargets =
                 current.targets
                     .decrementValue(id, 1)
                     .ensureAlive(id)
                     .ensureVisible(id)
-            val updatedField =
-                if (updatedTargets.first { it.id == id }.isProfitable) {
-                    current.field.updateScore(1)
-                } else {
-                    current.field
-                }
+            val updatedTarget = updatedTargets.first { it.id == id }
+            val awarded = if (updatedTarget.isProfitable) 1 else 0
+            val updatedField = if (updatedTarget.isProfitable) current.field.updateScore(1) else current.field
             _stateFlow.value = GameState(updatedField, updatedTargets)
+            if (previousValue > 0 && updatedTarget.value == 0) {
+                _events.tryEmit(GameEvent.TargetZeroed(id, awarded))
+            }
         }
 
     suspend fun fireButtonClicked() =
@@ -156,6 +175,7 @@ class Game(
                     .updateActionButtons(nextOperationSign, nextOperationDigit)
                     .updateScore(gained)
             _stateFlow.value = GameState(updatedField, updatedTargets)
+            _events.tryEmit(GameEvent.OperationResolved(gained, streakedField.bonusMultiplier))
         }
 
     // The engine's own clock: advances every active target by elapsedMs and resolves whatever that
@@ -179,13 +199,29 @@ class Game(
             val targetsAfterShorten =
                 if (stillWaiting) targetsAfterBreakout.shortenAppearanceDelay(random) else targetsAfterBreakout
 
+            val leveledUp = targetsAfterShorten.none { it.isActive }
             _stateFlow.value =
-                if (targetsAfterShorten.none { it.isActive }) {
+                if (leveledUp) {
                     val leveledField = fieldAfterBreakout.updateLevel()
                     GameState(leveledField, recreateTargets(leveledField))
                 } else {
                     GameState(fieldAfterBreakout, targetsAfterShorten)
                 }
+
+            // lifeCount is decremented by exactly one per id, in this same order, inside
+            // resolveBreakouts - so the i-th id's own post-breakout count is derivable here without
+            // resolveBreakouts having to thread it back out as extra return state.
+            brokenOutIds.forEachIndexed { index, id ->
+                _events.tryEmit(GameEvent.TargetBrokeOut(id, current.field.lifeCount - (index + 1)))
+            }
+            if (leveledUp) {
+                _events.tryEmit(GameEvent.LevelUp(_stateFlow.value.field.level))
+            }
+            // current.field.isClosed already returned this call early above, so a closed field here
+            // is always a fresh transition, not a repeat of one already reported.
+            if (_stateFlow.value.field.isClosed) {
+                _events.tryEmit(GameEvent.GameOver)
+            }
         }
 
     private suspend fun activeTargetsAbsent() =
@@ -202,6 +238,7 @@ class Game(
                 // MC-42 exists to close (level+1 against the still-inactive target set).
                 val updatedField = current.field.updateLevel()
                 _stateFlow.value = GameState(updatedField, recreateTargets(updatedField))
+                _events.tryEmit(GameEvent.LevelUp(updatedField.level))
             }
         }
 
