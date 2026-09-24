@@ -49,6 +49,9 @@ class GameViewModel(
                     state.value.copy(
                         field = field,
                         targetList = if (targets.isNotEmpty()) targets.toImmutableList() else previousTargets,
+                        // isClosed is the engine's own signal, not something a player action drives, so
+                        // it overrides whatever nextPhase computed rather than going through it.
+                        phase = if (field.isClosed) GamePhase.GameOver else state.value.phase,
                     )
                 if (fieldChanged) {
                     gameRepository.updateField(field)
@@ -73,42 +76,17 @@ class GameViewModel(
         viewModelScope.launch {
             action.consumeAsFlow().collect { action ->
                 when (action) {
-                    Action.ReadyToPlayButtonClicked -> {
-                        _state.value =
-                            state.value.copy(
-                                isGamePaused = false,
-                            )
-                    }
-
-                    Action.ShowCountDown -> {
-                        _state.value =
-                            state.value.copy(
-                                isGameStarted = false,
-                            )
-                    }
-
-                    Action.StartGame -> {
-                        _state.value =
-                            state.value.copy(
-                                isGameStarted = true,
-                            )
+                    Action.ReadyToPlayButtonClicked, Action.ShowCountDown, Action.StartGame -> {
+                        _state.value = state.value.copy(phase = nextPhase(state.value.phase, action))
                     }
 
                     Action.PauseGame -> {
                         persistTargetsNow()
-                        _state.value =
-                            state.value.copy(
-                                isGamePaused = true,
-                                isGameStarted = false,
-                            )
+                        _state.value = state.value.copy(phase = nextPhase(state.value.phase, action))
                     }
 
                     Action.RestartGame -> {
-                        _state.value =
-                            state.value.copy(
-                                isGamePaused = true,
-                                isGameStarted = false,
-                            )
+                        _state.value = state.value.copy(phase = nextPhase(state.value.phase, action))
                         persistTargetsNow()
                         updateSession()
                     }
@@ -116,11 +94,7 @@ class GameViewModel(
                     Action.BackToMainMenuClicked -> {
                         persistTargetsNow()
                         _uiEvents.trySend(UiEvent.NavigateToMainMenuScreen)
-                        _state.value =
-                            state.value.copy(
-                                isGamePaused = true,
-                                isGameStarted = false,
-                            )
+                        _state.value = state.value.copy(phase = nextPhase(state.value.phase, action))
                     }
 
                     is Action.TargetClicked -> {
@@ -209,8 +183,7 @@ class GameViewModel(
     data class State(
         val targetList: ImmutableList<Target> = persistentListOf(),
         val field: Field = Field(),
-        val isGamePaused: Boolean = true,
-        val isGameStarted: Boolean = false,
+        val phase: GamePhase = GamePhase.ReadyToPlay,
     )
 
     sealed class UiEvent {
@@ -236,3 +209,52 @@ internal fun shouldPersistTargets(
     fun List<Target>.withoutClock() = map { it.copy(fallenMs = 0, appearanceDelayMs = 0) }
     return previousTargets.withoutClock() != nextTargets.withoutClock()
 }
+
+// The single source of truth for what an action does to the screen's phase, replacing the
+// isGamePaused/isGameStarted pair whose implicit branch order in GameScreen's old `when` made
+// "not started yet" and "paused" the same state (MC-55). field.isClosed -> GamePhase.GameOver is
+// not here: it is the engine's own signal, not a player action, and is applied directly where the
+// field is collected.
+internal fun nextPhase(
+    current: GamePhase,
+    action: GameViewModel.Action,
+): GamePhase =
+    when (action) {
+        GameViewModel.Action.ReadyToPlayButtonClicked -> {
+            if (current == GamePhase.ReadyToPlay || current == GamePhase.Paused) GamePhase.CountingDown else current
+        }
+
+        GameViewModel.Action.ShowCountDown -> {
+            if (current == GamePhase.Playing) GamePhase.CountingDown else current
+        }
+
+        GameViewModel.Action.StartGame -> {
+            if (current == GamePhase.CountingDown) GamePhase.Playing else current
+        }
+
+        // Only Playing can be paused: there is nothing running to pause from GameOver, and the
+        // other phases are already showing their own "not playing yet" screen.
+        GameViewModel.Action.PauseGame -> {
+            if (current == GamePhase.Playing) GamePhase.Paused else current
+        }
+
+        // Both land on Paused regardless of where they started, mirroring the old code's
+        // unconditional isGamePaused = true, isGameStarted = false - a fresh session still needs a
+        // confirmation before the countdown runs, and neither action can ever produce ReadyToPlay
+        // again once a session has started.
+        GameViewModel.Action.RestartGame -> {
+            GamePhase.Paused
+        }
+
+        GameViewModel.Action.BackToMainMenuClicked -> {
+            GamePhase.Paused
+        }
+
+        is GameViewModel.Action.TargetClicked,
+        GameViewModel.Action.FireButtonClicked,
+        is GameViewModel.Action.Tick,
+        GameViewModel.Action.PersistTargetsNow,
+        -> {
+            current
+        }
+    }

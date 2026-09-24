@@ -1,5 +1,7 @@
 <resources>
     <string name="pause">Paused</string>
+    <string name="pause_button">Pause</string>
+    <string name="resume">Resume</string>
     <string name="restart">Restart</string>
     <string name="main_menu">Main Menu</string>
     <string name="game_over">Game\nOver</string>

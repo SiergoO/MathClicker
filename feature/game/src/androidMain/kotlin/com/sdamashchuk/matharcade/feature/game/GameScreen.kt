@@ -20,8 +20,46 @@ fun GameScreen(component: GameComponent) {
             modifier = Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            when {
-                gameState.value.field.isClosed -> {
+            when (gameState.value.phase) {
+                GamePhase.ReadyToPlay -> {
+                    GamePausedOverlay {
+                        component.sendAction(GameViewModel.Action.ReadyToPlayButtonClicked)
+                    }
+                }
+
+                GamePhase.CountingDown -> {
+                    CountdownOverlay {
+                        component.sendAction(GameViewModel.Action.StartGame)
+                    }
+                }
+
+                GamePhase.Playing -> {
+                    // The frame loop lives inside Field's LaunchedEffect, so this guard - not just
+                    // being the body of this branch - is what a test can pin without a Compose rule:
+                    // see shouldComposeField's test for the property that pausing stops the engine.
+                    if (shouldComposeField(gameState.value.phase)) {
+                        Field(
+                            gameState,
+                            onTargetClicked = { id -> component.sendAction(GameViewModel.Action.TargetClicked(id)) },
+                            onFireClicked = { component.sendAction(GameViewModel.Action.FireButtonClicked) },
+                            onTick = { component.sendAction(GameViewModel.Action.Tick(it)) },
+                            onPauseClicked = { component.sendAction(GameViewModel.Action.PauseGame) },
+                        )
+                    }
+                }
+
+                GamePhase.Paused -> {
+                    GamePausedDialog(
+                        onResumeClicked = { component.sendAction(GameViewModel.Action.ReadyToPlayButtonClicked) },
+                        onRestartClicked = { component.sendAction(GameViewModel.Action.RestartGame) },
+                        onBackToMainMenuClicked = { component.sendAction(GameViewModel.Action.BackToMainMenuClicked) },
+                    )
+                }
+
+                // MC-57 adds this phase's UI; unreachable until then.
+                GamePhase.LevelIntro -> {}
+
+                GamePhase.GameOver -> {
                     GameMenuDialog(
                         headerText = stringResource(id = R.string.game_over),
                         onRestartClicked = { component.sendAction(GameViewModel.Action.RestartGame) },
@@ -30,27 +68,6 @@ fun GameScreen(component: GameComponent) {
                                 GameViewModel.Action.BackToMainMenuClicked,
                             )
                         },
-                    )
-                }
-
-                gameState.value.isGamePaused -> {
-                    GamePausedOverlay {
-                        component.sendAction(GameViewModel.Action.ReadyToPlayButtonClicked)
-                    }
-                }
-
-                !gameState.value.isGameStarted -> {
-                    CountdownOverlay {
-                        component.sendAction(GameViewModel.Action.StartGame)
-                    }
-                }
-
-                else -> {
-                    Field(
-                        gameState,
-                        onTargetClicked = { id -> component.sendAction(GameViewModel.Action.TargetClicked(id)) },
-                        onFireClicked = { component.sendAction(GameViewModel.Action.FireButtonClicked) },
-                        onTick = { component.sendAction(GameViewModel.Action.Tick(it)) },
                     )
                 }
             }
@@ -67,3 +84,7 @@ fun GameScreen(component: GameComponent) {
         }
     }
 }
+
+// Field owns the frame loop that drives the engine clock (withFrameNanos -> onTick), so composing
+// it only for Playing is what makes pausing stop that clock structurally rather than via a flag.
+internal fun shouldComposeField(phase: GamePhase) = phase == GamePhase.Playing

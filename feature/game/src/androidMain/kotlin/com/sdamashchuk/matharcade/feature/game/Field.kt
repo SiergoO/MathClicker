@@ -1,6 +1,7 @@
 package com.sdamashchuk.matharcade.feature.game
 
 import android.util.Size
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -53,6 +54,7 @@ fun Field(
     onTargetClicked: (id: Int) -> Unit,
     onFireClicked: () -> Unit,
     onTick: (elapsedMs: Int) -> Unit,
+    onPauseClicked: () -> Unit,
 ) {
     var gameColumnSize by remember { mutableStateOf(Size(0, 0)) }
     val localDensity = LocalDensity.current
@@ -99,6 +101,18 @@ fun Field(
                     id = R.string.game_session_score,
                     gameState.value.field.score,
                 ).toUpperCase(Locale.current),
+            style = MaterialTheme.typography.body1,
+        )
+        // Fixed width, not weight(1f): Level and Score stay centred on each other regardless of
+        // this button's presence.
+        Text(
+            modifier =
+                Modifier
+                    .width(56.dp)
+                    .align(Alignment.CenterVertically)
+                    .clickable(onClick = onPauseClicked),
+            textAlign = TextAlign.Center,
+            text = stringResource(id = R.string.pause_button).toUpperCase(Locale.current),
             style = MaterialTheme.typography.body1,
         )
     }

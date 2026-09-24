@@ -205,4 +205,37 @@ class GameViewModelTest {
                     .toSet(),
             )
         }
+
+    // field.isClosed is the engine's own signal, not a player action, so it is not part of
+    // nextPhase - this pins where it actually gets applied instead: the stateFlow collector.
+    @Test
+    fun `the field closing forces GameOver regardless of the previous phase`() =
+        runTest {
+            val existingTargets =
+                (1..3).map { id ->
+                    Target(
+                        id = id,
+                        relatedFieldId = 5,
+                        columnId = id - 1,
+                        value = 10,
+                        fallenMs = 0,
+                        appearanceDelayMs = 0,
+                        lifetimeMs = 1000,
+                    )
+                }
+            val repository =
+                FakeGameRepository(
+                    unfinishedField = Field(id = 5, level = 1, isClosed = false),
+                    unfinishedTargets = existingTargets,
+                )
+            val game = Game(FakeSessionHelper(targetAmount = 3), CoroutineScope(Dispatchers.Unconfined))
+
+            val viewModel = GameViewModel(game, repository)
+
+            // All three share the same 1000ms lifetime and zero appearance delay, so four 250ms
+            // ticks break them out together, taking lifeCount from 3 (Field's default) to 0 in one step.
+            repeat(4) { game.tick(250) }
+
+            assertEquals(GamePhase.GameOver, viewModel.state.value.phase)
+        }
 }

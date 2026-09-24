@@ -1,7 +1,10 @@
 package com.sdamashchuk.matharcade.feature.game
 
 import com.sdamashchuk.matharcade.core.model.Target
+import com.sdamashchuk.matharcade.feature.game.GameViewModel.Action
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -92,5 +95,127 @@ class GameViewModelLogicTest {
         val previous = listOf(target(id = 1))
         val next = listOf(target(id = 1), target(id = 2))
         assertTrue(shouldPersistTargets(previous, next))
+    }
+
+    @Test
+    fun `nextPhase for ReadyToPlayButtonClicked leaves ReadyToPlay and Paused through CountingDown`() {
+        assertEquals(GamePhase.CountingDown, nextPhase(GamePhase.ReadyToPlay, Action.ReadyToPlayButtonClicked))
+        assertEquals(GamePhase.CountingDown, nextPhase(GamePhase.CountingDown, Action.ReadyToPlayButtonClicked))
+        assertEquals(GamePhase.Playing, nextPhase(GamePhase.Playing, Action.ReadyToPlayButtonClicked))
+        assertEquals(GamePhase.CountingDown, nextPhase(GamePhase.Paused, Action.ReadyToPlayButtonClicked))
+        assertEquals(GamePhase.LevelIntro, nextPhase(GamePhase.LevelIntro, Action.ReadyToPlayButtonClicked))
+        assertEquals(GamePhase.GameOver, nextPhase(GamePhase.GameOver, Action.ReadyToPlayButtonClicked))
+    }
+
+    @Test
+    fun `nextPhase for ShowCountDown only fires while Playing`() {
+        assertEquals(GamePhase.ReadyToPlay, nextPhase(GamePhase.ReadyToPlay, Action.ShowCountDown))
+        assertEquals(GamePhase.CountingDown, nextPhase(GamePhase.CountingDown, Action.ShowCountDown))
+        assertEquals(GamePhase.CountingDown, nextPhase(GamePhase.Playing, Action.ShowCountDown))
+        assertEquals(GamePhase.Paused, nextPhase(GamePhase.Paused, Action.ShowCountDown))
+        assertEquals(GamePhase.LevelIntro, nextPhase(GamePhase.LevelIntro, Action.ShowCountDown))
+        assertEquals(GamePhase.GameOver, nextPhase(GamePhase.GameOver, Action.ShowCountDown))
+    }
+
+    @Test
+    fun `nextPhase for StartGame only fires from CountingDown`() {
+        assertEquals(GamePhase.ReadyToPlay, nextPhase(GamePhase.ReadyToPlay, Action.StartGame))
+        assertEquals(GamePhase.Playing, nextPhase(GamePhase.CountingDown, Action.StartGame))
+        assertEquals(GamePhase.Playing, nextPhase(GamePhase.Playing, Action.StartGame))
+        assertEquals(GamePhase.Paused, nextPhase(GamePhase.Paused, Action.StartGame))
+        assertEquals(GamePhase.LevelIntro, nextPhase(GamePhase.LevelIntro, Action.StartGame))
+        assertEquals(GamePhase.GameOver, nextPhase(GamePhase.GameOver, Action.StartGame))
+    }
+
+    // M1: pausing only ever fires from Playing. GameOver in particular must be refused - there is
+    // nothing running to pause once the game has ended.
+    @Test
+    fun `nextPhase for PauseGame only fires from Playing, and is refused from GameOver`() {
+        assertEquals(GamePhase.ReadyToPlay, nextPhase(GamePhase.ReadyToPlay, Action.PauseGame))
+        assertEquals(GamePhase.CountingDown, nextPhase(GamePhase.CountingDown, Action.PauseGame))
+        assertEquals(GamePhase.Paused, nextPhase(GamePhase.Playing, Action.PauseGame))
+        assertEquals(GamePhase.Paused, nextPhase(GamePhase.Paused, Action.PauseGame))
+        assertEquals(GamePhase.LevelIntro, nextPhase(GamePhase.LevelIntro, Action.PauseGame))
+        assertEquals(GamePhase.GameOver, nextPhase(GamePhase.GameOver, Action.PauseGame))
+    }
+
+    @Test
+    fun `nextPhase for RestartGame always lands on Paused`() {
+        assertEquals(GamePhase.Paused, nextPhase(GamePhase.ReadyToPlay, Action.RestartGame))
+        assertEquals(GamePhase.Paused, nextPhase(GamePhase.CountingDown, Action.RestartGame))
+        assertEquals(GamePhase.Paused, nextPhase(GamePhase.Playing, Action.RestartGame))
+        assertEquals(GamePhase.Paused, nextPhase(GamePhase.Paused, Action.RestartGame))
+        assertEquals(GamePhase.Paused, nextPhase(GamePhase.LevelIntro, Action.RestartGame))
+        assertEquals(GamePhase.Paused, nextPhase(GamePhase.GameOver, Action.RestartGame))
+    }
+
+    @Test
+    fun `nextPhase for BackToMainMenuClicked always lands on Paused`() {
+        assertEquals(GamePhase.Paused, nextPhase(GamePhase.ReadyToPlay, Action.BackToMainMenuClicked))
+        assertEquals(GamePhase.Paused, nextPhase(GamePhase.CountingDown, Action.BackToMainMenuClicked))
+        assertEquals(GamePhase.Paused, nextPhase(GamePhase.Playing, Action.BackToMainMenuClicked))
+        assertEquals(GamePhase.Paused, nextPhase(GamePhase.Paused, Action.BackToMainMenuClicked))
+        assertEquals(GamePhase.Paused, nextPhase(GamePhase.LevelIntro, Action.BackToMainMenuClicked))
+        assertEquals(GamePhase.Paused, nextPhase(GamePhase.GameOver, Action.BackToMainMenuClicked))
+    }
+
+    @Test
+    fun `nextPhase for TargetClicked, FireButtonClicked, Tick and PersistTargetsNow never changes phase`() {
+        val gameplayActions =
+            listOf(Action.TargetClicked(1), Action.FireButtonClicked, Action.Tick(16), Action.PersistTargetsNow)
+        val phases =
+            listOf(
+                GamePhase.ReadyToPlay,
+                GamePhase.CountingDown,
+                GamePhase.Playing,
+                GamePhase.Paused,
+                GamePhase.LevelIntro,
+                GamePhase.GameOver,
+            )
+        phases.forEach { phase ->
+            gameplayActions.forEach { action ->
+                assertEquals(phase, nextPhase(phase, action))
+            }
+        }
+    }
+
+    // M2: resuming from Paused must never drop the player straight into falling targets.
+    @Test
+    fun `leaving Paused lands in CountingDown, never directly in Playing`() {
+        val resumed = nextPhase(GamePhase.Paused, Action.ReadyToPlayButtonClicked)
+        assertEquals(GamePhase.CountingDown, resumed)
+        assertNotEquals(GamePhase.Playing, resumed)
+    }
+
+    // Once a session has started, ReadyToPlay must never come back - it is the boolean-conflation
+    // bug (M5) this task exists to remove. Every action, from every phase but ReadyToPlay itself.
+    @Test
+    fun `ReadyToPlay is not reachable again once the session has started`() {
+        val startedPhases =
+            listOf(
+                GamePhase.CountingDown,
+                GamePhase.Playing,
+                GamePhase.Paused,
+                GamePhase.LevelIntro,
+                GamePhase.GameOver,
+            )
+        val allActions =
+            listOf(
+                Action.ReadyToPlayButtonClicked,
+                Action.ShowCountDown,
+                Action.StartGame,
+                Action.PauseGame,
+                Action.RestartGame,
+                Action.BackToMainMenuClicked,
+                Action.TargetClicked(1),
+                Action.FireButtonClicked,
+                Action.Tick(16),
+                Action.PersistTargetsNow,
+            )
+        startedPhases.forEach { phase ->
+            allActions.forEach { action ->
+                assertNotEquals(GamePhase.ReadyToPlay, nextPhase(phase, action))
+            }
+        }
     }
 }
