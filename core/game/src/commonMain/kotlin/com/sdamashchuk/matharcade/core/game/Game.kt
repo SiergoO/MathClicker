@@ -42,6 +42,14 @@ import kotlin.random.Random
 // floor the moment it resumes. Read from Field's withFrameNanos loop, the sole driver of tick().
 internal const val MAX_TICK_MS = 250
 
+// getNextSignAndDigit redraws rather than offers a press that cannot succeed against anything
+// visible (MC-50). Bounded rather than looped unconditionally: a board every candidate digit range
+// genuinely cannot touch (pathological, but not provably impossible) must still return in finite
+// time. 20 is generous against what that loop actually costs - each attempt is one Random draw and
+// a scan of the visible targets - and the fallback on exhaustion is simply the last draw made, dud
+// or not, which is exactly what every press already tolerated before this task.
+private const val MAX_OPERATION_DRAW_ATTEMPTS = 20
+
 class Game(
     private val sessionHelper: SessionHelper,
     private val scope: CoroutineScope,
@@ -153,7 +161,6 @@ class Game(
     suspend fun fireButtonClicked() =
         mutex.withLock {
             val current = _stateFlow.value
-            val (nextOperationSign, nextOperationDigit) = getNextSignAndDigit()
             val pressOutcome =
                 current.targets.performOperation(
                     current.field.currentOperationSign,
@@ -164,6 +171,15 @@ class Game(
                 pressOutcome.targets
                     .ensureAlive()
                     .ensureVisible()
+            // Drawn against updatedTargets, not the pre-press board: this is the freshest state
+            // available before the draw is promoted to "current" by updateActionButtons below, so a
+            // target this same press just cleared or retired can't be the reason the next offer is a
+            // dud (MC-50). The board can still move again before the draw is actually used - tick()
+            // runs between now and the next press - but that gap is unavoidable without validating
+            // inside performOperation itself, which is deliberately out of scope: a press that turns
+            // out to fail must still cost what it costs.
+            val (nextOperationSign, nextOperationDigit) =
+                getNextSignAndDigit(updatedTargets, current.field.level)
             val streakedField = current.field.advanceStreak(pressOutcome.failed)
             // In Long: totalScore is bounded by the board, but appliedMultiplier is not, so the
             // product is the first place an uncapped streak can overflow.
@@ -300,10 +316,37 @@ class Game(
         }
     }
 
-    private fun getNextSignAndDigit(): Pair<OperationSign, Int> {
-        val nextOperationSign = OperationSign.values().random(random)
-        val nextOperationDigit =
-            sessionHelper.getOperationDigitByLevel(nextOperationSign, _stateFlow.value.field.level)
-        return Pair(nextOperationSign, nextOperationDigit)
+    // Never offers a sign/digit that would fail against every visible target (MC-50): an empty or
+    // fully-hidden board (no visible active target at all) has no dud to avoid, so the first draw is
+    // taken unconditionally rather than looping. Otherwise redraws until one succeeds against at
+    // least one visible active target, or MAX_OPERATION_DRAW_ATTEMPTS is spent, whichever comes
+    // first - see that constant for why the bound and its fallback are safe to fall back on.
+    private fun getNextSignAndDigit(
+        targets: List<Target>,
+        level: Int,
+    ): Pair<OperationSign, Int> {
+        val visibleActiveTargets = targets.filter { it.isActive && it.isVisible }
+        var sign = OperationSign.values().random(random)
+        var digit = sessionHelper.getOperationDigitByLevel(sign, level)
+        var attempts = 1
+        while (
+            visibleActiveTargets.isNotEmpty() &&
+            visibleActiveTargets.none { it.succeedsAgainst(sign, digit) } &&
+            attempts < MAX_OPERATION_DRAW_ATTEMPTS
+        ) {
+            sign = OperationSign.values().random(random)
+            digit = sessionHelper.getOperationDigitByLevel(sign, level)
+            attempts++
+        }
+        return Pair(sign, digit)
     }
 }
+
+private fun Target.succeedsAgainst(
+    sign: OperationSign,
+    digit: Int,
+): Boolean =
+    when (sign) {
+        OperationSign.DIVISION -> digit != 0 && value % digit == 0
+        OperationSign.SUBTRACTION -> value - digit >= 0
+    }
