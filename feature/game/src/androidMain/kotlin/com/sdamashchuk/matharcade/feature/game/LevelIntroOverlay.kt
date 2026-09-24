@@ -19,8 +19,8 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.intl.Locale
 import androidx.compose.ui.text.toUpperCase
+import com.sdamashchuk.matharcade.core.ui.theme.Red500
 import com.sdamashchuk.matharcade.core.ui.theme.Translucent
-import com.sdamashchuk.matharcade.core.ui.theme.White
 import kotlinx.coroutines.delay
 
 private const val FADE_IN_MS = 200
@@ -30,6 +30,9 @@ private const val FADE_OUT_MS = 200
 /**
  * The 800ms `LEVEL N` announcement gating a level-up: no flag stops the fall while this is on
  * screen, the field composable simply isn't in this branch (see GameScreen).
+ *
+ * Red500, not White: Translucent is 40% *white* over a white board, so white text renders
+ * invisible - which is exactly how this shipped its first emulator run.
  */
 @Composable
 fun LevelIntroOverlay(
@@ -62,7 +65,7 @@ fun LevelIntroOverlay(
         Text(
             text = stringResource(id = R.string.game_level_intro, level).toUpperCase(Locale.current),
             style = MaterialTheme.typography.h1,
-            color = White,
+            color = Red500,
         )
     }
 }
