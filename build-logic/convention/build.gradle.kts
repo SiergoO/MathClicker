@@ -1,5 +1,9 @@
 plugins {
     `kotlin-dsl`
+    // Applied directly, not through matharcade.quality: that plugin lives in this very module,
+    // so applying it here would ask the build to compile itself before it can be configured.
+    alias(libs.plugins.detekt)
+    alias(libs.plugins.spotless)
 }
 
 group = "com.sdamashchuk.matharcade.buildlogic"
@@ -45,5 +49,24 @@ gradlePlugin {
             id = "matharcade.kmp.feature"
             implementationClass = "com.sdamashchuk.matharcade.buildlogic.KmpFeatureConventionPlugin"
         }
+    }
+}
+
+detekt {
+    source.setFrom(files("src/main/kotlin"))
+    config.setFrom(files("../../config/detekt/detekt.yml"))
+    buildUponDefaultConfig = true
+    parallel = true
+    failOnSeverity = dev.detekt.gradle.extensions.FailOnSeverity.Warning
+}
+
+spotless {
+    kotlin {
+        target("src/**/*.kt")
+        ktlint(libs.versions.ktlint.get())
+    }
+    kotlinGradle {
+        target("*.gradle.kts")
+        ktlint(libs.versions.ktlint.get())
     }
 }

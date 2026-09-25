@@ -12,8 +12,8 @@ import org.jetbrains.kotlin.gradle.dsl.KotlinAndroidProjectExtension
  * declared lint baseline path (MC-4.3 wires baseline generation and the `check` gate).
  */
 internal fun Project.configureKotlinAndroid(extension: CommonExtension) {
-    extension.compileSdk = 37
-    extension.defaultConfig.minSdk = 24
+    extension.compileSdk = SdkVersions.COMPILE
+    extension.defaultConfig.minSdk = SdkVersions.MIN
     extension.compileOptions.sourceCompatibility = JavaVersion.VERSION_17
     extension.compileOptions.targetCompatibility = JavaVersion.VERSION_17
     extension.lint.baseline = file("lint-baseline.xml")

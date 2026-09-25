@@ -14,9 +14,7 @@ internal val Project.libs: VersionCatalog
     get() = extensions.getByType<VersionCatalogsExtension>().named("libs")
 
 /** Required version string for a catalog version alias (e.g. "agp"). */
-internal fun VersionCatalog.version(alias: String): String =
-    findVersion(alias).get().requiredVersion
+internal fun VersionCatalog.version(alias: String): String = findVersion(alias).get().requiredVersion
 
 /** Dependency provider for a catalog library alias (e.g. "kotlinx-coroutines-core"). */
-internal fun VersionCatalog.library(alias: String): Provider<MinimalExternalModuleDependency> =
-    findLibrary(alias).get()
+internal fun VersionCatalog.library(alias: String): Provider<MinimalExternalModuleDependency> = findLibrary(alias).get()

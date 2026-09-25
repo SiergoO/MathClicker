@@ -11,23 +11,24 @@ import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
  * and Koin in `commonMain`, mirroring the dependencies `app/build.gradle.kts` wires by hand today.
  */
 class KmpFeatureConventionPlugin : Plugin<Project> {
-    override fun apply(target: Project) = with(target) {
-        pluginManager.apply("matharcade.kmp.library")
-        pluginManager.apply("org.jetbrains.kotlin.plugin.compose")
-        pluginManager.apply("org.jetbrains.compose")
+    override fun apply(target: Project) =
+        with(target) {
+            pluginManager.apply("matharcade.kmp.library")
+            pluginManager.apply("org.jetbrains.kotlin.plugin.compose")
+            pluginManager.apply("org.jetbrains.compose")
 
-        extensions.configure<KotlinMultiplatformExtension> {
-            sourceSets.commonMain.dependencies {
-                implementation(libs.library("compose-ui"))
-                implementation(libs.library("compose-foundation"))
-                implementation(libs.library("compose-foundation-layout"))
-                implementation(libs.library("compose-material"))
-                implementation(libs.library("decompose"))
-                implementation(libs.library("decompose-compose"))
-                implementation(libs.library("essenty-lifecycle"))
-                implementation(libs.library("essenty-instance-keeper"))
-                implementation(libs.library("koin-core"))
+            extensions.configure<KotlinMultiplatformExtension> {
+                sourceSets.commonMain.dependencies {
+                    implementation(libs.library("compose-ui"))
+                    implementation(libs.library("compose-foundation"))
+                    implementation(libs.library("compose-foundation-layout"))
+                    implementation(libs.library("compose-material"))
+                    implementation(libs.library("decompose"))
+                    implementation(libs.library("decompose-compose"))
+                    implementation(libs.library("essenty-lifecycle"))
+                    implementation(libs.library("essenty-instance-keeper"))
+                    implementation(libs.library("koin-core"))
+                }
             }
         }
-    }
 }

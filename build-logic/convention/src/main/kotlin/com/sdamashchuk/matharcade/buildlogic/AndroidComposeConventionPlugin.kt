@@ -11,12 +11,13 @@ import org.gradle.kotlin.dsl.configure
  * Compose Multiplatform plugin so `:app`'s dependencies resolve against the CMP BOM.
  */
 class AndroidComposeConventionPlugin : Plugin<Project> {
-    override fun apply(target: Project) = with(target) {
-        pluginManager.apply("org.jetbrains.kotlin.plugin.compose")
-        pluginManager.apply("org.jetbrains.compose")
+    override fun apply(target: Project) =
+        with(target) {
+            pluginManager.apply("org.jetbrains.kotlin.plugin.compose")
+            pluginManager.apply("org.jetbrains.compose")
 
-        extensions.configure<CommonExtension> {
-            buildFeatures.compose = true
+            extensions.configure<CommonExtension> {
+                buildFeatures.compose = true
+            }
         }
-    }
 }

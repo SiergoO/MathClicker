@@ -31,7 +31,6 @@ import javax.inject.Inject
  * and survived past where the splash hands off," not literal proof that Menu composed.
  */
 abstract class AppLaunchCheckTask : DefaultTask() {
-
     @get:InputDirectory
     abstract val apkFolder: DirectoryProperty
 
@@ -59,7 +58,8 @@ abstract class AppLaunchCheckTask : DefaultTask() {
         // would mean nothing. Run it every time check does.
         outputs.upToDateWhen { false }
         group = "verification"
-        description = "Installs and launches the debug app on a connected device, failing if it does not reach its first frame."
+        description =
+            "Installs and launches the debug app on a connected device, failing if it does not reach its first frame."
     }
 
     @TaskAction
@@ -67,7 +67,9 @@ abstract class AppLaunchCheckTask : DefaultTask() {
         val adb = adbExecutable.get().asFile.absolutePath
         val online = onlineDevices(adb)
         if (online.isEmpty()) {
-            skip("no connected device or emulator (`adb devices` found none). Attach one and re-run to exercise this check.")
+            skip(
+                "no connected device or emulator (`adb devices` found none). Attach one and re-run to exercise this check.",
+            )
             return
         }
         val serial = selectSerial(online)
@@ -117,7 +119,9 @@ abstract class AppLaunchCheckTask : DefaultTask() {
         adb: String,
         serial: String,
     ) {
-        check("Status: ok" in startOutput) { launchFailure("ActivityManager rejected the launch", startOutput, adb, serial) }
+        check(
+            "Status: ok" in startOutput,
+        ) { launchFailure("ActivityManager rejected the launch", startOutput, adb, serial) }
         check("Activity not started" !in startOutput) {
             launchFailure(
                 "am start warned the activity was not started — a warm process was already on top " +
@@ -132,7 +136,12 @@ abstract class AppLaunchCheckTask : DefaultTask() {
         // ClassCastException thrown during Compose's first composition never reaches that point:
         // Status still reads "ok" but TotalTime is missing, which is exactly what a manual
         // reproduction of MC-26's target bug showed.
-        val totalTime = Regex("TotalTime:\\s*(\\d+)").find(startOutput)?.groupValues?.get(1)?.toIntOrNull()
+        val totalTime =
+            Regex("TotalTime:\\s*(\\d+)")
+                .find(startOutput)
+                ?.groupValues
+                ?.get(1)
+                ?.toIntOrNull()
         check(totalTime != null && totalTime > 0) {
             launchFailure("app never reported a nonzero TotalTime (first frame displayed)", startOutput, adb, serial)
         }
@@ -148,7 +157,8 @@ abstract class AppLaunchCheckTask : DefaultTask() {
         // fast enough can already be in the buffer by the time `am start -W` returns, and an
         // exception without its stack trace tells nobody what actually happened.
         val crash = adbOut(adb, "-s", serial, "logcat", "-b", "crash", "-d").trim()
-        val crashSection = if (crash.isEmpty()) "no crash captured in the crash log buffer yet" else "crash log:\n$crash"
+        val crashSection =
+            if (crash.isEmpty()) "no crash captured in the crash log buffer yet" else "crash log:\n$crash"
         return "$reason on $serial:\n$startOutput\n$crashSection"
     }
 
@@ -206,7 +216,9 @@ abstract class AppLaunchCheckTask : DefaultTask() {
     private fun selectSerial(online: List<String>): String {
         val requested = requestedSerial.orNull
         if (requested != null) {
-            check(requested in online) { "ANDROID_SERIAL=$requested is set but is not among the connected devices: $online" }
+            check(
+                requested in online,
+            ) { "ANDROID_SERIAL=$requested is set but is not among the connected devices: $online" }
             return requested
         }
         check(online.size == 1) {
@@ -244,7 +256,8 @@ abstract class AppLaunchCheckTask : DefaultTask() {
 
     private fun loadApk(): String {
         val builtArtifacts = builtArtifactsLoader.get().load(apkFolder.get())
-        val element = checkNotNull(builtArtifacts?.elements?.firstOrNull()) { "no APK was produced in ${apkFolder.get()}" }
+        val element =
+            checkNotNull(builtArtifacts?.elements?.firstOrNull()) { "no APK was produced in ${apkFolder.get()}" }
         return element.outputFile
     }
 

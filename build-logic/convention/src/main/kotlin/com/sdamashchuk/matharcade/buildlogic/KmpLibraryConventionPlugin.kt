@@ -20,37 +20,38 @@ import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
  * synthesized per `.gradle.kts` script, not a compiled extension function a plugin class can call.
  */
 class KmpLibraryConventionPlugin : Plugin<Project> {
-    override fun apply(target: Project) = with(target) {
-        pluginManager.apply("org.jetbrains.kotlin.multiplatform")
-        pluginManager.apply("com.android.kotlin.multiplatform.library")
-        pluginManager.apply("matharcade.quality")
+    override fun apply(target: Project) =
+        with(target) {
+            pluginManager.apply("org.jetbrains.kotlin.multiplatform")
+            pluginManager.apply("com.android.kotlin.multiplatform.library")
+            pluginManager.apply("matharcade.quality")
 
-        extensions.configure<KotlinMultiplatformExtension> {
-            extensions.configure(KotlinMultiplatformAndroidLibraryTarget::class.java) {
-                namespace = namespaceFromPath
-                compileSdk = 37
-                minSdk = 24
-                withHostTest {}
-                compilerOptions {
-                    jvmTarget.set(JvmTarget.JVM_17)
+            extensions.configure<KotlinMultiplatformExtension> {
+                extensions.configure(KotlinMultiplatformAndroidLibraryTarget::class.java) {
+                    namespace = namespaceFromPath
+                    compileSdk = SdkVersions.COMPILE
+                    minSdk = SdkVersions.MIN
+                    withHostTest {}
+                    compilerOptions {
+                        jvmTarget.set(JvmTarget.JVM_17)
+                    }
+                    // No lint block on purpose. AGP 9.2.1's KMP library plugin creates only
+                    // lintAnalyzeAndroidHostTest for this module — no production analysis task and no
+                    // report — so a lint { } here is accepted, configures nothing that runs, and reads
+                    // as coverage that does not exist. :core therefore has no Android lint; detekt and
+                    // spotless do cover it. MC-6.6 re-checks whether a later AGP creates the tasks.
                 }
-                // No lint block on purpose. AGP 9.2.1's KMP library plugin creates only
-                // lintAnalyzeAndroidHostTest for this module — no production analysis task and no
-                // report — so a lint { } here is accepted, configures nothing that runs, and reads
-                // as coverage that does not exist. :core therefore has no Android lint; detekt and
-                // spotless do cover it. MC-6.6 re-checks whether a later AGP creates the tasks.
-            }
 
-            iosArm64()
-            iosSimulatorArm64()
+                iosArm64()
+                iosSimulatorArm64()
 
-            // kotlin.test only. Coroutines are not every module's business — pushing them in
-            // here put kotlinx-coroutines-core into :core:model, whose whole reason to exist is
-            // depending on nothing, and a convention that hands out runtime libraries makes each
-            // module's real dependencies unreadable from its own build file.
-            sourceSets.commonTest.dependencies {
-                implementation(kotlin("test"))
+                // kotlin.test only. Coroutines are not every module's business — pushing them in
+                // here put kotlinx-coroutines-core into :core:model, whose whole reason to exist is
+                // depending on nothing, and a convention that hands out runtime libraries makes each
+                // module's real dependencies unreadable from its own build file.
+                sourceSets.commonTest.dependencies {
+                    implementation(kotlin("test"))
+                }
             }
         }
-    }
 }

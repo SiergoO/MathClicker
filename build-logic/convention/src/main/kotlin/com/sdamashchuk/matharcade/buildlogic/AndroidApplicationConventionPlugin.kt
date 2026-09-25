@@ -19,27 +19,28 @@ import org.gradle.kotlin.dsl.register
  * off; applying org.jetbrains.kotlin.android alongside it is a hard error.
  */
 class AndroidApplicationConventionPlugin : Plugin<Project> {
-    override fun apply(target: Project) = with(target) {
-        pluginManager.apply("com.android.application")
-        pluginManager.apply("matharcade.quality")
+    override fun apply(target: Project) =
+        with(target) {
+            pluginManager.apply("com.android.application")
+            pluginManager.apply("matharcade.quality")
 
-        extensions.configure<ApplicationExtension> {
-            configureKotlinAndroid(this)
-            defaultConfig.targetSdk = 33
-            packaging { }
-        }
+            extensions.configure<ApplicationExtension> {
+                configureKotlinAndroid(this)
+                defaultConfig.targetSdk = SdkVersions.TARGET
+                packaging { }
+            }
 
-        val androidComponents = extensions.getByType<ApplicationAndroidComponentsExtension>()
-        androidComponents.onVariants(androidComponents.selector().withBuildType("debug")) { variant ->
-            val checkAppLaunch =
-                tasks.register<AppLaunchCheckTask>("checkAppLaunch") {
-                    apkFolder.set(variant.artifacts.get(SingleArtifact.APK))
-                    builtArtifactsLoader.set(variant.artifacts.getBuiltArtifactsLoader())
-                    applicationId.set(variant.applicationId)
-                    adbExecutable.set(androidComponents.sdkComponents.adb)
-                    requestedSerial.set(providers.environmentVariable("ANDROID_SERIAL"))
-                }
-            tasks.named<Task>("check") { dependsOn(checkAppLaunch) }
+            val androidComponents = extensions.getByType<ApplicationAndroidComponentsExtension>()
+            androidComponents.onVariants(androidComponents.selector().withBuildType("debug")) { variant ->
+                val checkAppLaunch =
+                    tasks.register<AppLaunchCheckTask>("checkAppLaunch") {
+                        apkFolder.set(variant.artifacts.get(SingleArtifact.APK))
+                        builtArtifactsLoader.set(variant.artifacts.getBuiltArtifactsLoader())
+                        applicationId.set(variant.applicationId)
+                        adbExecutable.set(androidComponents.sdkComponents.adb)
+                        requestedSerial.set(providers.environmentVariable("ANDROID_SERIAL"))
+                    }
+                tasks.named<Task>("check") { dependsOn(checkAppLaunch) }
+            }
         }
-    }
 }
