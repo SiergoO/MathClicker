@@ -44,6 +44,7 @@ import androidx.compose.ui.text.toUpperCase
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.sdamashchuk.matharcade.core.model.GAME_COLUMN_COUNT
+import com.sdamashchuk.matharcade.core.model.INITIAL_LIFE_COUNT
 import com.sdamashchuk.matharcade.core.ui.theme.Red200
 import com.sdamashchuk.matharcade.core.ui.theme.Red500
 import com.sdamashchuk.matharcade.core.ui.theme.White
@@ -185,7 +186,7 @@ fun Field(
                     .fillMaxWidth(),
             verticalArrangement = Arrangement.Top,
         ) {
-            repeat(3) {
+            repeat(calculateLifeSlotCount(gameState.value.field.lifeCount)) {
                 Divider(color = if (it < gameState.value.field.lifeCount) Red500 else Color.LightGray, thickness = 3.dp)
                 Spacer(modifier = Modifier.padding(bottom = 2.dp))
             }
@@ -244,6 +245,10 @@ fun Field(
         }
     }
 }
+
+// maxOf, not the bare cap: a lifeCount above INITIAL_LIFE_COUNT (a future random-event grant -
+// see LifeBonusTest) must still get a slot, or the extra life stays invisible.
+internal fun calculateLifeSlotCount(lifeCount: Int): Int = maxOf(INITIAL_LIFE_COUNT, lifeCount)
 
 // The dividers between columns cost one gap fewer than there are columns.
 internal fun calculateGameColumnWidth(measuredWidthDp: Int): Int =
