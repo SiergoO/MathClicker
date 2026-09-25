@@ -1,11 +1,14 @@
 package com.sdamashchuk.matharcade.feature.game
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
@@ -53,25 +56,38 @@ fun ResultsScreen(
             style = MaterialTheme.typography.h1,
         )
         SummaryText(resultsSummaryOf(field, bestResult))
-        ResultsTable(
-            recentResults = recentResults,
-            bestResultId = bestResult?.id,
+        // Table and buttons are one group centred in the space left below the header, so a
+        // two-row history (new install) and a ten-row one both read as deliberate instead of the
+        // table stranding the buttons above an empty half-screen (MC-75). verticalScroll is the
+        // fallback if a large font scale ever makes the group taller than that space.
+        Column(
             modifier =
                 Modifier
                     .weight(1f)
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 8.dp),
-        )
-        MenuButton(
-            modifier = Modifier.padding(bottom = 12.dp),
-            text = stringResource(id = R.string.restart),
-            onClick = onRestartClicked,
-        )
-        MenuButton(
-            modifier = Modifier.padding(bottom = 12.dp),
-            text = stringResource(id = R.string.main_menu),
-            onClick = onBackToMainMenuClicked,
-        )
+                    .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            ResultsTable(
+                recentResults = recentResults,
+                bestResultId = bestResult?.id,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp, vertical = 8.dp),
+            )
+            MenuButton(
+                modifier = Modifier.padding(bottom = 12.dp),
+                text = stringResource(id = R.string.restart),
+                onClick = onRestartClicked,
+            )
+            MenuButton(
+                modifier = Modifier.padding(bottom = 12.dp),
+                text = stringResource(id = R.string.main_menu),
+                onClick = onBackToMainMenuClicked,
+            )
+        }
     }
 }
 
