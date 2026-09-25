@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.consumeAsFlow
 import kotlinx.coroutines.launch
+import kotlin.time.Clock
 
 class GameViewModel(
     private val game: Game,
@@ -125,6 +126,7 @@ class GameViewModel(
                     Action.RestartGame -> {
                         _state.value = state.value.copy(phase = nextPhase(state.value.phase, action))
                         persistTargetsNow()
+                        abandonUnfinishedField()
                         updateSession()
                     }
 
@@ -172,6 +174,18 @@ class GameViewModel(
                 recentResults = gameRepository.getRecentClosedFields().toImmutableList(),
                 bestResult = gameRepository.getBestClosedField(),
             )
+    }
+
+    // Restart from Paused otherwise hands the open field straight back: getUnfinishedField() in
+    // updateSession() below would restore the very session Restart was asked to discard (MC-66).
+    // From GameOver the field is already closed by Game itself, so this is a no-op there - the two
+    // call sites end up meaning the same thing without a phase check. The abandoned run is left
+    // closed rather than deleted, so it can still surface in results history the same way a run
+    // that ended in GameOver does - the player still reached this score, they just chose to stop.
+    private suspend fun abandonUnfinishedField() {
+        val field = state.value.field
+        if (field.id == 0 || field.isClosed) return
+        gameRepository.updateField(field.copy(isClosed = true, finishedAt = Clock.System.now().toEpochMilliseconds()))
     }
 
     private suspend fun updateSession() {
