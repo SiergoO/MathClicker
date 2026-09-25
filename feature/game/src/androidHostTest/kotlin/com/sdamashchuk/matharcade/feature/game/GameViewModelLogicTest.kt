@@ -160,13 +160,15 @@ class GameViewModelLogicTest {
     }
 
     @Test
-    fun `nextPhase for RestartGame always lands on Paused`() {
-        assertEquals(GamePhase.Paused, nextPhase(GamePhase.ReadyToPlay, Action.RestartGame))
-        assertEquals(GamePhase.Paused, nextPhase(GamePhase.CountingDown, Action.RestartGame))
-        assertEquals(GamePhase.Paused, nextPhase(GamePhase.Playing, Action.RestartGame))
-        assertEquals(GamePhase.Paused, nextPhase(GamePhase.Paused, Action.RestartGame))
-        assertEquals(GamePhase.Paused, nextPhase(GamePhase.LevelIntro, Action.RestartGame))
-        assertEquals(GamePhase.Paused, nextPhase(GamePhase.GameOver, Action.RestartGame))
+    fun `nextPhase for RestartGame always lands on ReadyToPlay`() {
+        // MC-77: Paused specifically must not map to Paused - that is the case where the player
+        // pressed Restart and saw nothing change, while the session had in fact restarted.
+        assertEquals(GamePhase.ReadyToPlay, nextPhase(GamePhase.ReadyToPlay, Action.RestartGame))
+        assertEquals(GamePhase.ReadyToPlay, nextPhase(GamePhase.CountingDown, Action.RestartGame))
+        assertEquals(GamePhase.ReadyToPlay, nextPhase(GamePhase.Playing, Action.RestartGame))
+        assertEquals(GamePhase.ReadyToPlay, nextPhase(GamePhase.Paused, Action.RestartGame))
+        assertEquals(GamePhase.ReadyToPlay, nextPhase(GamePhase.LevelIntro, Action.RestartGame))
+        assertEquals(GamePhase.ReadyToPlay, nextPhase(GamePhase.GameOver, Action.RestartGame))
     }
 
     @Test
@@ -208,9 +210,13 @@ class GameViewModelLogicTest {
     }
 
     // Once a session has started, ReadyToPlay must never come back - it is the boolean-conflation
-    // bug (M5) this task exists to remove. Every action, from every phase but ReadyToPlay itself.
+    // bug (M5) MC-55 exists to remove: resuming, ticking or pausing must not slip back to the
+    // pre-game screen. MC-77 carves out RestartGame and only RestartGame, because that action does
+    // genuinely begin a new session, and a new session's own screen is exactly ReadyToPlay. The
+    // exclusion is one named action rather than a relaxed assertion: every other way back is still
+    // forbidden here.
     @Test
-    fun `ReadyToPlay is not reachable again once the session has started`() {
+    fun `ReadyToPlay is not reachable again once the session has started - except by restarting`() {
         val startedPhases =
             listOf(
                 GamePhase.CountingDown,
@@ -226,7 +232,6 @@ class GameViewModelLogicTest {
                 Action.StartGame,
                 Action.LevelIntroFinished,
                 Action.PauseGame,
-                Action.RestartGame,
                 Action.BackToMainMenuClicked,
                 Action.TargetClicked(1),
                 Action.FireButtonClicked,

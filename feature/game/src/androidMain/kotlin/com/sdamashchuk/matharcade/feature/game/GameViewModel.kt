@@ -337,12 +337,14 @@ internal fun nextPhase(
             current.transitionTo(GamePhase.Playing, to = GamePhase.Paused)
         }
 
-        // Both land on Paused regardless of where they started, mirroring the old code's
-        // unconditional isGamePaused = true, isGameStarted = false - a fresh session still needs a
-        // confirmation before the countdown runs, and neither action can ever produce ReadyToPlay
-        // again once a session has started.
+        // MC-77: ReadyToPlay, not Paused. Landing on Paused was invisible from Paused itself - the
+        // session really did restart underneath (score 1 -> 0 on a device) while the pause menu
+        // stayed up, so Restart read as a dead button until the player pressed Resume. The old
+        // comment argued ReadyToPlay could never be reached again once a session had started, which
+        // was true only while that phase shared the paused overlay's composable; MC-64 split them,
+        // and a fresh session showing "touch screen to start" is exactly what this phase is for.
         GameViewModel.Action.RestartGame -> {
-            GamePhase.Paused
+            GamePhase.ReadyToPlay
         }
 
         GameViewModel.Action.BackToMainMenuClicked -> {
