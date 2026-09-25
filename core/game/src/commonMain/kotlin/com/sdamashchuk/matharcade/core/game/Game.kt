@@ -203,61 +203,69 @@ class Game(
     // step. Targets are never rewritten here (MC-72: their schedule is stable, only the clock they
     // are read against moves); this is now the only way a target is revealed or breaks out, there
     // is no equivalent UI-driven call left.
-    suspend fun tick(elapsedMs: Int) =
-        mutex.withLock {
-            val current = _stateFlow.value
-            if (current.field.isClosed || current.targets.none { it.isActive }) return@withLock
-            val step = elapsedMs.coerceIn(0, MAX_TICK_MS)
-            val hadVisibleActiveTarget = current.targets.any { it.isActive && it.isVisible(current.field.gameTimeMs) }
+    //
+    // clockScale is MC-74's freeze/slow seam: a coefficient on this call's own step, defaulted to
+    // 1.0 so every existing caller (there is no consumer of a non-default value yet) reproduces
+    // today's arithmetic exactly. It is a parameter, not state Game or Field carries between calls -
+    // Field is persisted, and a freeze that survives killing and relaunching the app is a bug, not a
+    // feature. A future caller drives it every frame, the same way the UI already drives elapsedMs.
+    suspend fun tick(
+        elapsedMs: Int,
+        clockScale: Double = 1.0,
+    ) = mutex.withLock {
+        val current = _stateFlow.value
+        if (current.field.isClosed || current.targets.none { it.isActive }) return@withLock
+        val step = scaleTickStep(elapsedMs, clockScale, MAX_TICK_MS)
+        val hadVisibleActiveTarget = current.targets.any { it.isActive && it.isVisible(current.field.gameTimeMs) }
 
-            val advancedField = current.field.advanceClock(step)
-            val brokenOutIds =
-                current.targets.filter { it.isActive && it.hasBrokenOut(advancedField.gameTimeMs) }.map { it.id }
-            val (fieldAfterBreakout, targetsAfterBreakout) =
-                resolveBreakouts(current.targets, brokenOutIds, advancedField)
+        val advancedField = current.field.advanceClock(step)
+        val brokenOutIds =
+            current.targets.filter { it.isActive && it.hasBrokenOut(advancedField.gameTimeMs) }.map { it.id }
+        val (fieldAfterBreakout, targetsAfterBreakout) =
+            resolveBreakouts(current.targets, brokenOutIds, advancedField)
 
-            // Fired on the edge - a visible active target existed before this step and does not
-            // after - never on the level, or the draw count this makes would depend on frame rate
-            // instead of game events (see shortenAppearanceDelay's own determinism guarantee).
-            val stillWaiting =
-                hadVisibleActiveTarget &&
-                    targetsAfterBreakout.none { it.isActive && it.isVisible(advancedField.gameTimeMs) }
-            val targetsAfterShorten =
-                if (stillWaiting) {
-                    targetsAfterBreakout.shortenAppearanceDelay(advancedField.gameTimeMs)
-                } else {
-                    targetsAfterBreakout
-                }
-
-            // fieldAfterBreakout can already be closed here - the breakout that emptied the board
-            // is also the one that cost the last life. A closed field must not level up or get a
-            // fresh target set for a session that is already over (MC-59), so the board is instead
-            // published exactly as resolveBreakouts left it: the just-broken-out targets, inactive,
-            // not a recreated set.
-            val leveledUp = targetsAfterShorten.none { it.isActive } && !fieldAfterBreakout.isClosed
-            _stateFlow.value =
-                if (leveledUp) {
-                    val leveledField = fieldAfterBreakout.updateLevel()
-                    GameState(leveledField, recreateTargets(leveledField))
-                } else {
-                    GameState(fieldAfterBreakout, targetsAfterShorten)
-                }
-
-            // lifeCount is decremented by exactly one per id, in this same order, inside
-            // resolveBreakouts - so the i-th id's own post-breakout count is derivable here without
-            // resolveBreakouts having to thread it back out as extra return state.
-            brokenOutIds.forEachIndexed { index, id ->
-                _events.tryEmit(GameEvent.TargetBrokeOut(id, current.field.lifeCount - (index + 1)))
+        // Fired on the edge - a visible active target existed before this step and does not
+        // after - never on the level, or the draw count this makes would depend on frame rate
+        // instead of game events (see shortenAppearanceDelay's own determinism guarantee).
+        val stillWaiting =
+            hadVisibleActiveTarget &&
+                targetsAfterBreakout.none { it.isActive && it.isVisible(advancedField.gameTimeMs) }
+        val targetsAfterShorten =
+            if (stillWaiting) {
+                targetsAfterBreakout.shortenAppearanceDelay(advancedField.gameTimeMs)
+            } else {
+                targetsAfterBreakout
             }
+
+        // fieldAfterBreakout can already be closed here - the breakout that emptied the board
+        // is also the one that cost the last life. A closed field must not level up or get a
+        // fresh target set for a session that is already over (MC-59), so the board is instead
+        // published exactly as resolveBreakouts left it: the just-broken-out targets, inactive,
+        // not a recreated set.
+        val leveledUp = targetsAfterShorten.none { it.isActive } && !fieldAfterBreakout.isClosed
+        _stateFlow.value =
             if (leveledUp) {
-                _events.tryEmit(GameEvent.LevelUp(_stateFlow.value.field.level))
+                val leveledField = fieldAfterBreakout.updateLevel()
+                GameState(leveledField, recreateTargets(leveledField))
+            } else {
+                GameState(fieldAfterBreakout, targetsAfterShorten)
             }
-            // current.field.isClosed already returned this call early above, so a closed field here
-            // is always a fresh transition, not a repeat of one already reported.
-            if (_stateFlow.value.field.isClosed) {
-                _events.tryEmit(GameEvent.GameOver)
-            }
+
+        // lifeCount is decremented by exactly one per id, in this same order, inside
+        // resolveBreakouts - so the i-th id's own post-breakout count is derivable here without
+        // resolveBreakouts having to thread it back out as extra return state.
+        brokenOutIds.forEachIndexed { index, id ->
+            _events.tryEmit(GameEvent.TargetBrokeOut(id, current.field.lifeCount - (index + 1)))
         }
+        if (leveledUp) {
+            _events.tryEmit(GameEvent.LevelUp(_stateFlow.value.field.level))
+        }
+        // current.field.isClosed already returned this call early above, so a closed field here
+        // is always a fresh transition, not a repeat of one already reported.
+        if (_stateFlow.value.field.isClosed) {
+            _events.tryEmit(GameEvent.GameOver)
+        }
+    }
 
     // No caller today - MC-76 removed the every-N-levels trigger MC-54 wired through updateLevel,
     // but kept the grant itself as the mechanism a future random event calls. Mutex-guarded like

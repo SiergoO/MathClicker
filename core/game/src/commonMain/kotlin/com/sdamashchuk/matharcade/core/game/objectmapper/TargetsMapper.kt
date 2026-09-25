@@ -31,6 +31,30 @@ internal fun List<Target>.decrementValue(
         }
     }
 
+// The floor a hold's clamp below coerces finishesAtMs against - strictly after appearsAtMs, never
+// equal to it, so the result can never reopen Target.position's own zero-span guard.
+private const val MIN_TARGET_SPAN_MS = 1L
+
+// The two single-target axis effects from MC-71's design doc collapse into one function: a positive
+// byMs holds the target (finishesAtMs += x), a negative one speeds it up (finishesAtMs -= x).
+// appearsAtMs never moves - shifting both ends would slide the whole flight rather than hold or
+// hurry it. A no-op on every other id, and on this id too once it is inactive or has already broken
+// out against gameTimeMs (checked independently of isActive, not assumed redundant with it, since a
+// restored row could in principle carry a stale isActive against a finishesAtMs already in the
+// past). The coerceAtLeast floor is what stops a large enough speed-up from inverting the span.
+internal fun List<Target>.shiftFinish(
+    id: Int,
+    byMs: Long,
+    gameTimeMs: Long,
+): List<Target> =
+    this.map {
+        if (id == it.id && it.isActive && !it.hasBrokenOut(gameTimeMs)) {
+            it.copy(finishesAtMs = (it.finishesAtMs + byMs).coerceAtLeast(it.appearsAtMs + MIN_TARGET_SPAN_MS))
+        } else {
+            it
+        }
+    }
+
 internal fun List<Target>.ensureAlive(): List<Target> =
     this.map {
         it.copy(

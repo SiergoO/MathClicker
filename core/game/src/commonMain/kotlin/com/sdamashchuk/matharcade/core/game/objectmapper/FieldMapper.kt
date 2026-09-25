@@ -16,6 +16,14 @@ internal fun Field.decrementLifeCount(decrement: Int): Field {
 // what the design doc asks not to do.
 internal fun Field.advanceClock(stepMs: Int): Field = copy(gameTimeMs = gameTimeMs + stepMs)
 
+// The whole-axis rewind effect from MC-71's design doc: gameTimeMs -= x, with every target's
+// derived position/visibility/breakout rising back up on its own - no target is touched. Clamped at
+// 0, the clock's own origin, rather than allowed negative. isClosed, finishedAt and lifeCount are
+// deliberately untouched: they are real, owned state written once by closeIfNecessary and
+// decrementLifeCount, never derived from gameTimeMs, so winding the clock back cannot reopen a
+// closed field or hand back a spent life - the resurrection this operation must never cause.
+internal fun Field.rewind(byMs: Long): Field = copy(gameTimeMs = (gameTimeMs - byMs).coerceAtLeast(0L))
+
 // nowMs comes from Game's own injected Clock rather than being read here, the same reason
 // getNextSignAndDigit takes Game's Random instead of drawing its own - two engines seeded alike
 // (GameSimulationTest, GameTest) must play out identically, wall-clock time included. isClosed is

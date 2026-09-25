@@ -126,6 +126,33 @@ class FieldMapperTest {
     }
 
     @Test
+    fun `rewind subtracts byMs from gameTimeMs when it does not cross zero`() {
+        assertEquals(4750L, Field(gameTimeMs = 5000).rewind(250).gameTimeMs)
+    }
+
+    // M1: removing the coerceAtLeast(0L) clamp lets this go negative instead.
+    @Test
+    fun `rewind clamps at zero rather than letting the clock go negative`() {
+        assertEquals(0L, Field(gameTimeMs = 100).rewind(500).gameTimeMs)
+    }
+
+    // M2: a rewind that "helpfully" restores a spent life or reopens a closed field once gameTimeMs
+    // winds back before finishedAt would be exactly the resurrection this operation must never
+    // cause - isClosed, lifeCount and finishedAt are real, owned state, never derived from the
+    // clock, so rewind must leave every one of them exactly as it found them.
+    @Test
+    fun `rewind never restores lifeCount or reopens an already closed field`() {
+        val closed = Field(gameTimeMs = 5000, lifeCount = 0, isClosed = true, finishedAt = 1000L)
+
+        val rewound = closed.rewind(10_000)
+
+        assertEquals(0L, rewound.gameTimeMs)
+        assertTrue(rewound.isClosed)
+        assertEquals(0, rewound.lifeCount)
+        assertEquals(1000L, rewound.finishedAt)
+    }
+
+    @Test
     fun `updateActionButtons promotes the pending operation and queues a new one`() {
         val field =
             Field(

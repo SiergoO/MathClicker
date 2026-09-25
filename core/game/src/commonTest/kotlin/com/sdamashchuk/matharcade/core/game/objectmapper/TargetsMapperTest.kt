@@ -161,4 +161,79 @@ class TargetsMapperTest {
 
         assertEquals(targets, shortened)
     }
+
+    @Test
+    fun `shiftFinish holds a target by adding to finishesAtMs without moving appearsAtMs`() {
+        val targets = listOf(target(id = 1, appearsAtMs = 0, finishesAtMs = 1000))
+
+        val held = targets.shiftFinish(id = 1, byMs = 500, gameTimeMs = 0)
+
+        assertEquals(0L, held.first().appearsAtMs)
+        assertEquals(1500L, held.first().finishesAtMs)
+    }
+
+    @Test
+    fun `shiftFinish speeds a target up by subtracting from finishesAtMs`() {
+        val targets = listOf(target(id = 1, appearsAtMs = 0, finishesAtMs = 1000))
+
+        val sped = targets.shiftFinish(id = 1, byMs = -400, gameTimeMs = 0)
+
+        assertEquals(600L, sped.first().finishesAtMs)
+    }
+
+    // M4: shifting appearsAtMs alongside finishesAtMs would slide the whole flight instead of
+    // holding or hurrying it - this pins appearsAtMs as untouched regardless of byMs's sign.
+    @Test
+    fun `shiftFinish never changes appearsAtMs`() {
+        val targets = listOf(target(id = 1, appearsAtMs = 200, finishesAtMs = 1000))
+
+        val held = targets.shiftFinish(id = 1, byMs = 5000, gameTimeMs = 0)
+        val sped = targets.shiftFinish(id = 1, byMs = -5000, gameTimeMs = 0)
+
+        assertEquals(200L, held.first().appearsAtMs)
+        assertEquals(200L, sped.first().appearsAtMs)
+    }
+
+    // M5: removing the coerceAtLeast floor would let a large enough speed-up push finishesAtMs at
+    // or below appearsAtMs, reopening Target.position's own zero-span guard.
+    @Test
+    fun `shiftFinish clamps a large speed-up so the span never inverts`() {
+        val targets = listOf(target(id = 1, appearsAtMs = 1000, finishesAtMs = 1200))
+
+        val sped = targets.shiftFinish(id = 1, byMs = -10_000, gameTimeMs = 0)
+
+        assertTrue(sped.first().finishesAtMs > sped.first().appearsAtMs)
+    }
+
+    @Test
+    fun `shiftFinish only ever touches the target with the matching id`() {
+        val targets =
+            listOf(
+                target(id = 1, appearsAtMs = 0, finishesAtMs = 1000),
+                target(id = 2, appearsAtMs = 0, finishesAtMs = 1000),
+            )
+
+        val held = targets.shiftFinish(id = 1, byMs = 500, gameTimeMs = 0)
+
+        assertEquals(1500L, held.first { it.id == 1 }.finishesAtMs)
+        assertEquals(1000L, held.first { it.id == 2 }.finishesAtMs)
+    }
+
+    @Test
+    fun `shiftFinish is a no-op on an inactive target`() {
+        val targets = listOf(target(id = 1, appearsAtMs = 0, finishesAtMs = 1000, isActive = false))
+
+        val held = targets.shiftFinish(id = 1, byMs = 500, gameTimeMs = 0)
+
+        assertEquals(targets, held)
+    }
+
+    @Test
+    fun `shiftFinish is a no-op on a target that has already broken out`() {
+        val targets = listOf(target(id = 1, appearsAtMs = 0, finishesAtMs = 1000))
+
+        val held = targets.shiftFinish(id = 1, byMs = 500, gameTimeMs = 1000)
+
+        assertEquals(targets, held)
+    }
 }
