@@ -20,15 +20,18 @@ import androidx.compose.ui.text.intl.Locale
 import androidx.compose.ui.text.toUpperCase
 import com.sdamashchuk.matharcade.core.ui.theme.Red200
 import com.sdamashchuk.matharcade.core.ui.theme.Translucent
-import com.sdamashchuk.matharcade.core.ui.theme.White
 import io.github.alexzhirkevich.compottie.Compottie
 import io.github.alexzhirkevich.compottie.DotLottie
 import io.github.alexzhirkevich.compottie.LottieCompositionSpec
 import io.github.alexzhirkevich.compottie.rememberLottieComposition
 import io.github.alexzhirkevich.compottie.rememberLottiePainter
 
+/**
+ * GamePhase.ReadyToPlay's pre-game screen - a game that hasn't started can't be "paused", so this
+ * carries no pause label. The tap-highlight animation plus the hint below it already say what to do.
+ */
 @Composable
-fun GamePausedOverlay(onClick: () -> Unit) {
+fun ReadyToPlayOverlay(onClick: () -> Unit) {
     Column(
         modifier =
             Modifier
@@ -49,11 +52,6 @@ fun GamePausedOverlay(onClick: () -> Unit) {
             Image(
                 painter = rememberLottiePainter(composition = composition, iterations = Compottie.IterateForever),
                 contentDescription = null,
-            )
-            Text(
-                text = stringResource(id = R.string.pause).toUpperCase(Locale.current),
-                style = MaterialTheme.typography.body1,
-                color = White,
             )
         }
         Text(

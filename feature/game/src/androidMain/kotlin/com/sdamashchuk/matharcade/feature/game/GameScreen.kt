@@ -72,7 +72,7 @@ fun GameScreen(component: GameComponent) {
             ) {
                 when (gameState.value.phase) {
                     GamePhase.ReadyToPlay -> {
-                        GamePausedOverlay {
+                        ReadyToPlayOverlay {
                             component.sendAction(GameViewModel.Action.ReadyToPlayButtonClicked)
                         }
                     }
