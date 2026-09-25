@@ -548,8 +548,21 @@ class GameTest {
             game.tick(1)
             testScheduler.runCurrent()
 
-            // Random(42) draws SUBTRACTION/3 here (pinned by the seeded-reproducibility test above);
-            // against value 1 that takes the losing branch: value grows to 4, isProfitable flips false.
+            // Random(42) used to draw SUBTRACTION/3 here (pinned by the seeded-reproducibility test
+            // above), a guaranteed fail against value 1 - which was exactly MC-65's bug: an opening
+            // draw with no target to validate against. createTargets() now corrects that draw on its
+            // own, so the losing operation this test needs has to be forced explicitly instead, the
+            // same way GameOperationDrawTest pins one for the same reason.
+            game.fieldRestored(
+                game.stateFlow.value.field.copy(
+                    currentOperationSign = OperationSign.SUBTRACTION,
+                    currentOperationDigit = 3,
+                ),
+            )
+            testScheduler.runCurrent()
+
+            // Against value 1, SUBTRACTION/3 takes the losing branch: value grows to 4, isProfitable
+            // flips false.
             game.fireButtonClicked()
             testScheduler.runCurrent()
             val afterFire =

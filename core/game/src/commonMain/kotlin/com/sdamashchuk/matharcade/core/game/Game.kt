@@ -309,7 +309,36 @@ class Game(
     // activeTargetsAbsent() no longer routes through here: it has to publish the bumped field and the
     // regenerated targets in one assignment, which this cannot express.
     private fun createTargetsLocked() {
-        _stateFlow.value = _stateFlow.value.copy(targets = recreateTargets(_stateFlow.value.field))
+        val field = _stateFlow.value.field
+        val targets = recreateTargets(field)
+        _stateFlow.value =
+            _stateFlow.value.copy(field = ensureOpeningOperationSucceeds(field, targets), targets = targets)
+    }
+
+    // MC-65: recreateField draws currentOperationSign/currentOperationDigit before a single target
+    // exists to validate against, so MC-50's guarantee never covered a session's opening operation.
+    // Validated here instead, once the targets recreateField had nothing to check against are actually
+    // known - and against the moment those targets first become visible (targets.minOf { appearsAtMs
+    // }), not against "now": recreateTargets's own opening offset guarantees appearsAtMs is never
+    // before gameTimeMs at creation (see getOpeningOffsetMsByLevel), so filtering on gameTimeMs here
+    // would find an empty board every time and validate nothing. A no-op when the draw already
+    // succeeds or there is nothing yet to fail against, so a healthy opening board costs no extra
+    // Random draw.
+    private fun ensureOpeningOperationSucceeds(
+        field: Field,
+        targets: List<Target>,
+    ): Field {
+        if (targets.isEmpty()) return field
+        val firstVisibleAtMs = targets.minOf { it.appearsAtMs }
+        val openingWave = targets.filter { it.isActive && it.isVisible(firstVisibleAtMs) }
+        val alreadySucceeds =
+            openingWave.any { it.succeedsAgainst(field.currentOperationSign, field.currentOperationDigit) }
+        return if (openingWave.isEmpty() || alreadySucceeds) {
+            field
+        } else {
+            val (sign, digit) = drawSignAndDigit(openingWave, field.level)
+            field.copy(currentOperationSign = sign, currentOperationDigit = digit)
+        }
     }
 
     // The body of the old targetDidBreakout, minus its "already inactive" guard: that guard is now
@@ -402,6 +431,16 @@ class Game(
         gameTimeMs: Long,
     ): Pair<OperationSign, Int> {
         val visibleActiveTargets = targets.filter { it.isActive && it.isVisible(gameTimeMs) }
+        return drawSignAndDigit(visibleActiveTargets, level)
+    }
+
+    // The redraw loop itself, shared with ensureOpeningOperationSucceeds above: the only thing that
+    // differs between "the next press" and "the session's opening press" is which targets count as
+    // visible, never this arithmetic.
+    private fun drawSignAndDigit(
+        visibleActiveTargets: List<Target>,
+        level: Int,
+    ): Pair<OperationSign, Int> {
         var sign = OperationSign.values().random(random)
         var digit = sessionHelper.getOperationDigitByLevel(sign, level)
         var attempts = 1

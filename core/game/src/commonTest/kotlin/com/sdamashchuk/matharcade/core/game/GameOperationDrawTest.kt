@@ -14,6 +14,10 @@ import kotlin.test.assertTrue
 
 // MC-50: getNextSignAndDigit must never offer a sign/digit that fails against every visible active
 // target on the board - a press the player had no way to win, decided before they touched anything.
+// MC-65: the same guarantee for the operation a session opens with - recreateField draws it before a
+// single target exists to check it against, so MC-50's redraw never covered it. createTargets now
+// validates against the first wave of targets to become visible (not "now": none of them are visible
+// yet at creation - see ensureOpeningOperationSucceeds's own comment in Game.kt).
 
 // Counts every draw made through the delegate, the same pattern GameTest's own CountingRandom uses
 // (a separate, identically-shaped class - top-level private names collide across files in the same
@@ -127,6 +131,65 @@ class GameOperationDrawTest {
                 if (dud) duds++
             }
             assertEquals(0, duds, "seeded draws produced $duds board-wide duds")
+        }
+
+    @Test
+    fun `a seeded session opens with an operation that succeeds against its first visible targets`() =
+        runTest {
+            // Several levels, not just the level every fresh session actually starts at: createTargets
+            // is also the recovery path a restored field with an arbitrary level routes through when
+            // its persisted targets are gone (GameViewModel.updateSession), and the validation this
+            // covers applies there identically.
+            var duds = 0
+            var trials = 0
+            for (level in listOf(1, 10, 30, 100, 999)) {
+                repeat(2_000) { trial ->
+                    trials++
+                    val seed = level * 1_000_000L + trial
+                    val game = Game(SessionHelperImpl(random = Random(seed)), backgroundScope, Random(seed))
+                    game.createField(1)
+                    if (level != 1) {
+                        game.fieldRestored(
+                            game.stateFlow.value.field
+                                .copy(level = level),
+                        )
+                    }
+                    game.createTargets()
+
+                    val field = game.stateFlow.value.field
+                    val targets = game.stateFlow.value.targets
+                    val firstVisibleAtMs = targets.minOf { it.appearsAtMs }
+                    val openingWave = targets.filter { it.isActive && it.isVisible(firstVisibleAtMs) }
+                    val dud =
+                        openingWave.none {
+                            it.isReachableBy(field.currentOperationSign, field.currentOperationDigit)
+                        }
+                    if (dud) duds++
+                }
+            }
+            assertEquals(0, duds, "$duds of $trials seeded sessions opened with a board-wide dud")
+        }
+
+    @Test
+    fun `createTargets redraws a dud opening operation but still terminates within the same bound`() =
+        runTest {
+            val countingRandom = DrawCountingRandom(Random(7))
+            val game = Game(AlwaysDudSessionHelper(), backgroundScope, countingRandom)
+            game.createField(1)
+            val drawsBeforeCreatingTargets = countingRandom.drawCount
+
+            game.createTargets()
+
+            // AlwaysDudSessionHelper's sole target is visible at creation (see its own comment), so
+            // this bound is spent inside createTargets() itself, not deferred to a later tick or press.
+            assertEquals(EXPECTED_DRAW_BOUND, countingRandom.drawCount - drawsBeforeCreatingTargets)
+            val target =
+                game.stateFlow.value.targets
+                    .first()
+            val field = game.stateFlow.value.field
+            assertTrue(target.isReachableBy(field.currentOperationSign, field.currentOperationDigit))
+            assertEquals(OperationSign.SUBTRACTION, field.currentOperationSign)
+            assertEquals(target.value, field.currentOperationDigit)
         }
 
     @Test
