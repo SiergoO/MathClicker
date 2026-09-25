@@ -6,6 +6,10 @@ import kotlin.math.ceil
 import kotlin.math.roundToInt
 import kotlin.random.Random
 
+// FLIGHT_BASE_MS and baseFlightMsByLevel live in FlightCurve.kt, top-level in this same package: this
+// class was already at detekt's TooManyFunctions ceiling before getSubtractionTargetValueByLevel
+// (MC-70), and baseFlightMsByLevel reads none of this class's state - not even its Random - so it
+// moved out rather than raising the threshold.
 class SessionHelperImpl(
     private val random: Random = Random.Default,
 ) : SessionHelper {
@@ -15,15 +19,6 @@ class SessionHelperImpl(
 
         private const val INITIAL_TARGET_VALUE_MIN = 1
         private const val INITIAL_TARGET_VALUE_MAX = 20
-
-        // MC-52 (kept by MC-73): base minus a linear step, floored - that ordering is what keeps the
-        // curve from ever going empty at any level in 1..999 (SessionHelperImplTest pins this as a
-        // property, not a number: the pre-MC-52 curve crossed at level 1334, which is why LEVEL_MAX
-        // exists). MC-73 dropped the "add a fixed spread on top" half: the spread now lives on
-        // getTargetFlightTimeMs as a speed multiplier, not on this base curve directly.
-        private const val FLIGHT_BASE_MS = 9500
-        private const val FLIGHT_STEP_MS = 110
-        private const val FLIGHT_FLOOR_MS = 3500
 
         // MC-73: the owner's 0...-20% speed spread. A speed multiplier drawn from
         // (MIN_SPEED_MULTIPLIER, 1] lands flight time in [base, base / MIN_SPEED_MULTIPLIER] = [base,
@@ -68,12 +63,6 @@ class SessionHelperImpl(
     override val initialTargetAmountRange = IntRange(INITIAL_TARGET_AMOUNT_MIN, INITIAL_TARGET_AMOUNT_MAX)
     override val initialDivisionValueRange = IntRange(INITIAL_DIVISION_VALUE_MIN, INITIAL_DIVISION_VALUE_MAX)
     override val initialSubtractionValueRange = IntRange(INITIAL_SUBTRACTION_VALUE_MIN, INITIAL_SUBTRACTION_VALUE_MAX)
-
-    // The base (un-spread) flight time a level's speed curve implies - floored so it, and everything
-    // derived from it below, can never go empty or cross at any level in 1..999 (see FLIGHT_BASE_MS's
-    // own comment).
-    private fun baseFlightMsByLevel(level: Int): Int =
-        (FLIGHT_BASE_MS - level * FLIGHT_STEP_MS).coerceAtLeast(FLIGHT_FLOOR_MS)
 
     init {
         // MC-73's whole fix, checked once here rather than only in a test: three breakouts
@@ -150,6 +139,40 @@ class SessionHelperImpl(
         val currentCost = baseValue % operationDigit
         val shift = (desiredCost - currentCost + operationDigit) % operationDigit
         return (baseValue + shift).coerceAtMost(maxThreshold)
+    }
+
+    /**
+     * Calculates the target value for a subtraction-armed board (MC-70). Subtraction succeeds
+     * whenever value >= digit - not modular like division, so there is no remainder to shift toward.
+     * Instead, desiredPreparationCost's level profile picks the fraction of targets that are genuine
+     * traps: a value below the digit outright, which tapping can only shrink further and never lift
+     * back to ready, so it must be cleared by hand rather than fired on. The rest are generated ready
+     * to fire immediately.
+     * @param level
+     * @param operationDigit the subtraction digit the value is generated against.
+     * @return random target value, ready or a trap according to the level's preparation profile.
+     */
+    override fun getSubtractionTargetValueByLevel(
+        level: Int,
+        operationDigit: Int,
+    ): Int {
+        val minThreshold = initialTargetValueRange.first + level / 10
+        val maxThreshold = initialTargetValueRange.last + level * TARGET_VALUE_LEVEL_SCALE
+        return if (operationDigit <= 1) {
+            // Every target value is at least 1, so nothing can ever fall below this digit.
+            IntRange(minThreshold, maxThreshold).random(random)
+        } else {
+            val desiredCost = desiredPreparationCost(level, operationDigit, random)
+            if (desiredCost == 0) {
+                val readyLower = maxOf(minThreshold, operationDigit).coerceAtMost(maxThreshold)
+                IntRange(readyLower, maxThreshold).random(random)
+            } else {
+                // A trap: desiredCost is spent directly as the value, not a shift - the number of
+                // plain taps this target costs to clear by hand, since firing on it would only fail
+                // and grow it.
+                desiredCost
+            }
+        }
     }
 
     /**

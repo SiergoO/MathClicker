@@ -15,11 +15,22 @@ interface SessionHelper {
 
     // operationDigit is the divisor the value is generated against - MC-60: preparation cost is a
     // relationship between a target and the digit the player is about to press, not a property of
-    // the target alone, so the generator needs to know which digit that is.
+    // the target alone, so the generator needs to know which digit that is. Division-armed boards
+    // only (MC-70): the remainder this shapes is meaningless against subtraction, which is not
+    // modular - see getSubtractionTargetValueByLevel below.
     fun getTargetValueByLevel(
         level: Int,
         operationDigit: Int,
     ): Int
+
+    // MC-70: subtraction succeeds whenever value >= digit, a magnitude check with no remainder to
+    // shift - reusing getTargetValueByLevel's residue math here would shape nothing real. Defaults to
+    // delegating there so a fake that never overrides this keeps compiling and behaving exactly as it
+    // always has.
+    fun getSubtractionTargetValueByLevel(
+        level: Int,
+        operationDigit: Int,
+    ): Int = getTargetValueByLevel(level, operationDigit)
 
     // MC-73: the authoring knob - one deterministic number per level, no random draw. Fraction of a
     // fall covered per millisecond; getTargetFlightTimeMs is its inverse, with the per-target spread

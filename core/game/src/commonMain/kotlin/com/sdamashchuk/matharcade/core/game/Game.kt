@@ -362,7 +362,22 @@ class Game(
             // left-to-right by call-site position - reordering them silently desyncs every draw
             // after the first (the same discipline MC-72's version of this comment documented for
             // its own three draws).
-            val value = sessionHelper.getTargetValueByLevel(field.level, field.currentOperationDigit)
+            //
+            // MC-70: the armed sign picks which shaping the value gets - getTargetValueByLevel's
+            // residue is meaningless against subtraction, which is not modular (see
+            // getSubtractionTargetValueByLevel). Both still draw from the same shared Random, just a
+            // different number of times per call, so this branch can move the draw count from here on
+            // without desyncing the order above.
+            val value =
+                when (field.currentOperationSign) {
+                    OperationSign.DIVISION -> {
+                        sessionHelper.getTargetValueByLevel(field.level, field.currentOperationDigit)
+                    }
+
+                    OperationSign.SUBTRACTION -> {
+                        sessionHelper.getSubtractionTargetValueByLevel(field.level, field.currentOperationDigit)
+                    }
+                }
             val flightTimeMs = sessionHelper.getTargetFlightTimeMs(field.level)
             val finishesAtMs = field.gameTimeMs + openingOffsetMs + id * finishSpacingMs
             val appearsAtMs = finishesAtMs - flightTimeMs

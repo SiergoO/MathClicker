@@ -13,5 +13,5 @@ fun isReadyFor(
 ): Boolean =
     when (sign) {
         OperationSign.DIVISION -> digit != 0 && target.value % digit == 0
-        OperationSign.SUBTRACTION -> target.value - digit >= 0
+        OperationSign.SUBTRACTION -> digit != 0 && target.value - digit >= 0
     }

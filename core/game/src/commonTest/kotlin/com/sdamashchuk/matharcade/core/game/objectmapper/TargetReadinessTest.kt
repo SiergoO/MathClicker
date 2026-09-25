@@ -47,4 +47,13 @@ class TargetReadinessTest {
         // is the state a new session's first frame is in before a real digit is assigned.
         assertFalse(isReadyFor(target(value = 10), OperationSign.DIVISION, digit = 0))
     }
+
+    @Test
+    fun `subtraction by a zero digit is never ready and never throws`() {
+        // MC-70: the KDoc above already promised this for both signs, but only DIVISION's branch
+        // guarded digit 0 - SUBTRACTION's value - digit >= 0 is trivially true (a target's own value
+        // is never negative), so a target could read "ready" against a sign armed with no real digit
+        // yet. Mirrors the DIVISION case immediately above.
+        assertFalse(isReadyFor(target(value = 10), OperationSign.SUBTRACTION, digit = 0))
+    }
 }
