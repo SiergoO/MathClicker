@@ -64,9 +64,7 @@ fun MenuScreen(component: MenuComponent) {
                     component.sendAction(MenuViewModel.Action.OpenDialog)
                 },
             )
-            Image(
-                painter = painterResource(id = R.drawable.logo),
-                contentDescription = stringResource(id = R.string.logo),
+            MenuLogo(
                 modifier =
                     Modifier
                         .constrainAs(logoImage) {
