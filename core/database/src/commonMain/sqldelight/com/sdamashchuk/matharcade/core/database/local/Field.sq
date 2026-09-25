@@ -15,8 +15,16 @@ WHERE id = ?;
 getFieldById:
 SELECT * FROM field WHERE id = ?;
 
+-- Nothing in the schema stops two rows from being open at once (updateSession only inserts when
+-- none is, but that is an app-layer invariant, not a constraint). executeAsOneOrNull throws on
+-- more than one row, so an ordered LIMIT 1 is required, not optional. The newest by id wins - id
+-- is monotonic, and the newest open field is the session the player was actually in. The older
+-- one is left untouched here rather than folded into closed history: doing that would fabricate a
+-- finish (and a finishedAt) for a run the player never actually ended, and could hand it a bogus
+-- entry on the best-score board. It just stays open, permanently excluded from every future call
+-- of this query now that it always resolves to the newest row.
 getUnfinishedField:
-SELECT * FROM field WHERE isClosed = 0;
+SELECT * FROM field WHERE isClosed = 0 ORDER BY id DESC LIMIT 1;
 
 getFieldCount:
 SELECT COUNT(id) FROM field;

@@ -74,6 +74,38 @@ class GameRepositoryImplTest {
             assertEquals(55, repository.getUnfinishedField()?.score)
         }
 
+    // Two open fields must never throw (executeAsOneOrNull dies on a second row); the newest by
+    // id wins because it is the session the player was actually in. M1: ORDER BY id DESC removed -
+    // a bare LIMIT 1 on this table scan returns id 1's row instead, failing this assertion. M2:
+    // LIMIT 1 removed - executeAsOneOrNull sees two rows and throws before this assertion runs.
+    @Test
+    fun `getUnfinishedField resolves two open fields to the newest by id`() =
+        runTest {
+            // The older row carries the HIGHER score deliberately: with both ordered the same way,
+            // an ORDER BY score would satisfy this assertion just as well as ORDER BY id, and the
+            // test could not tell "newest" from "best".
+            repository.insertField(Field(isClosed = false, score = 30))
+            repository.insertField(Field(isClosed = false, score = 20))
+
+            assertEquals(20, repository.getUnfinishedField()?.score)
+        }
+
+    // The losing field is deliberately left alone rather than closed: folding it into history
+    // would fabricate a finish the player never reached. It just sits open, and the test above
+    // already proves getUnfinishedField never surfaces it again.
+    @Test
+    fun `getUnfinishedField leaves the older open field open and untouched`() =
+        runTest {
+            repository.insertField(Field(isClosed = false, score = 30))
+            repository.insertField(Field(isClosed = false, score = 20))
+
+            repository.getUnfinishedField()
+
+            val olderField = fieldDao.getFieldById(1)
+            assertEquals(30, olderField.score)
+            assertEquals(false, olderField.isClosed)
+        }
+
     // updateField is the only write the game performs during play: GameViewModel persists the
     // field on every change. A crossed pair here is invisible until the next launch restores a
     // session with the wrong numbers in it, which no insert-path test can see.
