@@ -1,7 +1,9 @@
 package com.sdamashchuk.matharcade.core.game.helper
 
-import com.sdamashchuk.matharcade.core.model.GAME_COLUMN_COUNT
+import com.sdamashchuk.matharcade.core.model.INITIAL_LIFE_COUNT
 import com.sdamashchuk.matharcade.core.model.OperationSign
+import kotlin.math.ceil
+import kotlin.math.roundToInt
 import kotlin.random.Random
 
 class SessionHelperImpl(
@@ -14,23 +16,34 @@ class SessionHelperImpl(
         private const val INITIAL_TARGET_VALUE_MIN = 1
         private const val INITIAL_TARGET_VALUE_MAX = 20
 
-        // MC-52: base minus a linear step, floored, then a fixed spread added on top of the floored
-        // minimum rather than the raw base - that ordering is what keeps the resulting range from
-        // ever going empty at any level in 1..999 (SessionHelperImplTest pins this as a property,
-        // not a number: the pre-MC-52 curve crossed at level 1334, which is why LEVEL_MAX exists).
-        private const val LIFETIME_BASE_MS = 9500
-        private const val LIFETIME_STEP_MS = 110
-        private const val LIFETIME_FLOOR_MS = 3500
-        private const val LIFETIME_SPREAD_MS = 2500
+        // MC-52 (kept by MC-73): base minus a linear step, floored - that ordering is what keeps the
+        // curve from ever going empty at any level in 1..999 (SessionHelperImplTest pins this as a
+        // property, not a number: the pre-MC-52 curve crossed at level 1334, which is why LEVEL_MAX
+        // exists). MC-73 dropped the "add a fixed spread on top" half: the spread now lives on
+        // getTargetFlightTimeMs as a speed multiplier, not on this base curve directly.
+        private const val FLIGHT_BASE_MS = 9500
+        private const val FLIGHT_STEP_MS = 110
+        private const val FLIGHT_FLOOR_MS = 3500
 
-        // Wave gap, not a per-target delay: getTargetAppearanceDelayMsByIdAndLevel spends this once
-        // per id/GAME_COLUMN_COUNT group, then subdivides it again within the group (see that
-        // function) so the four targets sharing a wave don't all land on the same instant - the bug
-        // a device run caught (game over in ~28s with zero input, MC-52 spec).
-        private const val WAVE_GAP_BASE_MS = 3800
-        private const val WAVE_GAP_STEP_MS = 55
-        private const val WAVE_GAP_FLOOR_MS = 1400
-        private const val WAVE_GAP_SPREAD_MS = 800
+        // MC-73: the owner's 0...-20% speed spread. A speed multiplier drawn from
+        // (MIN_SPEED_MULTIPLIER, 1] lands flight time in [base, base / MIN_SPEED_MULTIPLIER] = [base,
+        // base * 1.25] - about the same 26% the old fixed-ms spread gave, but spent on how long a
+        // target is on screen rather than on when it finishes.
+        private const val FLIGHT_SPEED_SPREAD = 0.2f
+        private const val MIN_SPEED_MULTIPLIER = 1f - FLIGHT_SPEED_SPREAD
+
+        // Fraction of the level's own base flight time. This is the whole fix: three lives lost to
+        // breakouts (INITIAL_LIFE_COUNT - 1 gaps between them) must together span at least one
+        // level's worst-case flight time, i.e. FINISH_SPACING_FRACTION * (INITIAL_LIFE_COUNT - 1) >=
+        // 1 / MIN_SPEED_MULTIPLIER, so FINISH_SPACING_FRACTION >= 0.625 for INITIAL_LIFE_COUNT 3. 0.7
+        // keeps a deliberate margin over that floor against integer rounding -
+        // SessionHelperImplTest's invariant test proves this holds at every level, not just checked
+        // once here. Never lower this without re-checking that test.
+        private const val FINISH_SPACING_FRACTION = 0.7f
+
+        // Authoring unit for getTargetSpeedByLevel: one whole fall, so speed is "fraction of a fall
+        // covered per millisecond" rather than a unit tied to any real screen dimension.
+        private const val SPAN_UNITS = 1f
 
         private const val INITIAL_TARGET_AMOUNT_MIN = 6
         private const val INITIAL_TARGET_AMOUNT_MAX = 10
@@ -47,49 +60,61 @@ class SessionHelperImpl(
 
     override val levelRange = IntRange(LEVEL_MIN, LEVEL_MAX)
     override val initialTargetValueRange = IntRange(INITIAL_TARGET_VALUE_MIN, INITIAL_TARGET_VALUE_MAX)
-    override val initialTargetLifetimeMsRange = IntRange(LIFETIME_BASE_MS, LIFETIME_BASE_MS + LIFETIME_SPREAD_MS)
-    override val initialTargetAppearanceDelayMsRange = IntRange(WAVE_GAP_BASE_MS, WAVE_GAP_BASE_MS + WAVE_GAP_SPREAD_MS)
+
+    // Unscaled, like initialTargetValueRange above - the raw base/ceiling this curve is built from,
+    // not getTargetFlightTimeMs(1)'s own (slightly tighter) output.
+    override val initialTargetFlightTimeMsRange =
+        IntRange(FLIGHT_BASE_MS, ceil(FLIGHT_BASE_MS / MIN_SPEED_MULTIPLIER).toInt())
     override val initialTargetAmountRange = IntRange(INITIAL_TARGET_AMOUNT_MIN, INITIAL_TARGET_AMOUNT_MAX)
     override val initialDivisionValueRange = IntRange(INITIAL_DIVISION_VALUE_MIN, INITIAL_DIVISION_VALUE_MAX)
     override val initialSubtractionValueRange = IntRange(INITIAL_SUBTRACTION_VALUE_MIN, INITIAL_SUBTRACTION_VALUE_MAX)
 
-    /**
-     * Calculates the target lifetime depending on the level. The higher the level, the less time the target should be
-     * visible during the level, down to a floor it never falls below.
-     * @param level
-     * @return random target lifetime in a certain range of values.
-     */
-    override fun getTargetLifetimeMsByLevel(level: Int): Int {
-        val floor = (LIFETIME_BASE_MS - level * LIFETIME_STEP_MS).coerceAtLeast(LIFETIME_FLOOR_MS)
-        return IntRange(floor, floor + LIFETIME_SPREAD_MS).random(random)
+    // The base (un-spread) flight time a level's speed curve implies - floored so it, and everything
+    // derived from it below, can never go empty or cross at any level in 1..999 (see FLIGHT_BASE_MS's
+    // own comment).
+    private fun baseFlightMsByLevel(level: Int): Int =
+        (FLIGHT_BASE_MS - level * FLIGHT_STEP_MS).coerceAtLeast(FLIGHT_FLOOR_MS)
+
+    init {
+        // MC-73's whole fix, checked once here rather than only in a test: three breakouts
+        // (INITIAL_LIFE_COUNT - 1 gaps) must together span at least one flight time, or the bug this
+        // task exists for - three lives lost within milliseconds - comes back. A future edit that
+        // narrows FINISH_SPACING_FRACTION below the floor fails fast at construction, not silently
+        // in production.
+        check(FINISH_SPACING_FRACTION * (INITIAL_LIFE_COUNT - 1) * MIN_SPEED_MULTIPLIER >= 1f) {
+            "FINISH_SPACING_FRACTION is too small: (INITIAL_LIFE_COUNT - 1) * spacing must be >= the level's max flight time"
+        }
     }
 
-    // The gap between waves of GAME_COLUMN_COUNT targets, same floor-then-spread shape as the
-    // lifetime curve above and for the same reason: tightens with level down to a floor it can never
-    // cross, so the range this feeds getTargetAppearanceDelayMsByIdAndLevel from can never go empty.
-    private fun getWaveGapMsByLevel(level: Int): Int {
-        val floor = (WAVE_GAP_BASE_MS - level * WAVE_GAP_STEP_MS).coerceAtLeast(WAVE_GAP_FLOOR_MS)
-        return IntRange(floor, floor + WAVE_GAP_SPREAD_MS).random(random)
-    }
+    override fun getTargetSpeedByLevel(level: Int): Float = SPAN_UNITS / baseFlightMsByLevel(level)
 
     /**
-     * Calculates the target appearance delay depending on the level. Targets are grouped into waves of
-     * GAME_COLUMN_COUNT, and staggered within their own wave rather than all landing on the wave's start:
-     * a whole wave sharing one delay (the pre-MC-52 shape) let the first wave alone close out a session
-     * with zero player input in ~28s on device, faster than any single target's own fall.
-     * @param id
+     * Flight time is speed's inverse, with the per-target spread applied as a multiplier on speed
+     * (0...-20%, FLIGHT_SPEED_SPREAD) rather than as a separate draw on time. Recomputed from
+     * baseFlightMsByLevel directly rather than round-tripping through the Float
+     * getTargetSpeedByLevel returns, so maxFlightMsByLevel's ceil() stays a provably safe bound
+     * regardless of Float rounding.
      * @param level
-     * @return target appearance delay, randomized once per call by the wave gap it is built from.
+     * @return random flight time in [base, base / MIN_SPEED_MULTIPLIER] for the level.
      */
-    override fun getTargetAppearanceDelayMsByIdAndLevel(
-        id: Int,
-        level: Int,
-    ): Int {
-        val waveGapMs = getWaveGapMsByLevel(level)
-        val wave = id / GAME_COLUMN_COUNT
-        val positionInWave = id % GAME_COLUMN_COUNT
-        return wave * waveGapMs + positionInWave * (waveGapMs / GAME_COLUMN_COUNT)
+    override fun getTargetFlightTimeMs(level: Int): Int {
+        val speedMultiplier = 1f - random.nextFloat() * FLIGHT_SPEED_SPREAD
+        return (baseFlightMsByLevel(level) / speedMultiplier).roundToInt()
     }
+
+    // Deterministic by construction - no Random draw - which is the entire fix MC-73 exists for: the
+    // distance between two consecutive finishesAtMs is exactly this value, and no per-target flight
+    // spread can touch it because it is never built out of one.
+    override fun getFinishSpacingMsByLevel(level: Int): Int =
+        (baseFlightMsByLevel(level) * FINISH_SPACING_FRACTION).roundToInt()
+
+    // The level's own worst-case flight time - ceil, not round, so getTargetFlightTimeMs's actual
+    // draw (roundToInt of a value strictly below base / MIN_SPEED_MULTIPLIER, since the multiplier
+    // never reaches MIN_SPEED_MULTIPLIER exactly) can never round up past this. At least that bound
+    // is what keeps finishesAtMs(0) - flightTime(0) - and every later target's, since the opening
+    // offset only ever adds headroom - from ever landing before Field.gameTimeMs.
+    override fun getOpeningOffsetMsByLevel(level: Int): Int =
+        ceil(baseFlightMsByLevel(level) / MIN_SPEED_MULTIPLIER).toInt()
 
     /**
      * Calculates the target value depending on the level and the digit the player is about to press

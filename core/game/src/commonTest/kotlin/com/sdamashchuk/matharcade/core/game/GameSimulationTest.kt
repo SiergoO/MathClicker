@@ -23,12 +23,14 @@ private class SimulationSessionHelper(
     private val targetAmount: Int = 1,
     private val targetValue: Int = 10,
     private val lifetimeMs: Int = 1_000_000,
-    private val appearanceDelayMsById: (Int) -> Int = { 0 },
+    // Total opening offset for id 0, mirroring FakeSessionHelper's own shape: null auto-floors to
+    // the flight time (lifetimeMs above), so id 0 appears immediately unless overridden.
+    private val openingOffsetMs: Int? = null,
+    private val finishSpacingMs: Int = 1,
 ) : SessionHelper {
     override val levelRange = 1..999
     override val initialTargetValueRange = 1..20
-    override val initialTargetLifetimeMsRange = 20000..40000
-    override val initialTargetAppearanceDelayMsRange = 10000..20000
+    override val initialTargetFlightTimeMsRange = 20000..40000
     override val initialTargetAmountRange = 6..10
     override val initialDivisionValueRange = 2..5
     override val initialSubtractionValueRange = 1..3
@@ -38,12 +40,13 @@ private class SimulationSessionHelper(
         operationDigit: Int,
     ) = targetValue
 
-    override fun getTargetLifetimeMsByLevel(level: Int) = lifetimeMs
+    override fun getTargetSpeedByLevel(level: Int) = 1f / lifetimeMs
 
-    override fun getTargetAppearanceDelayMsByIdAndLevel(
-        id: Int,
-        level: Int,
-    ) = appearanceDelayMsById(id)
+    override fun getTargetFlightTimeMs(level: Int) = lifetimeMs
+
+    override fun getFinishSpacingMsByLevel(level: Int) = finishSpacingMs
+
+    override fun getOpeningOffsetMsByLevel(level: Int) = (openingOffsetMs ?: lifetimeMs).coerceAtLeast(lifetimeMs)
 
     override fun getTargetAmountByLevel(level: Int) = targetAmount
 
@@ -98,8 +101,13 @@ class GameSimulationTest {
             // MC-52 shortened and floored the lifetime/wave-gap curves, which is why this moved down
             // from the pre-MC-52 30640. MC-60 threads operationDigit into getTargetValueByLevel,
             // adding one Random draw per target - that reshuffles every later draw off the same
-            // seed, which is why this moved again from 12784.
-            assertEquals(12496, elapsedMs)
+            // seed, which is why this moved again from 12784. MC-73 assigns finishesAtMs directly
+            // instead of summing an independently-rolled appearance delay and lifetime, with a finish
+            // spacing floor derived from (INITIAL_LIFE_COUNT - 1) surviving one flight time - almost
+            // exactly double the old wave-gap-derived spacing, which is why this moved up from 12496
+            // to 24896 rather than down: the fix is precisely "no-input sessions now last longer",
+            // and this pin is the end-to-end proof of it.
+            assertEquals(24896, elapsedMs)
         }
 
     // The MC-27 bug class as a JVM assertion for the first time: a target's accumulated fall must
@@ -163,6 +171,50 @@ class GameSimulationTest {
             assertFalse(game.stateFlow.value.field.isClosed)
         }
 
+    // MC-68's acceptance criterion, restated as MC-73's own closing proof: a no-input session's three
+    // life losses (INITIAL_LIFE_COUNT - 1 gaps) must be spread across at least one flight time, not
+    // clustered within a couple of milliseconds of each other - the measured device bug this whole
+    // epic exists to close.
+    @Test
+    fun `a no-input session spreads its three life losses across at least one flight time - across several levels`() =
+        runTest {
+            for (level in listOf(1, 10, 30, 100, 999)) {
+                val seed = level.toLong()
+                val sessionHelper = SessionHelperImpl(random = Random(seed))
+                val game = Game(sessionHelper, backgroundScope, Random(seed))
+                game.createField(1)
+                game.fieldRestored(
+                    game.stateFlow.value.field
+                        .copy(level = level),
+                )
+                game.createTargets()
+
+                val lifeLossTimes = mutableListOf<Long>()
+                var previousLifeCount = game.stateFlow.value.field.lifeCount
+                while (!game.stateFlow.value.field.isClosed) {
+                    game.tick(TICK_MS)
+                    val current = game.stateFlow.value.field
+                    if (current.lifeCount < previousLifeCount) {
+                        repeat(previousLifeCount - current.lifeCount) { lifeLossTimes.add(current.gameTimeMs) }
+                        previousLifeCount = current.lifeCount
+                    }
+                }
+
+                assertTrue(lifeLossTimes.size >= 2, "level $level: fewer than two life losses recorded")
+                val interval = lifeLossTimes.last() - lifeLossTimes.first()
+                // Against the level's own worst-case flight time, not a global floor: at level 1 the
+                // floor is under a third of the real flight, so a regression that halved the spacing
+                // would still clear it. getOpeningOffsetMsByLevel is that worst case by definition
+                // (see its own comment), and it is a different production quantity from the spacing
+                // under test - so this stays a cross-check rather than a restatement of the formula.
+                val maxFlightTimeMs = sessionHelper.getOpeningOffsetMsByLevel(level).toLong()
+                assertTrue(
+                    interval >= maxFlightTimeMs,
+                    "level $level: first-to-last life-loss interval ${interval}ms is under one flight time ${maxFlightTimeMs}ms",
+                )
+            }
+        }
+
     // MAX_TICK_MS is the belt to the structural brace (a paused composition no longer feeds tick()
     // at all): one huge step must still not walk a target further than the clamp allows.
     @Test
@@ -209,18 +261,19 @@ class GameSimulationTest {
     @Test
     fun `gameTimeMs does not advance once the field is closed`() =
         runTest {
-            val game =
-                Game(
-                    SimulationSessionHelper(
-                        targetAmount = 4,
-                        lifetimeMs = 1000,
-                        appearanceDelayMsById = { index -> if (index < 3) 0 else 50_000 },
-                    ),
-                    backgroundScope,
-                    Random(7),
-                )
+            // MC-73: built directly rather than through SimulationSessionHelper/createTargets(),
+            // since per-id delay staggering is no longer expressible through SessionHelper (spacing
+            // is uniform by construction).
+            val game = Game(SimulationSessionHelper(), backgroundScope, Random(7))
             game.createField(1)
-            game.createTargets()
+            game.targetsRestored(
+                listOf(
+                    scheduledTarget(id = 1, value = 10, appearanceDelayMs = 0, lifetimeMs = 1000),
+                    scheduledTarget(id = 2, value = 10, appearanceDelayMs = 0, lifetimeMs = 1000),
+                    scheduledTarget(id = 3, value = 10, appearanceDelayMs = 0, lifetimeMs = 1000),
+                    scheduledTarget(id = 4, value = 10, appearanceDelayMs = 50_000, lifetimeMs = 1000),
+                ),
+            )
             val stillDelayedId =
                 game.stateFlow.value.targets
                     .first { it.appearsAtMs > game.stateFlow.value.field.gameTimeMs }
@@ -249,19 +302,16 @@ class GameSimulationTest {
     @Test
     fun `ten seconds of ticks reveals exactly the targets whose delay has elapsed`() =
         runTest {
-            val delaysMs = listOf(1000, 5000, 9000, 11000)
-            val game =
-                Game(
-                    SimulationSessionHelper(
-                        targetAmount = delaysMs.size,
-                        lifetimeMs = 1_000_000,
-                        appearanceDelayMsById = { delaysMs[it] },
-                    ),
-                    backgroundScope,
-                    Random(3),
-                )
+            // MC-73: built directly rather than through SimulationSessionHelper/createTargets() -
+            // see the comment on the test above.
+            val delaysMs = listOf(1000L, 5000L, 9000L, 11000L)
+            val game = Game(SimulationSessionHelper(), backgroundScope, Random(3))
             game.createField(1)
-            game.createTargets()
+            game.targetsRestored(
+                delaysMs.mapIndexed { index, delayMs ->
+                    scheduledTarget(id = index + 1, value = 10, appearanceDelayMs = delayMs, lifetimeMs = 1_000_000)
+                },
+            )
 
             repeat(40) { game.tick(250) } // 10_000ms total
 
@@ -318,25 +368,31 @@ class GameSimulationTest {
             val totalElapsedMs = 8000
             val seed = 11L
 
-            fun newGame() =
-                Game(
-                    SimulationSessionHelper(
-                        targetAmount = 8,
+            // MC-73: built directly rather than through SimulationSessionHelper/createTargets() -
+            // see the comment on the tests above. Applied identically to both games below, so the
+            // fast/slow comparison this test exists for is unaffected by the fixture no longer
+            // coming from the session helper itself.
+            fun targetFixture() =
+                (0 until 8).map { index ->
+                    scheduledTarget(
+                        id = index + 1,
+                        columnId = index.toGameColumnId(),
+                        value = 10,
+                        appearanceDelayMs = (2000 + index * 1000).toLong(),
                         lifetimeMs = 1_000_000,
-                        appearanceDelayMsById = { 2000 + it * 1000 },
-                    ),
-                    backgroundScope,
-                    Random(seed),
-                )
+                    )
+                }
+
+            fun newGame() = Game(SimulationSessionHelper(), backgroundScope, Random(seed))
 
             val fast = newGame()
             fast.createField(1)
-            fast.createTargets()
+            fast.targetsRestored(targetFixture())
             repeat(totalElapsedMs / 16) { fast.tick(16) }
 
             val slow = newGame()
             slow.createField(1)
-            slow.createTargets()
+            slow.targetsRestored(targetFixture())
             repeat(totalElapsedMs / 8) { slow.tick(8) }
 
             assertEquals(fast.stateFlow.value.field, slow.stateFlow.value.field)

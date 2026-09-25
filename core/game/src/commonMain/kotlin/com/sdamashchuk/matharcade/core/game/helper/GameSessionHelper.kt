@@ -5,8 +5,10 @@ import com.sdamashchuk.matharcade.core.model.OperationSign
 interface SessionHelper {
     val levelRange: IntRange
     val initialTargetValueRange: IntRange
-    val initialTargetLifetimeMsRange: IntRange
-    val initialTargetAppearanceDelayMsRange: IntRange
+
+    // MC-73: replaces initialTargetLifetimeMsRange - same shape (level 1's own randomized range),
+    // named for what the value now is: how long a target spends falling, not a countdown it owns.
+    val initialTargetFlightTimeMsRange: IntRange
     val initialTargetAmountRange: IntRange
     val initialDivisionValueRange: IntRange
     val initialSubtractionValueRange: IntRange
@@ -19,12 +21,26 @@ interface SessionHelper {
         operationDigit: Int,
     ): Int
 
-    fun getTargetLifetimeMsByLevel(level: Int): Int
+    // MC-73: the authoring knob - one deterministic number per level, no random draw. Fraction of a
+    // fall covered per millisecond; getTargetFlightTimeMs is its inverse, with the per-target spread
+    // applied to speed rather than to time (see that function).
+    fun getTargetSpeedByLevel(level: Int): Float
 
-    fun getTargetAppearanceDelayMsByIdAndLevel(
-        id: Int,
-        level: Int,
-    ): Int
+    // The only randomized draw left in target scheduling: how long this one target is visible for,
+    // in [base, base / 0.8] - a 0..-20% draw against the level's speed, landing as 0..+25% against
+    // its flight time. Everything else a target is scheduled against (finishesAtMs, via
+    // getFinishSpacingMsByLevel/getOpeningOffsetMsByLevel) is deterministic.
+    fun getTargetFlightTimeMs(level: Int): Int
+
+    // Deterministic, never random - see the MC-73 spec's "что из этого следует бесплатно". This is
+    // the number that used to be erasable by a draw; it no longer can be, because it is not built
+    // from one. finishesAtMs(i) - finishesAtMs(i-1) is exactly this value by construction.
+    fun getFinishSpacingMsByLevel(level: Int): Int
+
+    // At least the level's own maximum possible flight time, so the very first target's appearsAtMs
+    // is never before Field.gameTimeMs - see the MC-73 spec's note on why zero-clamping would be
+    // wrong (a target starting mid-fall) rather than the honest floor this is.
+    fun getOpeningOffsetMsByLevel(level: Int): Int
 
     fun getTargetAmountByLevel(level: Int): Int
 

@@ -73,7 +73,7 @@ class GameEventTest {
         runTest {
             val game =
                 Game(
-                    FakeSessionHelper(targetAmount = 1, appearanceDelayMs = 1_000_000),
+                    FakeSessionHelper(targetAmount = 1, openingOffsetMs = 1_000_000),
                     backgroundScope,
                     Random(1),
                 )

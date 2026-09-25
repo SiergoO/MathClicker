@@ -4,7 +4,7 @@ data class Field(
     val id: Int = 0,
     val level: Int = 1,
     val score: Int = 0,
-    val lifeCount: Int = 3,
+    val lifeCount: Int = INITIAL_LIFE_COUNT,
     val bonusMultiplier: Int = 0,
     val currentOperationSign: OperationSign = OperationSign.DIVISION,
     val currentOperationDigit: Int = 0,

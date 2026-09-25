@@ -25,8 +25,7 @@ private class FakeSessionHelper(
 ) : SessionHelper {
     override val levelRange = 1..999
     override val initialTargetValueRange = 1..20
-    override val initialTargetLifetimeMsRange = 20000..40000
-    override val initialTargetAppearanceDelayMsRange = 10000..20000
+    override val initialTargetFlightTimeMsRange = 20000..40000
     override val initialTargetAmountRange = 6..10
     override val initialDivisionValueRange = 2..5
     override val initialSubtractionValueRange = 1..3
@@ -36,12 +35,15 @@ private class FakeSessionHelper(
         operationDigit: Int,
     ) = 10
 
-    override fun getTargetLifetimeMsByLevel(level: Int) = 1000
+    override fun getTargetSpeedByLevel(level: Int) = 1f / 1000
 
-    override fun getTargetAppearanceDelayMsByIdAndLevel(
-        id: Int,
-        level: Int,
-    ) = 0
+    override fun getTargetFlightTimeMs(level: Int) = 1000
+
+    override fun getFinishSpacingMsByLevel(level: Int) = 2000
+
+    // 0 auto-floors to the flight time (1000), so id 0 always appears immediately - the same
+    // default every FakeSessionHelper in this codebase uses.
+    override fun getOpeningOffsetMsByLevel(level: Int) = 1000
 
     // Level-dependent so a level-up actually changes the id set recreateTargets hands out -
     // a constant amount would make every level produce the same 1..amount ids.

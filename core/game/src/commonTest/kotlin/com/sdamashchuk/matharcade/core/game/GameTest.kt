@@ -46,8 +46,9 @@ class GameTest {
             game.createTargets()
             testScheduler.runCurrent()
 
-            // level 1's lifetimeMs is 1000 and appearanceDelayMs is 0, so four 250ms ticks reveal
-            // and then break the sole target out in the same locked step.
+            // level 1's flightTimeMs is 1000 and id 0 always appears immediately (MC-73:
+            // appearsAtMs == gameTimeMs at creation), so four 250ms ticks reveal and then break the
+            // sole target out in the same locked step.
             repeat(4) { game.tick(250) }
             testScheduler.runCurrent()
 
@@ -68,12 +69,19 @@ class GameTest {
             // these ticks - exactly the state a re-added visibleTargetsAbsent() branch would fire on,
             // every single time, off this same Random.
             val countingRandom = CountingRandom(Random(8))
-            val delays = listOf(5000, 6000, 7000)
-            val sessionHelper = FakeSessionHelper(targetAmount = 3, appearanceDelayMsById = { delays[it] })
-            val game = Game(sessionHelper, backgroundScope, countingRandom)
+            val delays = listOf(5000L, 6000L, 7000L)
+            val game = Game(FakeSessionHelper(), backgroundScope, countingRandom)
             game.start()
             game.createField(1)
-            game.createTargets()
+            // MC-73: per-id delay staggering is no longer something SessionHelper can express -
+            // getFinishSpacingMsByLevel is uniform by construction, which is the whole fix. Built
+            // directly rather than through createTargets() to keep this test's own staggered
+            // fixture.
+            game.targetsRestored(
+                delays.mapIndexed { index, delayMs ->
+                    scheduledTarget(id = index + 1, value = 1, appearanceDelayMs = delayMs)
+                },
+            )
             testScheduler.runCurrent()
             val drawsBeforeTicking = countingRandom.drawCount
 
@@ -110,7 +118,7 @@ class GameTest {
             testScheduler.runCurrent()
 
             // Level up to 2 first: getNextSignAndDigit hardcoding level 1 is invisible at level 1.
-            // Four 250ms ticks reveal and break the sole target out (lifetimeMs 1000, delay 0).
+            // Four 250ms ticks reveal and break the sole target out (flightTimeMs 1000, id 0 always appears immediately).
             repeat(4) { game.tick(250) }
             testScheduler.runCurrent()
             assertEquals(2, game.stateFlow.value.field.level)
@@ -140,15 +148,19 @@ class GameTest {
             // lifetime, 500ms delay gaps), so the board is never briefly empty of visible targets
             // mid-sequence - if it were, tick()'s edge-triggered shortenAppearanceDelay would consume
             // the staggering by pulling the next one forward.
-            val game =
-                Game(
-                    FakeSessionHelper(targetAmount = 3, appearanceDelayMsById = { it * 500 }),
-                    backgroundScope,
-                    Random(3),
-                )
+            // MC-73: built directly rather than through FakeSessionHelper/createTargets(), since
+            // per-id delay staggering is no longer expressible through SessionHelper (spacing is
+            // uniform by construction).
+            val game = Game(FakeSessionHelper(), backgroundScope, Random(3))
             game.start()
             game.createField(1)
-            game.createTargets()
+            game.targetsRestored(
+                listOf(
+                    scheduledTarget(id = 1, value = 1, appearanceDelayMs = 0, lifetimeMs = 1000),
+                    scheduledTarget(id = 2, value = 1, appearanceDelayMs = 500, lifetimeMs = 1000),
+                    scheduledTarget(id = 3, value = 1, appearanceDelayMs = 1000, lifetimeMs = 1000),
+                ),
+            )
             testScheduler.runCurrent()
 
             repeat(4) { game.tick(250) } // 1000ms elapsed: the undelayed target breaks out
@@ -310,11 +322,12 @@ class GameTest {
                 game.createField(1)
                 game.createTargets()
 
-                // The very first target always has appearanceDelayMs 0 (see
-                // SessionHelperImpl.getTargetAppearanceDelayMsByIdAndLevel), so it is already
-                // visible before this tick (MC-72: appearsAtMs == gameTimeMs at creation). The tick
-                // itself is still load-bearing for the pinned literals below - it is one real step
-                // of the simulation being reproduced, not a reveal.
+                // The very first target's own appearsAtMs always equals gameTimeMs at creation (id 0
+                // draws finishesAtMs = gameTimeMs + openingOffset, and openingOffset is at least the
+                // level's own max flight time - see SessionHelperImpl.getOpeningOffsetMsByLevel), so
+                // it is already visible before this tick. The tick itself is still load-bearing for
+                // the pinned literals below - it is one real step of the simulation being
+                // reproduced, not a reveal.
                 game.tick(TICK_STEP_MS)
                 game.fireButtonClicked()
 
@@ -337,106 +350,109 @@ class GameTest {
             // unseeded draw coincides by chance (getSubtractionDigitByLevel's 1..3 at level 1 agrees
             // roughly one run in four). Pinning exact seed-99 values is what actually catches that.
             // Unlike the old UI-driven path (which forced every target to break out regardless of
-            // elapsed time), the engine's own clock plays this out to a real game over: three of the
-            // eight targets break out before lifeCount reaches zero, and the other five freeze wherever
-            // they were falling once the field closes. MC-60 threads operationDigit into
-            // getTargetValueByLevel, adding one Random draw per target - that reshuffles every value,
-            // fall time and later draw off the same seed, which is why every literal below moved.
+            // elapsed time), the engine's own clock plays this out to a real game over. MC-73 assigns
+            // finishesAtMs directly instead of summing an independently-rolled delay and lifetime,
+            // which reshuffles every value, schedule and later draw off the same seed - every literal
+            // below moved, and the field now survives twice as many ticks before closing (the fix
+            // itself: GameSimulationTest's own pinned elapsedMs moved from 12496 to 24896 for the
+            // same reason).
             assertEquals(
                 Field(
                     id = 1,
                     level = 1,
-                    score = 9,
+                    score = 0,
                     lifeCount = 0,
                     bonusMultiplier = 0,
                     currentOperationSign = OperationSign.SUBTRACTION,
                     currentOperationDigit = 2,
                     nextOperationSign = OperationSign.SUBTRACTION,
-                    nextOperationDigit = 2,
+                    nextOperationDigit = 1,
                     isClosed = true,
                     finishedAt = 0L,
-                    // MC-71: 50 of the 200 250ms ticks land before the field closes and freezes the
+                    // MC-73: 100 of the 200 250ms ticks land before the field closes and freezes the
                     // clock with the rest - the same terminal instant GameSimulationTest's pinned
-                    // 12496 elapsedMs reaches at 16ms steps, off by the coarser step size here.
-                    gameTimeMs = 12500L,
+                    // 24896 elapsedMs reaches at 16ms steps, off by the coarser step size here.
+                    gameTimeMs = 25000L,
                 ),
                 firstField,
             )
             // MC-72: appearsAtMs/finishesAtMs replace fallenMs/appearanceDelayMs/lifetimeMs as the
             // pinned representation - each target's schedule is now the two absolute instants it was
-            // given at creation, not the countdown state a tick would have advanced it to.
+            // given at creation, not the countdown state a tick would have advanced it to. MC-73:
+            // consecutive finishesAtMs now differ by exactly getFinishSpacingMsByLevel(1) (6573ms) -
+            // by construction, not by luck of this particular seed.
             assertEquals(
                 listOf(
                     Target(
                         id = 1,
                         relatedFieldId = 1,
                         columnId = 0,
-                        value = 3,
-                        appearsAtMs = 0,
-                        finishesAtMs = 9519,
+                        value = 12,
+                        appearsAtMs = 1667,
+                        finishesAtMs = 11738,
                         isActive = false,
                     ),
                     Target(
                         id = 2,
                         relatedFieldId = 1,
                         columnId = 1,
-                        value = 13,
-                        appearsAtMs = 950,
-                        finishesAtMs = 11700,
+                        value = 15,
+                        appearsAtMs = 7350,
+                        finishesAtMs = 18311,
                         isActive = false,
                     ),
                     Target(
                         id = 3,
                         relatedFieldId = 1,
                         columnId = 2,
-                        value = 13,
-                        appearsAtMs = 2156,
-                        finishesAtMs = 12481,
+                        value = 5,
+                        appearsAtMs = 13540,
+                        finishesAtMs = 24884,
                         isActive = false,
                     ),
                     Target(
                         id = 4,
                         relatedFieldId = 1,
                         columnId = 3,
-                        value = 21,
-                        appearsAtMs = 3027,
-                        finishesAtMs = 14392,
+                        value = 18,
+                        appearsAtMs = 20171,
+                        finishesAtMs = 31457,
                         isActive = true,
                     ),
                     Target(
                         id = 5,
                         relatedFieldId = 1,
                         columnId = 1,
-                        value = 12,
-                        appearsAtMs = 4194,
-                        finishesAtMs = 14823,
+                        value = 4,
+                        appearsAtMs = 26584,
+                        finishesAtMs = 38030,
                         isActive = true,
                     ),
                     Target(
                         id = 6,
                         relatedFieldId = 1,
                         columnId = 2,
-                        value = 17,
-                        appearsAtMs = 5628,
-                        finishesAtMs = 16870,
+                        value = 5,
+                        appearsAtMs = 34819,
+                        finishesAtMs = 44603,
                         isActive = true,
                     ),
                     Target(
                         id = 7,
                         relatedFieldId = 1,
                         columnId = 3,
-                        value = 5,
-                        appearsAtMs = 6669,
-                        finishesAtMs = 17798,
+                        value = 17,
+                        appearsAtMs = 40320,
+                        finishesAtMs = 51176,
                         isActive = true,
                     ),
                     Target(
                         id = 8,
                         relatedFieldId = 1,
                         columnId = 0,
-                        value = 5,
-                        appearsAtMs = 7499,
-                        finishesAtMs = 18600,
+                        value = 13,
+                        appearsAtMs = 47551,
+                        finishesAtMs = 57749,
                         isActive = true,
                     ),
                 ),
@@ -617,14 +633,16 @@ class GameTest {
         runTest {
             // A second, never-revealed target stays active throughout so clearing the first one
             // doesn't leave the board fully inactive - that would level up and regenerate the whole
-            // target set out from under the id being asserted on below. Its own delay is far past
-            // this test's window, so the reveal tick below only reveals the first target.
+            // target set out from under the id being asserted on below. MC-73: a huge finish spacing
+            // (rather than a per-id delay, no longer expressible) pushes the second target's own
+            // appearsAtMs far past this test's window, so the reveal tick below only reveals the
+            // first target.
             val game =
                 Game(
                     FakeSessionHelper(
                         targetAmount = 2,
                         targetValue = 3,
-                        appearanceDelayMsById = { index -> if (index == 0) 0 else 999_999 },
+                        finishSpacingMs = 999_999,
                     ),
                     backgroundScope,
                     Random(42),
@@ -666,12 +684,12 @@ class GameTest {
             game.createTargets()
             testScheduler.runCurrent()
 
-            // Four 250ms ticks reveal and break the sole target out (lifetimeMs 1000, delay 0).
+            // Four 250ms ticks reveal and break the sole target out (flightTimeMs 1000, id 0 always appears immediately).
             repeat(4) { game.tick(250) }
             testScheduler.runCurrent()
             assertEquals(2, game.stateFlow.value.field.level)
 
-            // FakeSessionHelper: value = targetValue + (level - 1), lifetimeMs = 1000 + (level - 1).
+            // FakeSessionHelper: value = targetValue + (level - 1), flightTimeMs = 1000 + (level - 1).
             // A hardcoded 1 or an off-by-one level + 1 both land on a different number than this.
             val regenerated =
                 game.stateFlow.value.targets
@@ -726,7 +744,10 @@ class GameTest {
     @Test
     fun `a target created after restore is scheduled against the restored gameTimeMs not zero`() =
         runTest {
-            val game = Game(FakeSessionHelper(targetAmount = 1, appearanceDelayMs = 300), backgroundScope, Random(23))
+            // openingOffsetMs is the total, not an extra past the default (which auto-floors to the
+            // level's own flight time, 1000ms here, so id 0 appears immediately) - 1300 leaves
+            // exactly a 300ms gap past that floor.
+            val game = Game(FakeSessionHelper(targetAmount = 1, openingOffsetMs = 1300), backgroundScope, Random(23))
             game.fieldRestored(Field(id = 1, level = 1, lifeCount = 3, gameTimeMs = 5000, isClosed = false))
 
             game.createTargets()

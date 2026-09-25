@@ -20,16 +20,17 @@ import kotlin.random.Random
 
 private class PersistenceFakeSessionHelper(
     private val targetAmount: Int = 1,
-    private val appearanceDelayMs: Int = 0,
+    // Total opening offset for id 0, mirroring FakeSessionHelper's own shape: null auto-floors to
+    // the flight time (lifetimeMs below), so id 0 appears immediately unless overridden.
+    private val openingOffsetMs: Int? = null,
     // Comfortably above a hundred 1ms ticks, so the clock-only tests never cross into breakout.
     // Tests that need an actual breakout override this to something a handful of ticks can clear.
     private val lifetimeMs: Int = 100_000,
-    private val appearanceDelayMsById: (Int) -> Int = { appearanceDelayMs },
+    private val finishSpacingMs: Int = 200_000,
 ) : SessionHelper {
     override val levelRange = 1..999
     override val initialTargetValueRange = 1..20
-    override val initialTargetLifetimeMsRange = 20000..40000
-    override val initialTargetAppearanceDelayMsRange = 10000..20000
+    override val initialTargetFlightTimeMsRange = 20000..40000
     override val initialTargetAmountRange = 6..10
     override val initialDivisionValueRange = 2..5
     override val initialSubtractionValueRange = 1..3
@@ -39,12 +40,13 @@ private class PersistenceFakeSessionHelper(
         operationDigit: Int,
     ) = 10
 
-    override fun getTargetLifetimeMsByLevel(level: Int) = lifetimeMs
+    override fun getTargetSpeedByLevel(level: Int) = 1f / lifetimeMs
 
-    override fun getTargetAppearanceDelayMsByIdAndLevel(
-        id: Int,
-        level: Int,
-    ) = appearanceDelayMsById(id)
+    override fun getTargetFlightTimeMs(level: Int) = lifetimeMs
+
+    override fun getFinishSpacingMsByLevel(level: Int) = finishSpacingMs
+
+    override fun getOpeningOffsetMsByLevel(level: Int) = (openingOffsetMs ?: lifetimeMs).coerceAtLeast(lifetimeMs)
 
     override fun getTargetAmountByLevel(level: Int) = targetAmount + (level - 1)
 
@@ -141,7 +143,10 @@ class GameViewModelPersistenceTest {
             val repository = PersistenceFakeGameRepository()
             val game =
                 Game(
-                    PersistenceFakeSessionHelper(targetAmount = 1, appearanceDelayMs = 5000),
+                    // openingOffsetMs is the total, not an extra past the default (which
+                    // auto-floors to the flight time, lifetimeMs's own default 100_000) - 105_000
+                    // leaves exactly a 5000ms gap past that floor.
+                    PersistenceFakeSessionHelper(targetAmount = 1, openingOffsetMs = 105_000),
                     backgroundScope,
                     Random(1),
                 )
@@ -187,10 +192,13 @@ class GameViewModelPersistenceTest {
             // below.
             val game =
                 Game(
+                    // MC-73: a huge finish spacing (rather than a per-id delay, no longer
+                    // expressible) pushes the second target's own appearsAtMs well past this
+                    // test's window.
                     PersistenceFakeSessionHelper(
                         targetAmount = 2,
                         lifetimeMs = 1000,
-                        appearanceDelayMsById = { index -> if (index == 0) 0 else 999_999 },
+                        finishSpacingMs = 999_999,
                     ),
                     backgroundScope,
                     Random(3),
@@ -221,7 +229,10 @@ class GameViewModelPersistenceTest {
             val repository = PersistenceFakeGameRepository()
             val game =
                 Game(
-                    PersistenceFakeSessionHelper(targetAmount = 1, appearanceDelayMs = 5000),
+                    // openingOffsetMs is the total, not an extra past the default (which
+                    // auto-floors to the flight time, lifetimeMs's own default 100_000) - 105_000
+                    // leaves exactly a 5000ms gap past that floor.
+                    PersistenceFakeSessionHelper(targetAmount = 1, openingOffsetMs = 105_000),
                     backgroundScope,
                     Random(4),
                 )

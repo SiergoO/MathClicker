@@ -1,6 +1,7 @@
 package com.sdamashchuk.matharcade.core.game.objectmapper
 
 import com.sdamashchuk.matharcade.core.model.Field
+import com.sdamashchuk.matharcade.core.model.INITIAL_LIFE_COUNT
 import com.sdamashchuk.matharcade.core.model.OperationSign
 
 internal fun Field.decrementLifeCount(decrement: Int): Field {
@@ -38,7 +39,7 @@ private const val LEVEL_MAX = 999
 // Capped at Field's own starting lifeCount (see Field.kt) rather than an unbounded bank: the grant
 // is a recovery mechanic, not a second growth curve, and staying at or below the start keeps the
 // existing 3-slot life HUD (Field.kt in :feature:game) correct with no further change.
-private const val LIFE_BONUS_CAP = 3
+private const val LIFE_BONUS_CAP = INITIAL_LIFE_COUNT
 
 // The only place a level is ever incremented (see LEVEL_MAX above). Restoring a session never calls
 // this. MC-54's every-N-levels life bonus lived here too until MC-76 removed the trigger - leveling

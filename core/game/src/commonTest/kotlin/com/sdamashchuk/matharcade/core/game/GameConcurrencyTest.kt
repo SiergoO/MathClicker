@@ -27,12 +27,14 @@ import kotlin.test.assertEquals
 // value regardless of seed - fine for the race test below, but see the second test's comment.
 private class RaceSessionHelper(
     private val amount: Int = 1,
-    private val appearanceDelayMsById: (Int) -> Int = { 0 },
+    // Total opening offset for id 0, mirroring FakeSessionHelper's own shape: default 0 auto-floors
+    // to the flight time below (100ms), so id 0 appears immediately unless overridden.
+    private val openingOffsetMs: Int = 0,
+    private val finishSpacingMs: Int = 1,
 ) : SessionHelper {
     override val levelRange = 1..999
     override val initialTargetValueRange = 1..20
-    override val initialTargetLifetimeMsRange = 20000..40000
-    override val initialTargetAppearanceDelayMsRange = 10000..20000
+    override val initialTargetFlightTimeMsRange = 20000..40000
     override val initialTargetAmountRange = 6..10
     override val initialDivisionValueRange = 2..5
     override val initialSubtractionValueRange = 1..3
@@ -42,16 +44,17 @@ private class RaceSessionHelper(
         operationDigit: Int,
     ) = UNKILLABLE_TARGET_VALUE
 
+    override fun getTargetSpeedByLevel(level: Int) = 1f / FLIGHT_TIME_MS
+
     // Well under MAX_TICK_MS: a single BREAKOUT_TICK_MS tick both falls and breaks the target out in
     // one locked call, the same one-call atomicity the old single targetDidBreakout() call gave this
-    // race - a lifetime that needed several ticks to exhaust would spread the breakout across more
+    // race - a flight time that needed several ticks to exhaust would spread the breakout across more
     // than one mutex acquisition and change what is being raced against fire.
-    override fun getTargetLifetimeMsByLevel(level: Int) = 100
+    override fun getTargetFlightTimeMs(level: Int) = FLIGHT_TIME_MS
 
-    override fun getTargetAppearanceDelayMsByIdAndLevel(
-        id: Int,
-        level: Int,
-    ) = appearanceDelayMsById(id)
+    override fun getFinishSpacingMsByLevel(level: Int) = finishSpacingMs
+
+    override fun getOpeningOffsetMsByLevel(level: Int) = openingOffsetMs.coerceAtLeast(FLIGHT_TIME_MS)
 
     override fun getTargetAmountByLevel(level: Int) = amount
 
@@ -74,6 +77,8 @@ private class RaceSessionHelper(
 private const val SETTLE_TIMEOUT_MS = 300L
 
 private const val UNKILLABLE_TARGET_VALUE = 1_000_000
+
+private const val FLIGHT_TIME_MS = 100
 
 // Per-trial detection is not uniform across the three readers: injecting a split write measures
 // roughly 100% for the breakout reader, 9% for the fire reader and 0.1% for the level-up one. That
@@ -146,9 +151,11 @@ private suspend fun raceLevelUpAgainstFire(seed: Long): Pair<Field, List<Target>
 private suspend fun readerSeesTornStateOnLastLifeBreakout(seed: Long): Boolean {
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     try {
+        // MC-73: a huge finish spacing (rather than a per-id delay, no longer expressible) pushes
+        // the second target's own appearsAtMs well past this test's window.
         val game =
             Game(
-                RaceSessionHelper(amount = 2, appearanceDelayMsById = { index -> if (index == 0) 0 else 999_999 }),
+                RaceSessionHelper(amount = 2, finishSpacingMs = 999_999),
                 scope,
                 Random(seed),
             )

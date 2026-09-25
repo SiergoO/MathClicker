@@ -224,7 +224,7 @@ class Game(
                     targetsAfterBreakout.none { it.isActive && it.isVisible(advancedField.gameTimeMs) }
             val targetsAfterShorten =
                 if (stillWaiting) {
-                    targetsAfterBreakout.shortenAppearanceDelay(advancedField.gameTimeMs, random)
+                    targetsAfterBreakout.shortenAppearanceDelay(advancedField.gameTimeMs)
                 } else {
                     targetsAfterBreakout
                 }
@@ -342,16 +342,22 @@ class Game(
     // itself, instead of a second read-then-write of _stateFlow.
     private fun recreateTargets(field: Field): List<Target> {
         val amount = sessionHelper.getTargetAmountByLevel(field.level)
+        // Assigned once per field, not per target: both are deterministic (no Random draw), so
+        // there is nothing to desync by hoisting them out of the loop below - see MC-73's spec for
+        // why finishesAtMs is assigned directly rather than derived as appearsAtMs + a rolled
+        // lifetime (the bug this task exists for).
+        val openingOffsetMs = sessionHelper.getOpeningOffsetMsByLevel(field.level)
+        val finishSpacingMs = sessionHelper.getFinishSpacingMsByLevel(field.level)
         return List(amount) { id ->
-            // MC-72: an exact translation of the pre-MC-72 delay/lifetime pair into the two moments
-            // now scheduled directly - see the design doc's "why this is worth the churn". The three
-            // sessionHelper draws must stay in this order (value, then delay, then lifetime): they
-            // share one seeded Random, and the pre-MC-72 constructor call drew in exactly this order
-            // (Kotlin evaluates constructor arguments left-to-right by call-site position, not by
-            // declared parameter order) - reordering them silently desyncs every draw after the first.
+            // The two remaining sessionHelper draws must stay in this order (value, then flight
+            // time): they share one seeded Random, and Kotlin evaluates constructor/call arguments
+            // left-to-right by call-site position - reordering them silently desyncs every draw
+            // after the first (the same discipline MC-72's version of this comment documented for
+            // its own three draws).
             val value = sessionHelper.getTargetValueByLevel(field.level, field.currentOperationDigit)
-            val appearsAtMs = field.gameTimeMs + sessionHelper.getTargetAppearanceDelayMsByIdAndLevel(id, field.level)
-            val finishesAtMs = appearsAtMs + sessionHelper.getTargetLifetimeMsByLevel(field.level)
+            val flightTimeMs = sessionHelper.getTargetFlightTimeMs(field.level)
+            val finishesAtMs = field.gameTimeMs + openingOffsetMs + id * finishSpacingMs
+            val appearsAtMs = finishesAtMs - flightTimeMs
             Target(
                 id = id + 1,
                 relatedFieldId = field.id,
