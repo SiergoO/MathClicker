@@ -2,6 +2,7 @@ package com.sdamashchuk.matharcade.presentation.navigation
 
 import com.sdamashchuk.matharcade.feature.game.GameComponent
 import com.sdamashchuk.matharcade.feature.menu.MenuComponent
+import com.sdamashchuk.matharcade.feature.menu.SettingsComponent
 import com.sdamashchuk.matharcade.presentation.splash.SplashComponent
 
 sealed interface RootChild {
@@ -15,5 +16,9 @@ sealed interface RootChild {
 
     data class Game(
         val component: GameComponent,
+    ) : RootChild
+
+    data class Settings(
+        val component: SettingsComponent,
     ) : RootChild
 }

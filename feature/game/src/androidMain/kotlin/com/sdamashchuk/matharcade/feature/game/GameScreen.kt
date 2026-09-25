@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.lifecycle.Lifecycle
+import com.sdamashchuk.matharcade.core.ui.sound.model.SoundSample
 import com.sdamashchuk.matharcade.core.ui.theme.MathArcadeTheme
 import com.sdamashchuk.matharcade.feature.game.model.FeedbackEffect
 import kotlinx.coroutines.delay
@@ -49,6 +50,7 @@ fun GameScreen(component: GameComponent) {
                 hapticFeedback.performHapticFeedback(effect.haptic)
                 if (repeatIndex < effect.hapticRepeatCount - 1) delay(HAPTIC_REPEAT_GAP_MS)
             }
+            soundFor(effect)?.let { component.playSound(it) }
             if (effect is FeedbackEffect.TargetBrokeOut) {
                 scope.launch { shakeField(shakeOffsetX) }
             }
@@ -91,6 +93,10 @@ fun GameScreen(component: GameComponent) {
                             Field(
                                 gameState,
                                 onTargetClicked = { id ->
+                                    // Not routed through GameEvent: a tap that does not zero its
+                                    // target emits nothing on that stream (see targetClicked), but
+                                    // the asset table wants a sound on every tap regardless.
+                                    component.playSound(SoundSample.Tap)
                                     component.sendAction(GameViewModel.Action.TargetClicked(id))
                                 },
                                 onFireClicked = { component.sendAction(GameViewModel.Action.FireButtonClicked) },

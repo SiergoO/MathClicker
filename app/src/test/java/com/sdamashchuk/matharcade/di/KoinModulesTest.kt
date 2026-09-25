@@ -2,6 +2,8 @@ package com.sdamashchuk.matharcade.di
 
 import com.sdamashchuk.matharcade.core.database.repository.GameRepository
 import com.sdamashchuk.matharcade.core.game.Game
+import com.sdamashchuk.matharcade.core.ui.sound.SoundEventPlayer
+import com.sdamashchuk.matharcade.core.ui.sound.SoundSettings
 import kotlinx.coroutines.CoroutineScope
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
@@ -52,7 +54,7 @@ class KoinModulesTest {
     fun everyTypeRootComponentAsksKoinForHasADefinition() {
         module {
             includes(appModules)
-            factory { RootComponentProbe(get(), get()) }
+            factory { RootComponentProbe(get(), get(), get(), get()) }
         }.verify(extraTypes = listOf(CoroutineScope::class))
     }
 
@@ -92,5 +94,7 @@ class KoinModulesTest {
     private class RootComponentProbe(
         game: Game,
         gameRepository: GameRepository,
+        soundEventPlayer: SoundEventPlayer,
+        soundSettings: SoundSettings,
     )
 }

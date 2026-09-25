@@ -33,6 +33,10 @@ class MenuViewModel : ComponentViewModel() {
                         _uiEvents.trySend(UiEvent.NavigateToGameScreen)
                     }
 
+                    Action.ButtonSettingsClicked -> {
+                        _uiEvents.trySend(UiEvent.NavigateToSettingsScreen)
+                    }
+
                     Action.OpenDialog -> {
                         _state.value =
                             state.value.copy(
@@ -53,10 +57,14 @@ class MenuViewModel : ComponentViewModel() {
 
     sealed class UiEvent {
         object NavigateToGameScreen : UiEvent()
+
+        object NavigateToSettingsScreen : UiEvent()
     }
 
     sealed class Action {
         object ButtonPlayClicked : Action()
+
+        object ButtonSettingsClicked : Action()
 
         object OpenDialog : Action()
 

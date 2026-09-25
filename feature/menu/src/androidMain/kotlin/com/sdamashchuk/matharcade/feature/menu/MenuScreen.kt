@@ -3,7 +3,9 @@ package com.sdamashchuk.matharcade.feature.menu
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -21,6 +23,8 @@ import androidx.constraintlayout.compose.ConstraintLayout
 import com.sdamashchuk.matharcade.core.ui.component.MathArcadeDialog
 import com.sdamashchuk.matharcade.core.ui.component.MenuButton
 import com.sdamashchuk.matharcade.core.ui.theme.MathArcadeTheme
+
+private val MENU_BUTTON_GAP = 12.dp
 
 @Composable
 fun MenuScreen(component: MenuComponent) {
@@ -85,9 +89,16 @@ fun MenuScreen(component: MenuComponent) {
                         end.linkTo(parent.end)
                     },
             ) {
+                // SpaceEvenly distributes the chain's own slack, which is zero here - the two
+                // buttons abutted into one notched shape on a device until this gap was explicit.
                 MenuButton(
                     text = stringResource(id = R.string.menu_button_play),
                     onClick = { component.sendAction(MenuViewModel.Action.ButtonPlayClicked) },
+                )
+                Spacer(modifier = Modifier.height(MENU_BUTTON_GAP))
+                MenuButton(
+                    text = stringResource(id = R.string.menu_button_settings),
+                    onClick = { component.sendAction(MenuViewModel.Action.ButtonSettingsClicked) },
                 )
             }
             createVerticalChain(logoImage, menuButtons, chainStyle = ChainStyle.Spread)

@@ -18,6 +18,7 @@ import kotlinx.coroutines.launch
 class MenuComponent(
     componentContext: ComponentContext,
     private val onPlayClicked: () -> Unit,
+    private val onSettingsClicked: () -> Unit,
 ) : ComponentContext by componentContext {
     private val viewModel: MenuViewModel = viewModel { MenuViewModel() }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -30,6 +31,7 @@ class MenuComponent(
             viewModel.uiEvents.receiveAsFlow().collect { event ->
                 when (event) {
                     MenuViewModel.UiEvent.NavigateToGameScreen -> onPlayClicked()
+                    MenuViewModel.UiEvent.NavigateToSettingsScreen -> onSettingsClicked()
                 }
             }
         }

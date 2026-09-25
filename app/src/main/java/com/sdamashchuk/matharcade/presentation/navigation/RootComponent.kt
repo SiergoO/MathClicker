@@ -11,8 +11,11 @@ import com.arkivanov.decompose.router.stack.replaceAll
 import com.arkivanov.decompose.value.Value
 import com.sdamashchuk.matharcade.core.database.repository.GameRepository
 import com.sdamashchuk.matharcade.core.game.Game
+import com.sdamashchuk.matharcade.core.ui.sound.SoundEventPlayer
+import com.sdamashchuk.matharcade.core.ui.sound.SoundSettings
 import com.sdamashchuk.matharcade.feature.game.GameComponent
 import com.sdamashchuk.matharcade.feature.menu.MenuComponent
+import com.sdamashchuk.matharcade.feature.menu.SettingsComponent
 import com.sdamashchuk.matharcade.presentation.splash.SplashComponent
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.get
@@ -64,6 +67,7 @@ class RootComponent(
                     MenuComponent(
                         componentContext = componentContext,
                         onPlayClicked = { navigation.push(RootConfig.Game) },
+                        onSettingsClicked = { navigation.push(RootConfig.Settings) },
                     ),
                 )
             }
@@ -74,6 +78,11 @@ class RootComponent(
                         componentContext = componentContext,
                         game = get<Game>(),
                         gameRepository = get<GameRepository>(),
+                        // A fresh SoundEventPlayer per entry, not a shared one: soundModule
+                        // registers it as a Koin factory precisely so GameComponent gets its own
+                        // SoundPool to release on the way out, never one a previous session already
+                        // released.
+                        soundEventPlayer = get<SoundEventPlayer>(),
                         // Decompose requires unique configs in a stack, unlike the androidx.navigation
                         // backstack this replaces, so "back to menu" pops the existing Menu entry
                         // rather than pushing a second one. That is also a behaviour change worth
@@ -81,6 +90,16 @@ class RootComponent(
                         // Game Over dialog, and the stack grew by two entries per round. Now the
                         // menu is the bottom of the stack and back from it leaves the app.
                         onBackToMenu = { navigation.pop() },
+                    ),
+                )
+            }
+
+            RootConfig.Settings -> {
+                RootChild.Settings(
+                    SettingsComponent(
+                        componentContext = componentContext,
+                        soundSettings = get<SoundSettings>(),
+                        onBackClicked = { navigation.pop() },
                     ),
                 )
             }
