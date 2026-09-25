@@ -126,10 +126,8 @@ private fun failedGrowthCapTarget(value: Int) =
         relatedFieldId = 0,
         columnId = 0,
         value = value,
-        fallenMs = 0,
-        appearanceDelayMs = 0,
-        lifetimeMs = 0,
-        isVisible = true,
+        appearsAtMs = 0,
+        finishesAtMs = 0,
     )
 
 class SessionHelperImplTest {
@@ -379,7 +377,8 @@ class SessionHelperImplTest {
         // ceiling by a wide margin without the clamp.
         val targets = listOf(failedGrowthCapTarget(cap))
 
-        val (updated, _, failed) = targets.performOperation(OperationSign.DIVISION, currentOperationDigit = 7, cap)
+        val (updated, _, failed) =
+            targets.performOperation(OperationSign.DIVISION, currentOperationDigit = 7, cap, gameTimeMs = 0)
 
         assertTrue(failed)
         assertEquals(cap, updated.first().value)
@@ -408,7 +407,7 @@ class SessionHelperImplTest {
                         targets = targets.decrementValue(1, remainder)
                         tapsUsed += remainder
                     }
-                    targets = targets.performOperation(OperationSign.DIVISION, digit, cap).targets
+                    targets = targets.performOperation(OperationSign.DIVISION, digit, cap, gameTimeMs = 0).targets
                 }
                 tapsUsed += targets.first().value
                 assertTrue(

@@ -2,7 +2,6 @@ package com.sdamashchuk.matharcade.core.game
 
 import com.sdamashchuk.matharcade.core.model.Field
 import com.sdamashchuk.matharcade.core.model.OperationSign
-import com.sdamashchuk.matharcade.core.model.Target
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import kotlin.random.Random
@@ -21,16 +20,7 @@ class GameStreakTest {
             game.createField(1)
             game.targetsRestored(
                 listOf(
-                    Target(
-                        id = 1,
-                        relatedFieldId = 1,
-                        columnId = 0,
-                        value = 1000,
-                        fallenMs = 0,
-                        appearanceDelayMs = 0,
-                        lifetimeMs = 100_000,
-                        isVisible = true,
-                    ),
+                    scheduledTarget(id = 1, value = 1000),
                 ),
             )
 
@@ -59,26 +49,8 @@ class GameStreakTest {
             game.createField(1)
             game.targetsRestored(
                 listOf(
-                    Target(
-                        id = 1,
-                        relatedFieldId = 1,
-                        columnId = 0,
-                        value = 1000,
-                        fallenMs = 0,
-                        appearanceDelayMs = 0,
-                        lifetimeMs = 100_000,
-                        isVisible = true,
-                    ),
-                    Target(
-                        id = 2,
-                        relatedFieldId = 1,
-                        columnId = 1,
-                        value = 1000,
-                        fallenMs = 0,
-                        appearanceDelayMs = 0,
-                        lifetimeMs = 100_000,
-                        isVisible = true,
-                    ),
+                    scheduledTarget(id = 1, value = 1000),
+                    scheduledTarget(id = 2, columnId = 1, value = 1000),
                 ),
             )
             val field = game.stateFlow.value.field
@@ -94,27 +66,8 @@ class GameStreakTest {
         runTest {
             val game = Game(FakeSessionHelper(targetAmount = 2, targetValue = 1000), backgroundScope, Random(1))
             game.createField(1)
-            val steady =
-                Target(
-                    id = 1,
-                    relatedFieldId = 1,
-                    columnId = 0,
-                    value = 1000,
-                    fallenMs = 0,
-                    appearanceDelayMs = 0,
-                    lifetimeMs = 100_000,
-                    isVisible = true,
-                )
-            val dormant =
-                Target(
-                    id = 2,
-                    relatedFieldId = 1,
-                    columnId = 1,
-                    value = 2,
-                    fallenMs = 0,
-                    appearanceDelayMs = 0,
-                    lifetimeMs = 100_000,
-                )
+            val steady = scheduledTarget(id = 1, value = 1000)
+            val dormant = scheduledTarget(id = 2, columnId = 1, value = 2, appearanceDelayMs = 1)
             game.targetsRestored(listOf(steady, dormant))
 
             suspend fun fire(digit: Int) {
@@ -133,7 +86,7 @@ class GameStreakTest {
             // Reveal dormant and overshoot it (2 - 5 < 0) in the same press steady still succeeds in.
             game.targetsRestored(
                 game.stateFlow.value.targets
-                    .map { if (it.id == 2) it.copy(isVisible = true) else it },
+                    .map { if (it.id == 2) it.copy(appearsAtMs = 0) else it },
             )
 
             fire(5)
@@ -154,28 +107,8 @@ class GameStreakTest {
         runTest {
             val game = Game(FakeSessionHelper(targetAmount = 2, targetValue = 1000), backgroundScope, Random(1))
             game.createField(1)
-            val steady =
-                Target(
-                    id = 1,
-                    relatedFieldId = 1,
-                    columnId = 0,
-                    value = 1000,
-                    fallenMs = 0,
-                    appearanceDelayMs = 0,
-                    lifetimeMs = 100_000,
-                    isVisible = true,
-                )
-            val fallingOut =
-                Target(
-                    id = 2,
-                    relatedFieldId = 1,
-                    columnId = 1,
-                    value = 5,
-                    fallenMs = 90,
-                    appearanceDelayMs = 0,
-                    lifetimeMs = 100,
-                    isVisible = true,
-                )
+            val steady = scheduledTarget(id = 1, value = 1000)
+            val fallingOut = scheduledTarget(id = 2, columnId = 1, value = 5, fallenMs = 90, lifetimeMs = 100)
             game.targetsRestored(listOf(steady, fallingOut))
             val field = game.stateFlow.value.field
             game.fieldRestored(field.copy(currentOperationSign = OperationSign.SUBTRACTION, currentOperationDigit = 1))
@@ -195,16 +128,7 @@ class GameStreakTest {
             game.createField(1)
             game.targetsRestored(
                 listOf(
-                    Target(
-                        id = 1,
-                        relatedFieldId = 1,
-                        columnId = 0,
-                        value = 1000,
-                        fallenMs = 0,
-                        appearanceDelayMs = 0,
-                        lifetimeMs = 100_000,
-                        isVisible = true,
-                    ),
+                    scheduledTarget(id = 1, value = 1000),
                 ),
             )
 
@@ -234,16 +158,7 @@ class GameStreakTest {
             game.createField(1)
             game.targetsRestored(
                 listOf(
-                    Target(
-                        id = 1,
-                        relatedFieldId = 1,
-                        columnId = 0,
-                        value = 1_000_000,
-                        fallenMs = 0,
-                        appearanceDelayMs = 0,
-                        lifetimeMs = 100_000,
-                        isVisible = true,
-                    ),
+                    scheduledTarget(id = 1, value = 1_000_000),
                 ),
             )
             // A subtraction scores its own digit, so this press is worth 100 000 raw against a
@@ -278,28 +193,8 @@ class GameStreakTest {
                 )
             gameA.fieldRestored(baseField)
             gameB.fieldRestored(baseField)
-            val overshoot =
-                Target(
-                    id = 1,
-                    relatedFieldId = 1,
-                    columnId = 0,
-                    value = 2,
-                    fallenMs = 0,
-                    appearanceDelayMs = 0,
-                    lifetimeMs = 100_000,
-                    isVisible = true,
-                )
-            val success =
-                Target(
-                    id = 2,
-                    relatedFieldId = 1,
-                    columnId = 1,
-                    value = 10,
-                    fallenMs = 0,
-                    appearanceDelayMs = 0,
-                    lifetimeMs = 100_000,
-                    isVisible = true,
-                )
+            val overshoot = scheduledTarget(id = 1, value = 2)
+            val success = scheduledTarget(id = 2, columnId = 1, value = 10)
             gameA.targetsRestored(listOf(overshoot, success))
             gameB.targetsRestored(listOf(success, overshoot))
 

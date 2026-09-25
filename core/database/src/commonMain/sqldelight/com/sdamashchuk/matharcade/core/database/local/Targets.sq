@@ -1,12 +1,12 @@
-CREATE TABLE IF NOT EXISTS "targets" (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `relatedFieldId` INTEGER NOT NULL, `columnId` INTEGER NOT NULL, `value` INTEGER NOT NULL, `fallenMs` INTEGER NOT NULL, `appearanceDelayMs` INTEGER NOT NULL, `lifetimeMs` INTEGER NOT NULL, `isProfitable` INTEGER AS kotlin.Boolean NOT NULL, `isVisible` INTEGER AS kotlin.Boolean NOT NULL, `isActive` INTEGER AS kotlin.Boolean NOT NULL);
+CREATE TABLE IF NOT EXISTS "targets" (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `relatedFieldId` INTEGER NOT NULL, `columnId` INTEGER NOT NULL, `value` INTEGER NOT NULL, `fallenMs` INTEGER NOT NULL, `appearanceDelayMs` INTEGER NOT NULL, `lifetimeMs` INTEGER NOT NULL, `isProfitable` INTEGER AS kotlin.Boolean NOT NULL, `isVisible` INTEGER AS kotlin.Boolean NOT NULL, `isActive` INTEGER AS kotlin.Boolean NOT NULL, `appearsAtMs` INTEGER NOT NULL DEFAULT 0, `finishesAtMs` INTEGER NOT NULL DEFAULT 0);
 
 insertTarget:
-INSERT OR REPLACE INTO targets (id, relatedFieldId, columnId, value, fallenMs, appearanceDelayMs, lifetimeMs, isProfitable, isVisible, isActive)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+INSERT OR REPLACE INTO targets (id, relatedFieldId, columnId, value, fallenMs, appearanceDelayMs, lifetimeMs, isProfitable, isVisible, isActive, appearsAtMs, finishesAtMs)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 updateTarget:
 UPDATE OR REPLACE targets
-SET relatedFieldId = ?, columnId = ?, value = ?, fallenMs = ?, appearanceDelayMs = ?, lifetimeMs = ?, isProfitable = ?, isVisible = ?, isActive = ?
+SET relatedFieldId = ?, columnId = ?, value = ?, fallenMs = ?, appearanceDelayMs = ?, lifetimeMs = ?, isProfitable = ?, isVisible = ?, isActive = ?, appearsAtMs = ?, finishesAtMs = ?
 WHERE id = ?;
 
 deleteTargets:

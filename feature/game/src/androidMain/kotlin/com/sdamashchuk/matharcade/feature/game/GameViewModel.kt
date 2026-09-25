@@ -264,16 +264,14 @@ internal fun shouldRefreshTargets(
     nextIds: Set<Int>,
 ) = previousIds != nextIds
 
-// fallenMs and appearanceDelayMs both tick down on every tick(), so a target mid-fall or mid-delay
-// changes on every frame regardless of anything the player did; excluding only one of the two still
-// persists once per frame for as long as the other is moving.
+// MC-72: a target's schedule (appearsAtMs/finishesAtMs) is fixed at creation and only ever shifted
+// by an event (shorten, level-up) - unlike the old fallenMs/appearanceDelayMs pair, nothing on
+// Target itself moves on every tick() any more, only Field.gameTimeMs does. Plain equality is
+// therefore already the right check; no clock-only fields are left to exclude.
 internal fun shouldPersistTargets(
     previousTargets: List<Target>,
     nextTargets: List<Target>,
-): Boolean {
-    fun List<Target>.withoutClock() = map { it.copy(fallenMs = 0, appearanceDelayMs = 0) }
-    return previousTargets.withoutClock() != nextTargets.withoutClock()
-}
+): Boolean = previousTargets != nextTargets
 
 // Level-up arrives from two call sites inside Game - tick() and activeTargetsAbsent() - so the
 // trigger is this delta on the field the collector already sees, not either call site directly.

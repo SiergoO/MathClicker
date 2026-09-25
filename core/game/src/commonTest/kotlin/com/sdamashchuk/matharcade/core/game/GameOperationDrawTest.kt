@@ -112,10 +112,10 @@ class GameOperationDrawTest {
 
                 game.fireButtonClicked()
 
+                val field = game.stateFlow.value.field
                 val visibleActiveTargets =
                     game.stateFlow.value.targets
-                        .filter { it.isActive && it.isVisible }
-                val field = game.stateFlow.value.field
+                        .filter { it.isActive && it.isVisible(field.gameTimeMs) }
                 val dud =
                     visibleActiveTargets.isNotEmpty() &&
                         visibleActiveTargets.none {
@@ -147,7 +147,11 @@ class GameOperationDrawTest {
             val countingRandom = DrawCountingRandom(Random(1))
             val game = Game(SessionHelperImpl(random = Random(1)), backgroundScope, countingRandom)
             game.createField(1)
-            game.createTargets() // every target defaults to isVisible = false, never ticked
+            // MC-72: game.createTargets() no longer produces this case - the real session helper
+            // always schedules the first target's appearsAtMs at field.gameTimeMs (delay 0), so it is
+            // visible immediately, not hidden until a tick advances the clock past it. A genuinely
+            // fully-hidden board is now built directly: every target scheduled to appear in the future.
+            game.targetsRestored(listOf(scheduledTarget(id = 1, columnId = 0, value = 5, appearanceDelayMs = 1)))
             val drawsBeforeFiring = countingRandom.drawCount
 
             game.fireButtonClicked()
@@ -197,30 +201,11 @@ class GameOperationDrawTest {
             game.createField(1)
             game.targetsRestored(
                 listOf(
-                    Target(
-                        id = 1,
-                        relatedFieldId = 1,
-                        columnId = 0,
-                        value = 5,
-                        fallenMs = 0,
-                        appearanceDelayMs = 0,
-                        lifetimeMs = 100_000,
-                        isVisible = true,
-                        isActive = true,
-                    ),
+                    scheduledTarget(id = 1, columnId = 0, value = 5),
                     // Satisfies SUBTRACTION/999 (2000 - 999 >= 0), the one combination AlwaysDudSessionHelper
-                    // ever offers - but hidden, so it must not count as a way out of the dud above.
-                    Target(
-                        id = 2,
-                        relatedFieldId = 1,
-                        columnId = 1,
-                        value = 2000,
-                        fallenMs = 0,
-                        appearanceDelayMs = 0,
-                        lifetimeMs = 100_000,
-                        isVisible = false,
-                        isActive = true,
-                    ),
+                    // ever offers - but hidden (appearanceDelayMs > 0), so it must not count as a way
+                    // out of the dud above.
+                    scheduledTarget(id = 2, columnId = 1, value = 2000, appearanceDelayMs = 1),
                 ),
             )
             game.fieldRestored(

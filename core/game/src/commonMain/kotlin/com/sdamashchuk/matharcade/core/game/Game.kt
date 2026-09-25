@@ -3,16 +3,13 @@ package com.sdamashchuk.matharcade.core.game
 import com.sdamashchuk.matharcade.core.game.helper.SessionHelper
 import com.sdamashchuk.matharcade.core.game.model.GameEvent
 import com.sdamashchuk.matharcade.core.game.model.GameState
-import com.sdamashchuk.matharcade.core.game.objectmapper.advance
 import com.sdamashchuk.matharcade.core.game.objectmapper.advanceClock
 import com.sdamashchuk.matharcade.core.game.objectmapper.advanceStreak
 import com.sdamashchuk.matharcade.core.game.objectmapper.changeActiveness
-import com.sdamashchuk.matharcade.core.game.objectmapper.changeVisibility
 import com.sdamashchuk.matharcade.core.game.objectmapper.closeIfNecessary
 import com.sdamashchuk.matharcade.core.game.objectmapper.decrementLifeCount
 import com.sdamashchuk.matharcade.core.game.objectmapper.decrementValue
 import com.sdamashchuk.matharcade.core.game.objectmapper.ensureAlive
-import com.sdamashchuk.matharcade.core.game.objectmapper.ensureVisible
 import com.sdamashchuk.matharcade.core.game.objectmapper.grantLife
 import com.sdamashchuk.matharcade.core.game.objectmapper.resetStreak
 import com.sdamashchuk.matharcade.core.game.objectmapper.shortenAppearanceDelay
@@ -155,7 +152,6 @@ class Game(
                 current.targets
                     .decrementValue(id, 1)
                     .ensureAlive(id)
-                    .ensureVisible(id)
             val updatedTarget = updatedTargets.first { it.id == id }
             val awarded = if (updatedTarget.isProfitable) 1 else 0
             val updatedField = if (updatedTarget.isProfitable) current.field.updateScore(1) else current.field
@@ -173,11 +169,11 @@ class Game(
                     current.field.currentOperationSign,
                     current.field.currentOperationDigit,
                     sessionHelper.failedGrowthCap(current.field.level),
+                    current.field.gameTimeMs,
                 )
             val updatedTargets =
                 pressOutcome.targets
                     .ensureAlive()
-                    .ensureVisible()
             // Drawn against updatedTargets, not the pre-press board: this is the freshest state
             // available before the draw is promoted to "current" by updateActionButtons below, so a
             // target this same press just cleared or retired can't be the reason the next offer is a
@@ -186,7 +182,7 @@ class Game(
             // inside performOperation itself, which is deliberately out of scope: a press that turns
             // out to fail must still cost what it costs.
             val (nextOperationSign, nextOperationDigit) =
-                getNextSignAndDigit(updatedTargets, current.field.level)
+                getNextSignAndDigit(updatedTargets, current.field.level, current.field.gameTimeMs)
             val streakedField = current.field.advanceStreak(pressOutcome.failed)
             // In Long: totalScore is bounded by the board, but appliedMultiplier is not, so the
             // product is the first place an uncapped streak can overflow.
@@ -202,27 +198,36 @@ class Game(
             _events.tryEmit(GameEvent.OperationResolved(gained, streakedField.bonusMultiplier))
         }
 
-    // The engine's own clock: advances every active target by elapsedMs and resolves whatever that
-    // step causes - reveal, breakout, level-up - in this one locked step. This is now the only way
-    // a target falls, is revealed, or breaks out; there is no equivalent UI-driven call left.
+    // The engine's own clock: advances gameTimeMs by elapsedMs and resolves whatever that step
+    // causes against each target's fixed schedule - reveal, breakout, level-up - in this one locked
+    // step. Targets are never rewritten here (MC-72: their schedule is stable, only the clock they
+    // are read against moves); this is now the only way a target is revealed or breaks out, there
+    // is no equivalent UI-driven call left.
     suspend fun tick(elapsedMs: Int) =
         mutex.withLock {
             val current = _stateFlow.value
             if (current.field.isClosed || current.targets.none { it.isActive }) return@withLock
             val step = elapsedMs.coerceIn(0, MAX_TICK_MS)
-            val hadVisibleActiveTarget = current.targets.any { it.isActive && it.isVisible }
+            val hadVisibleActiveTarget = current.targets.any { it.isActive && it.isVisible(current.field.gameTimeMs) }
 
-            val advanced = current.targets.advance(step)
-            val brokenOutIds = advanced.filter { it.isActive && it.fallenMs >= it.lifetimeMs }.map { it.id }
+            val advancedField = current.field.advanceClock(step)
+            val brokenOutIds =
+                current.targets.filter { it.isActive && it.hasBrokenOut(advancedField.gameTimeMs) }.map { it.id }
             val (fieldAfterBreakout, targetsAfterBreakout) =
-                resolveBreakouts(advanced, brokenOutIds, current.field.advanceClock(step))
+                resolveBreakouts(current.targets, brokenOutIds, advancedField)
 
             // Fired on the edge - a visible active target existed before this step and does not
             // after - never on the level, or the draw count this makes would depend on frame rate
             // instead of game events (see shortenAppearanceDelay's own determinism guarantee).
-            val stillWaiting = hadVisibleActiveTarget && targetsAfterBreakout.none { it.isActive && it.isVisible }
+            val stillWaiting =
+                hadVisibleActiveTarget &&
+                    targetsAfterBreakout.none { it.isActive && it.isVisible(advancedField.gameTimeMs) }
             val targetsAfterShorten =
-                if (stillWaiting) targetsAfterBreakout.shortenAppearanceDelay(random) else targetsAfterBreakout
+                if (stillWaiting) {
+                    targetsAfterBreakout.shortenAppearanceDelay(advancedField.gameTimeMs, random)
+                } else {
+                    targetsAfterBreakout
+                }
 
             // fieldAfterBreakout can already be closed here - the breakout that emptied the board
             // is also the one that cost the last life. A closed field must not level up or get a
@@ -301,14 +306,16 @@ class Game(
 
     // The body of the old targetDidBreakout, minus its "already inactive" guard: that guard is now
     // structural, since tick only ever offers an id here once - the same locked step that finds
-    // fallenMs >= lifetimeMs is the one that deactivates it, leaving nothing for a repeat to find.
+    // hasBrokenOut() true is the one that deactivates it, leaving nothing for a repeat to find.
+    // isVisible no longer needs a matching changeVisibility() call: it is derived from the clock
+    // (MC-72), and every consumer already gates on isActive first, which this does set to false.
     private fun resolveBreakouts(
         targets: List<Target>,
         brokenOutIds: List<Int>,
         field: Field,
     ): Pair<Field, List<Target>> {
         val updatedTargets =
-            brokenOutIds.fold(targets) { acc, id -> acc.changeActiveness(id, false).changeVisibility(id, false) }
+            brokenOutIds.fold(targets) { acc, id -> acc.changeActiveness(id, false) }
         val fieldAfterLifeLoss = brokenOutIds.fold(field) { acc, _ -> acc.decrementLifeCount(1) }
         val updatedField =
             (if (brokenOutIds.isNotEmpty()) fieldAfterLifeLoss.resetStreak() else fieldAfterLifeLoss)
@@ -336,14 +343,22 @@ class Game(
     private fun recreateTargets(field: Field): List<Target> {
         val amount = sessionHelper.getTargetAmountByLevel(field.level)
         return List(amount) { id ->
+            // MC-72: an exact translation of the pre-MC-72 delay/lifetime pair into the two moments
+            // now scheduled directly - see the design doc's "why this is worth the churn". The three
+            // sessionHelper draws must stay in this order (value, then delay, then lifetime): they
+            // share one seeded Random, and the pre-MC-72 constructor call drew in exactly this order
+            // (Kotlin evaluates constructor arguments left-to-right by call-site position, not by
+            // declared parameter order) - reordering them silently desyncs every draw after the first.
+            val value = sessionHelper.getTargetValueByLevel(field.level, field.currentOperationDigit)
+            val appearsAtMs = field.gameTimeMs + sessionHelper.getTargetAppearanceDelayMsByIdAndLevel(id, field.level)
+            val finishesAtMs = appearsAtMs + sessionHelper.getTargetLifetimeMsByLevel(field.level)
             Target(
                 id = id + 1,
                 relatedFieldId = field.id,
                 columnId = id.toGameColumnId(),
-                value = sessionHelper.getTargetValueByLevel(field.level, field.currentOperationDigit),
-                fallenMs = 0,
-                appearanceDelayMs = sessionHelper.getTargetAppearanceDelayMsByIdAndLevel(id, field.level),
-                lifetimeMs = sessionHelper.getTargetLifetimeMsByLevel(field.level),
+                value = value,
+                appearsAtMs = appearsAtMs,
+                finishesAtMs = finishesAtMs,
             )
         }
     }
@@ -355,8 +370,9 @@ class Game(
     private fun getNextSignAndDigit(
         targets: List<Target>,
         level: Int,
+        gameTimeMs: Long,
     ): Pair<OperationSign, Int> {
-        val visibleActiveTargets = targets.filter { it.isActive && it.isVisible }
+        val visibleActiveTargets = targets.filter { it.isActive && it.isVisible(gameTimeMs) }
         var sign = OperationSign.values().random(random)
         var digit = sessionHelper.getOperationDigitByLevel(sign, level)
         var attempts = 1

@@ -50,15 +50,16 @@ fun TargetButton(
     target: Target,
     gameColumnSize: Size,
     isReady: Boolean,
+    gameTimeMs: Long,
     onTargetClicked: (id: Int) -> Unit,
 ) {
-    val targetButtonYOffset = target.position * gameColumnSize.height
+    val targetButtonYOffset = target.position(gameTimeMs) * gameColumnSize.height
     if (target.isActive && targetButtonYOffset.dp > 0.dp) {
         val telegraphTransition = rememberInfiniteTransition(label = "breakoutTelegraph")
         val telegraphScale by
             telegraphTransition.animateFloat(
                 initialValue = 1f,
-                targetValue = if (target.isTelegraphingBreakout) TELEGRAPH_PULSE_SCALE else 1f,
+                targetValue = if (target.isTelegraphingBreakout(gameTimeMs)) TELEGRAPH_PULSE_SCALE else 1f,
                 animationSpec =
                     infiniteRepeatable(
                         animation = tween(TELEGRAPH_PULSE_MS, easing = LinearEasing),
@@ -83,7 +84,12 @@ fun TargetButton(
                     .scale(telegraphScale)
                     .clip(CircleShape),
             colors = ButtonDefaults.buttonColors(backgroundColor = backgroundColor),
-            border = if (target.isTelegraphingBreakout) BorderStroke(TELEGRAPH_BORDER_WIDTH_DP.dp, DarkGray) else null,
+            border =
+                if (target.isTelegraphingBreakout(gameTimeMs)) {
+                    BorderStroke(TELEGRAPH_BORDER_WIDTH_DP.dp, DarkGray)
+                } else {
+                    null
+                },
             onClick = { onTargetClicked.invoke(target.id) },
         ) {
             Text(text = target.value.toString(), fontSize = 20.sp, color = Color.White)

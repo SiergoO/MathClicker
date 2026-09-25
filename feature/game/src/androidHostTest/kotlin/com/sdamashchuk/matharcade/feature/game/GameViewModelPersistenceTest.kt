@@ -14,7 +14,6 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import kotlin.random.Random
@@ -22,7 +21,7 @@ import kotlin.random.Random
 private class PersistenceFakeSessionHelper(
     private val targetAmount: Int = 1,
     private val appearanceDelayMs: Int = 0,
-    // Comfortably above a hundred 1ms ticks, so the fallenMs-only test never crosses into breakout.
+    // Comfortably above a hundred 1ms ticks, so the clock-only tests never cross into breakout.
     // Tests that need an actual breakout override this to something a handful of ticks can clear.
     private val lifetimeMs: Int = 100_000,
     private val appearanceDelayMsById: (Int) -> Int = { appearanceDelayMs },
@@ -110,16 +109,20 @@ class GameViewModelPersistenceTest {
         Dispatchers.resetMain()
     }
 
+    // MC-72: a target's schedule (appearsAtMs/finishesAtMs) is fixed once created, so a tick that
+    // moves nothing but the clock produces no target-list change at all - not the "at most one
+    // throttled write" the pre-MC-72 fallenMs/appearanceDelayMs counters needed, but exactly zero.
     @Test
-    fun `a hundred ticks differing only in fallenMs produce at most one persistence call`() =
+    fun `a hundred ticks against an already-visible target produce zero persistence calls`() =
         runTest {
             val repository = PersistenceFakeGameRepository()
             val game = Game(PersistenceFakeSessionHelper(targetAmount = 1), backgroundScope, Random(1))
             game.start()
             GameViewModel(game, repository)
             testScheduler.runCurrent()
-            // One tick outside the measured window reveals the target (appearanceDelayMs 0), so the
-            // hundred ticks that follow move fallenMs alone.
+            // One tick outside the measured window reveals the target (appearanceDelayMs 0) - not
+            // that revealing it writes anything either (see the isVisible test below), but this
+            // keeps the measured window itself free of the one-time creation write.
             game.tick(1)
             testScheduler.runCurrent()
             repository.clearCalls()
@@ -129,11 +132,11 @@ class GameViewModelPersistenceTest {
                 testScheduler.runCurrent()
             }
 
-            assertTrue(repository.persistenceCallCount() <= 1)
+            assertEquals(0, repository.persistenceCallCount())
         }
 
     @Test
-    fun `a hundred ticks differing only in appearanceDelayMs produce at most one persistence call`() =
+    fun `a hundred ticks against a still-waiting target produce zero persistence calls`() =
         runTest {
             val repository = PersistenceFakeGameRepository()
             val game =
@@ -152,7 +155,7 @@ class GameViewModelPersistenceTest {
                 testScheduler.runCurrent()
             }
 
-            assertTrue(repository.persistenceCallCount() <= 1)
+            assertEquals(0, repository.persistenceCallCount())
         }
 
     @Test
@@ -195,10 +198,10 @@ class GameViewModelPersistenceTest {
             game.start()
             GameViewModel(game, repository)
             testScheduler.runCurrent()
-            // One tick outside the measured window reveals the first target (appearanceDelayMs 0), so
+            // One tick outside the measured window reveals the first target (appearanceDelayMs 0) -
+            // a no-op on the persisted target list under MC-72 (see the isVisible test below), so
             // the reveal itself is not what the measured ticks below persist. The breakout they do
-            // cause flips isActive and isVisible together, in one emission - which is the point:
-            // a key change of any size is still one write.
+            // cause flips isActive, the one field a breakout actually writes now.
             game.tick(1)
             testScheduler.runCurrent()
             repository.clearCalls()
@@ -209,8 +212,11 @@ class GameViewModelPersistenceTest {
             assertEquals(1, repository.persistenceCallCount())
         }
 
+    // MC-72: isVisible is derived from the clock, not stored on Target, so crossing appearsAtMs
+    // changes nothing about the persisted target list - the opposite of the pre-MC-72 claim this
+    // test's name used to make, and the direct kill for a mutant that reintroduced a stored flag.
     @Test
-    fun `an isVisible change persists`() =
+    fun `crossing a target's appearsAtMs persists nothing`() =
         runTest {
             val repository = PersistenceFakeGameRepository()
             val game =
@@ -227,7 +233,7 @@ class GameViewModelPersistenceTest {
             repeat(20) { game.tick(250) } // 5000ms: exactly clears the delay, nothing more
             testScheduler.runCurrent()
 
-            assertEquals(1, repository.persistenceCallCount())
+            assertEquals(0, repository.persistenceCallCount())
         }
 
     @Test

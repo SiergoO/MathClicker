@@ -11,12 +11,13 @@ internal fun List<Target>.performOperation(
     currentOperationSign: OperationSign,
     currentOperationDigit: Int,
     failedGrowthCap: Int,
+    gameTimeMs: Long,
 ): PressOutcome {
     var totalScore = 0
     var pressFailed = false
     val updatedList =
         this.map { target ->
-            if (target.isActive && target.isVisible) {
+            if (target.isActive && target.isVisible(gameTimeMs)) {
                 var isProfitable = target.isProfitable
                 val nextValue =
                     run {

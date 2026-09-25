@@ -12,20 +12,16 @@ import org.junit.Test
 private fun target(
     id: Int = 1,
     value: Int = 10,
-    fallenMs: Int = 0,
-    appearanceDelayMs: Int = 0,
+    appearsAtMs: Long = 0,
     isActive: Boolean = true,
-    isVisible: Boolean = false,
 ) = Target(
     id = id,
     relatedFieldId = 1,
     columnId = 0,
     value = value,
-    fallenMs = fallenMs,
-    appearanceDelayMs = appearanceDelayMs,
-    lifetimeMs = 1000,
+    appearsAtMs = appearsAtMs,
+    finishesAtMs = appearsAtMs + 1000,
     isActive = isActive,
-    isVisible = isVisible,
 )
 
 class GameViewModelLogicTest {
@@ -49,25 +45,22 @@ class GameViewModelLogicTest {
         assertTrue(shouldRefreshTargets(emptySet(), setOf(1, 2, 3)))
     }
 
+    // MC-72: a target's schedule (appearsAtMs/finishesAtMs) is fixed once created - nothing on
+    // Target moves on its own between ticks any more, only Field.gameTimeMs does - so there is no
+    // longer a clock-only field for an unchanged board to exclude. shouldPersistTargets is now
+    // plain equality end to end; these pin that directly rather than a since-removed exclusion.
     @Test
-    fun `shouldPersistTargets is false when only fallenMs moves`() {
-        val previous = listOf(target(fallenMs = 0))
-        val next = listOf(target(fallenMs = 40))
+    fun `shouldPersistTargets is false when nothing about the board changed`() {
+        val previous = listOf(target())
+        val next = listOf(target())
         assertFalse(shouldPersistTargets(previous, next))
     }
 
     @Test
-    fun `shouldPersistTargets is false when only appearanceDelayMs moves`() {
-        val previous = listOf(target(appearanceDelayMs = 5000))
-        val next = listOf(target(appearanceDelayMs = 4960))
-        assertFalse(shouldPersistTargets(previous, next))
-    }
-
-    @Test
-    fun `shouldPersistTargets is false when both clock fields move at once`() {
-        val previous = listOf(target(fallenMs = 0, appearanceDelayMs = 5000))
-        val next = listOf(target(fallenMs = 40, appearanceDelayMs = 0))
-        assertFalse(shouldPersistTargets(previous, next))
+    fun `shouldPersistTargets is true when a target's schedule moves - shortenAppearanceDelay or a level-up`() {
+        val previous = listOf(target(appearsAtMs = 5000))
+        val next = listOf(target(appearsAtMs = 0))
+        assertTrue(shouldPersistTargets(previous, next))
     }
 
     @Test
@@ -81,13 +74,6 @@ class GameViewModelLogicTest {
     fun `shouldPersistTargets is true when isActive changes`() {
         val previous = listOf(target(isActive = true))
         val next = listOf(target(isActive = false))
-        assertTrue(shouldPersistTargets(previous, next))
-    }
-
-    @Test
-    fun `shouldPersistTargets is true when isVisible changes`() {
-        val previous = listOf(target(isVisible = false))
-        val next = listOf(target(isVisible = true))
         assertTrue(shouldPersistTargets(previous, next))
     }
 

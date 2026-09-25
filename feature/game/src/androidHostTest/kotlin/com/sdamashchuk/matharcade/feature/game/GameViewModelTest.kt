@@ -141,18 +141,16 @@ class GameViewModelTest {
                         relatedFieldId = 5,
                         columnId = 0,
                         value = 42,
-                        fallenMs = 10,
-                        appearanceDelayMs = 0,
-                        lifetimeMs = 1000,
+                        appearsAtMs = -10,
+                        finishesAtMs = 990,
                     ),
                     Target(
                         id = 2,
                         relatedFieldId = 5,
                         columnId = 1,
                         value = 43,
-                        fallenMs = 20,
-                        appearanceDelayMs = 0,
-                        lifetimeMs = 1000,
+                        appearsAtMs = -20,
+                        finishesAtMs = 980,
                     ),
                 )
             val repository =
@@ -182,18 +180,16 @@ class GameViewModelTest {
                         relatedFieldId = 5,
                         columnId = 0,
                         value = 5,
-                        fallenMs = 0,
-                        appearanceDelayMs = 0,
-                        lifetimeMs = 1000,
+                        appearsAtMs = 0,
+                        finishesAtMs = 1000,
                     ),
                     Target(
                         id = 2,
                         relatedFieldId = 5,
                         columnId = 1,
                         value = 5,
-                        fallenMs = 0,
-                        appearanceDelayMs = 0,
-                        lifetimeMs = 1000,
+                        appearsAtMs = 0,
+                        finishesAtMs = 1000,
                     ),
                 )
             val repository =
@@ -207,7 +203,7 @@ class GameViewModelTest {
             repository.refreshTargetsCalls.clear()
             repository.updateTargetsCalls.clear()
 
-            // Same id set: only the value/isActive/isVisible flags change.
+            // Same id set: only the value/isActive flags change.
             game.targetClicked(existingTargets[0].id)
             assertTrue(repository.updateTargetsCalls.isNotEmpty())
             assertTrue(repository.refreshTargetsCalls.isEmpty())
@@ -238,9 +234,8 @@ class GameViewModelTest {
                         relatedFieldId = 5,
                         columnId = id - 1,
                         value = 10,
-                        fallenMs = 0,
-                        appearanceDelayMs = 0,
-                        lifetimeMs = 1000,
+                        appearsAtMs = 0,
+                        finishesAtMs = 1000,
                     )
                 }
             val repository =
@@ -275,9 +270,8 @@ class GameViewModelTest {
                     relatedFieldId = 5,
                     columnId = 0,
                     value = 10,
-                    fallenMs = 0,
-                    appearanceDelayMs = 0,
-                    lifetimeMs = 1000,
+                    appearsAtMs = 0,
+                    finishesAtMs = 1000,
                 )
             val repository =
                 FakeGameRepository(
@@ -310,9 +304,8 @@ class GameViewModelTest {
                         relatedFieldId = 5,
                         columnId = id - 1,
                         value = 10,
-                        fallenMs = 0,
-                        appearanceDelayMs = 0,
-                        lifetimeMs = 1000,
+                        appearsAtMs = 0,
+                        finishesAtMs = 1000,
                     )
                 }
             val trueBest = Field(id = 1, score = 999, level = 9, isClosed = true)
@@ -345,9 +338,8 @@ class GameViewModelTest {
                     relatedFieldId = 5,
                     columnId = 0,
                     value = 1,
-                    fallenMs = 0,
-                    appearanceDelayMs = 0,
-                    lifetimeMs = 1000,
+                    appearsAtMs = 0,
+                    finishesAtMs = 1000,
                 )
             val repository =
                 FakeGameRepository(

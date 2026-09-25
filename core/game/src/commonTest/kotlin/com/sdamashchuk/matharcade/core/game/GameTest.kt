@@ -82,15 +82,20 @@ class GameTest {
                 testScheduler.runCurrent()
             }
 
+            val gameTimeMs = game.stateFlow.value.field.gameTimeMs
+            assertEquals(1000L, gameTimeMs)
+            // MC-72: the schedule itself (appearsAtMs) never moves - what "decrements" is the gap
+            // to it, read back off the clock, the same 4000/5000/6000 the old stored delay counted
+            // down to over the same 1000 ticks.
             assertEquals(
-                listOf(4000, 5000, 6000),
+                listOf(4000L, 5000L, 6000L),
                 game.stateFlow.value.targets
                     .sortedBy { it.id }
-                    .map { it.appearanceDelayMs },
+                    .map { it.appearsAtMs - gameTimeMs },
             )
             assertTrue(
                 game.stateFlow.value.targets
-                    .none { it.isVisible },
+                    .none { it.isVisible(gameTimeMs) },
             )
             assertEquals(drawsBeforeTicking, countingRandom.drawCount)
         }
@@ -168,16 +173,7 @@ class GameTest {
             val game = Game(FakeSessionHelper(targetAmount = 1), backgroundScope, Random(25))
             game.start()
             game.fieldRestored(Field(id = 1, level = 3, lifeCount = 1, isClosed = false))
-            val soleTarget =
-                Target(
-                    id = 1,
-                    relatedFieldId = 1,
-                    columnId = 0,
-                    value = 10,
-                    fallenMs = 0,
-                    appearanceDelayMs = 0,
-                    lifetimeMs = 1000,
-                )
+            val soleTarget = scheduledTarget(id = 1, value = 10, lifetimeMs = 1000)
             game.targetsRestored(listOf(soleTarget))
             testScheduler.runCurrent()
 
@@ -196,16 +192,7 @@ class GameTest {
             val game = Game(FakeSessionHelper(targetAmount = 1), backgroundScope, Random(26))
             game.start()
             game.fieldRestored(Field(id = 1, level = 3, lifeCount = 1, isClosed = false))
-            val soleTarget =
-                Target(
-                    id = 1,
-                    relatedFieldId = 1,
-                    columnId = 0,
-                    value = 10,
-                    fallenMs = 0,
-                    appearanceDelayMs = 0,
-                    lifetimeMs = 1000,
-                )
+            val soleTarget = scheduledTarget(id = 1, value = 10, lifetimeMs = 1000)
             game.targetsRestored(listOf(soleTarget))
             testScheduler.runCurrent()
 
@@ -232,16 +219,7 @@ class GameTest {
             val game = Game(FakeSessionHelper(targetAmount = 1, targetValue = 1), backgroundScope, Random(27))
             game.start()
             game.fieldRestored(Field(id = 1, level = 4, lifeCount = 0, isClosed = true))
-            val soleTarget =
-                Target(
-                    id = 1,
-                    relatedFieldId = 1,
-                    columnId = 0,
-                    value = 1,
-                    fallenMs = 0,
-                    appearanceDelayMs = 0,
-                    lifetimeMs = 1000,
-                )
+            val soleTarget = scheduledTarget(id = 1, value = 1, lifetimeMs = 1000)
             game.targetsRestored(listOf(soleTarget))
             testScheduler.runCurrent()
 
@@ -261,16 +239,7 @@ class GameTest {
             val game = Game(FakeSessionHelper(targetAmount = 1, targetValue = 1), backgroundScope, Random(28))
             game.start()
             game.fieldRestored(Field(id = 1, level = 4, lifeCount = 0, isClosed = true))
-            val soleTarget =
-                Target(
-                    id = 1,
-                    relatedFieldId = 1,
-                    columnId = 0,
-                    value = 1,
-                    fallenMs = 0,
-                    appearanceDelayMs = 0,
-                    lifetimeMs = 1000,
-                )
+            val soleTarget = scheduledTarget(id = 1, value = 1, lifetimeMs = 1000)
             game.targetsRestored(listOf(soleTarget))
             testScheduler.runCurrent()
 
@@ -342,9 +311,10 @@ class GameTest {
                 game.createTargets()
 
                 // The very first target always has appearanceDelayMs 0 (see
-                // SessionHelperImpl.getTargetAppearanceDelayMsByIdAndLevel), so one tick reveals it
-                // before firing once against it - the same ordering the old targetRevealed +
-                // fireButtonClicked call pair produced.
+                // SessionHelperImpl.getTargetAppearanceDelayMsByIdAndLevel), so it is already
+                // visible before this tick (MC-72: appearsAtMs == gameTimeMs at creation). The tick
+                // itself is still load-bearing for the pinned literals below - it is one real step
+                // of the simulation being reproduced, not a reveal.
                 game.tick(TICK_STEP_MS)
                 game.fireButtonClicked()
 
@@ -392,6 +362,9 @@ class GameTest {
                 ),
                 firstField,
             )
+            // MC-72: appearsAtMs/finishesAtMs replace fallenMs/appearanceDelayMs/lifetimeMs as the
+            // pinned representation - each target's schedule is now the two absolute instants it was
+            // given at creation, not the countdown state a tick would have advanced it to.
             assertEquals(
                 listOf(
                     Target(
@@ -399,10 +372,8 @@ class GameTest {
                         relatedFieldId = 1,
                         columnId = 0,
                         value = 3,
-                        fallenMs = 9750,
-                        appearanceDelayMs = 0,
-                        lifetimeMs = 9519,
-                        isVisible = false,
+                        appearsAtMs = 0,
+                        finishesAtMs = 9519,
                         isActive = false,
                     ),
                     Target(
@@ -410,10 +381,8 @@ class GameTest {
                         relatedFieldId = 1,
                         columnId = 1,
                         value = 13,
-                        fallenMs = 10800,
-                        appearanceDelayMs = 0,
-                        lifetimeMs = 10750,
-                        isVisible = false,
+                        appearsAtMs = 950,
+                        finishesAtMs = 11700,
                         isActive = false,
                     ),
                     Target(
@@ -421,10 +390,8 @@ class GameTest {
                         relatedFieldId = 1,
                         columnId = 2,
                         value = 13,
-                        fallenMs = 10344,
-                        appearanceDelayMs = 0,
-                        lifetimeMs = 10325,
-                        isVisible = false,
+                        appearsAtMs = 2156,
+                        finishesAtMs = 12481,
                         isActive = false,
                     ),
                     Target(
@@ -432,10 +399,8 @@ class GameTest {
                         relatedFieldId = 1,
                         columnId = 3,
                         value = 21,
-                        fallenMs = 9473,
-                        appearanceDelayMs = 0,
-                        lifetimeMs = 11365,
-                        isVisible = true,
+                        appearsAtMs = 3027,
+                        finishesAtMs = 14392,
                         isActive = true,
                     ),
                     Target(
@@ -443,10 +408,8 @@ class GameTest {
                         relatedFieldId = 1,
                         columnId = 1,
                         value = 12,
-                        fallenMs = 8306,
-                        appearanceDelayMs = 0,
-                        lifetimeMs = 10629,
-                        isVisible = true,
+                        appearsAtMs = 4194,
+                        finishesAtMs = 14823,
                         isActive = true,
                     ),
                     Target(
@@ -454,10 +417,8 @@ class GameTest {
                         relatedFieldId = 1,
                         columnId = 2,
                         value = 17,
-                        fallenMs = 6872,
-                        appearanceDelayMs = 0,
-                        lifetimeMs = 11242,
-                        isVisible = true,
+                        appearsAtMs = 5628,
+                        finishesAtMs = 16870,
                         isActive = true,
                     ),
                     Target(
@@ -465,10 +426,8 @@ class GameTest {
                         relatedFieldId = 1,
                         columnId = 3,
                         value = 5,
-                        fallenMs = 5831,
-                        appearanceDelayMs = 0,
-                        lifetimeMs = 11129,
-                        isVisible = true,
+                        appearsAtMs = 6669,
+                        finishesAtMs = 17798,
                         isActive = true,
                     ),
                     Target(
@@ -476,10 +435,8 @@ class GameTest {
                         relatedFieldId = 1,
                         columnId = 0,
                         value = 5,
-                        fallenMs = 5001,
-                        appearanceDelayMs = 0,
-                        lifetimeMs = 11101,
-                        isVisible = true,
+                        appearsAtMs = 7499,
+                        finishesAtMs = 18600,
                         isActive = true,
                     ),
                 ),
@@ -568,7 +525,10 @@ class GameTest {
                 game.stateFlow.value.targets
                     .first()
                     .id
-            // fireButtonClicked only operates on visible targets; one tick reveals it (delay 0).
+            // fireButtonClicked only operates on visible targets. A delay-0 target is already
+            // visible at creation under MC-72 (appearsAtMs == the field's gameTimeMs at that
+            // moment), so this tick is no longer load-bearing for the reveal - kept only to mirror
+            // real play, where tick() always runs before the first press.
             game.tick(1)
             testScheduler.runCurrent()
 
@@ -619,8 +579,10 @@ class GameTest {
                 game.stateFlow.value.targets
                     .first { it.id == targetId }
             assertEquals(0, cleared.value)
+            // MC-72: isVisible is derived from the clock alone, so retiring a target no longer
+            // forces it off - isActive false is what every consumer (TargetButton, performOperation)
+            // actually gates on, and that is what targetClicked's ensureAlive(id) sets here.
             assertFalse(cleared.isActive)
-            assertFalse(cleared.isVisible)
             assertEquals(1, game.stateFlow.value.field.score)
         }
 
@@ -676,7 +638,8 @@ class GameTest {
                     .sortedBy { it.id }
                     .first()
                     .id
-            // fireButtonClicked only operates on visible targets; one tick reveals it (delay 0).
+            // See the MC-72 note above: this tick is no longer load-bearing for the reveal, kept
+            // only to mirror real play.
             game.tick(1)
             testScheduler.runCurrent()
 
@@ -689,8 +652,8 @@ class GameTest {
                 game.stateFlow.value.targets
                     .first { it.id == targetId }
             assertEquals(0, cleared.value)
+            // See the MC-72 note on the same pair of assertions above.
             assertFalse(cleared.isActive)
-            assertFalse(cleared.isVisible)
             assertEquals(3, game.stateFlow.value.field.score)
         }
 
@@ -714,7 +677,7 @@ class GameTest {
                 game.stateFlow.value.targets
                     .first()
             assertEquals(11, regenerated.value)
-            assertEquals(1001, regenerated.lifetimeMs)
+            assertEquals(1001L, regenerated.finishesAtMs - regenerated.appearsAtMs)
         }
 
     @Test
@@ -744,16 +707,7 @@ class GameTest {
         runTest {
             val game = Game(FakeSessionHelper(targetAmount = 1), backgroundScope, Random(20))
             game.fieldRestored(Field(id = 1, level = 1, lifeCount = 3, gameTimeMs = 5000, isClosed = false))
-            val soleTarget =
-                Target(
-                    id = 1,
-                    relatedFieldId = 1,
-                    columnId = 0,
-                    value = 10,
-                    fallenMs = 0,
-                    appearanceDelayMs = 0,
-                    lifetimeMs = 1_000_000,
-                )
+            val soleTarget = scheduledTarget(id = 1, value = 10, lifetimeMs = 1_000_000)
             game.targetsRestored(listOf(soleTarget))
             testScheduler.runCurrent()
 
@@ -761,6 +715,27 @@ class GameTest {
             testScheduler.runCurrent()
 
             assertEquals(5250L, game.stateFlow.value.field.gameTimeMs)
+        }
+
+    // MC-72's own headline risk, sibling to the test above: a target created after a restore must
+    // be scheduled against the restored gameTimeMs, not a fresh zero. M4 in the mutation ledger -
+    // appearsAtMs written as the raw delay, without adding gameTimeMs - lands this at 300, already
+    // 4700ms in the past against a restored clock of 5000, breaking the target out before the first
+    // tick after restore even runs. That is the exact failure mode the design doc calls "the whole
+    // board vylets one tick" if the clock (or, as here, the schedule built off it) comes back wrong.
+    @Test
+    fun `a target created after restore is scheduled against the restored gameTimeMs not zero`() =
+        runTest {
+            val game = Game(FakeSessionHelper(targetAmount = 1, appearanceDelayMs = 300), backgroundScope, Random(23))
+            game.fieldRestored(Field(id = 1, level = 1, lifeCount = 3, gameTimeMs = 5000, isClosed = false))
+
+            game.createTargets()
+            testScheduler.runCurrent()
+
+            val created =
+                game.stateFlow.value.targets
+                    .first()
+            assertEquals(5300L, created.appearsAtMs)
         }
 
     @Test
@@ -774,18 +749,16 @@ class GameTest {
                         relatedFieldId = 7,
                         columnId = 0,
                         value = 9,
-                        fallenMs = 120,
-                        appearanceDelayMs = 0,
-                        lifetimeMs = 30000,
+                        appearsAtMs = -120,
+                        finishesAtMs = 29880,
                     ),
                     Target(
                         id = 2,
                         relatedFieldId = 7,
                         columnId = 1,
                         value = 4,
-                        fallenMs = 0,
-                        appearanceDelayMs = 5000,
-                        lifetimeMs = 25000,
+                        appearsAtMs = 5000,
+                        finishesAtMs = 30000,
                     ),
                 )
 

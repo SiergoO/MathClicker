@@ -104,8 +104,11 @@ class GameSimulationTest {
 
     // The MC-27 bug class as a JVM assertion for the first time: a target's accumulated fall must
     // survive a gap where tick() is simply never called (a paused/backgrounded composition), rather
-    // than the pre-MC-38 UI re-deriving position from a saved fraction on every resume. 250ms steps
-    // divide the 1000ms lifetime evenly, so the tick that reaches fallenMs == lifetimeMs is exact.
+    // than the pre-MC-38 UI re-deriving position from a saved fraction on every resume. MC-72 makes
+    // this structural - a target's schedule never changes once set, so the same reference captured
+    // before the "pause" below is reused after it, and its position moves only because gameTimeMs
+    // does. 250ms steps divide the 1000ms lifetime evenly, so the tick that reaches position 1 (and
+    // therefore breakout) is exact.
     @Test
     fun `pausing mid-fall and resuming keeps the accumulated fall`() =
         runTest {
@@ -115,12 +118,10 @@ class GameSimulationTest {
 
             game.tick(250)
             game.tick(250)
-            assertEquals(
-                500,
+            val target =
                 game.stateFlow.value.targets
                     .first()
-                    .fallenMs,
-            )
+            assertEquals(0.5f, target.position(game.stateFlow.value.field.gameTimeMs))
             assertEquals(3, game.stateFlow.value.field.lifeCount)
 
             // "Paused": no tick() call happens here at all, for any stretch of real or notional
@@ -128,12 +129,7 @@ class GameSimulationTest {
             // tick() again against the state left behind above.
 
             game.tick(250)
-            assertEquals(
-                750,
-                game.stateFlow.value.targets
-                    .first()
-                    .fallenMs,
-            )
+            assertEquals(0.75f, target.position(game.stateFlow.value.field.gameTimeMs))
             assertEquals(3, game.stateFlow.value.field.lifeCount)
 
             game.tick(250)
@@ -153,10 +149,10 @@ class GameSimulationTest {
             val game = Game(SessionHelperImpl(random = Random(seed)), backgroundScope, Random(seed))
             game.createField(1)
             game.createTargets()
-            val firstTargetLifetimeMs =
+            val firstTarget =
                 game.stateFlow.value.targets
                     .first { it.id == 1 }
-                    .lifetimeMs
+            val firstTargetLifetimeMs = firstTarget.finishesAtMs - firstTarget.appearsAtMs
 
             var elapsedMs = 0
             while (elapsedMs < firstTargetLifetimeMs) {
@@ -181,7 +177,7 @@ class GameSimulationTest {
             val target =
                 game.stateFlow.value.targets
                     .first()
-            assertEquals(MAX_TICK_MS, target.fallenMs)
+            assertEquals(MAX_TICK_MS.toLong(), game.stateFlow.value.field.gameTimeMs)
             assertTrue(target.isActive)
             assertEquals(3, game.stateFlow.value.field.lifeCount)
         }
@@ -227,7 +223,7 @@ class GameSimulationTest {
             game.createTargets()
             val stillDelayedId =
                 game.stateFlow.value.targets
-                    .first { it.appearanceDelayMs > 0 }
+                    .first { it.appearsAtMs > game.stateFlow.value.field.gameTimeMs }
                     .id
 
             // 1000ms: the three undelayed targets break out together, closing the field. That same
@@ -269,10 +265,11 @@ class GameSimulationTest {
 
             repeat(40) { game.tick(250) } // 10_000ms total
 
+            val gameTimeMs = game.stateFlow.value.field.gameTimeMs
             val visibility =
                 game.stateFlow.value.targets
                     .sortedBy { it.id }
-                    .map { it.isVisible }
+                    .map { it.isVisible(gameTimeMs) }
             assertEquals(listOf(true, true, true, false), visibility)
         }
 

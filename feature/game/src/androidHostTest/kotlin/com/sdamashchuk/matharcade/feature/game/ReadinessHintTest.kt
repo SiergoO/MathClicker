@@ -14,9 +14,8 @@ private fun target(
     relatedFieldId = 0,
     columnId = 0,
     value = value,
-    fallenMs = 0,
-    appearanceDelayMs = 0,
-    lifetimeMs = 0,
+    appearsAtMs = 0,
+    finishesAtMs = 0,
     isProfitable = isProfitable,
 )
 

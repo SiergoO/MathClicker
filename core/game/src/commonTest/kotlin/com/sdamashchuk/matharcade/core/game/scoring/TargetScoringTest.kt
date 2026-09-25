@@ -1,7 +1,7 @@
 package com.sdamashchuk.matharcade.core.game.scoring
 
+import com.sdamashchuk.matharcade.core.game.scheduledTarget
 import com.sdamashchuk.matharcade.core.model.OperationSign
-import com.sdamashchuk.matharcade.core.model.Target
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -12,22 +12,23 @@ import kotlin.test.assertTrue
 // which cap a given level produces - see SessionHelperImplTest for the level-scaled ceiling itself.
 private const val TEST_FAILED_GROWTH_CAP = 1_000_000
 
+// Every call below reads this same instant back through performOperation's own gameTimeMs
+// parameter, so a target built visible here (the isVisible default) stays visible there.
+private const val GAME_TIME_MS = 0L
+
 private fun target(
     id: Int,
     value: Int,
     isProfitable: Boolean = true,
     isVisible: Boolean = true,
     isActive: Boolean = true,
-) = Target(
+) = scheduledTarget(
     id = id,
     relatedFieldId = 0,
-    columnId = 0,
     value = value,
-    fallenMs = 0,
-    appearanceDelayMs = 0,
-    lifetimeMs = 0,
+    appearanceDelayMs = if (isVisible) 0 else 1,
+    referenceGameTimeMs = GAME_TIME_MS,
     isProfitable = isProfitable,
-    isVisible = isVisible,
     isActive = isActive,
 )
 
@@ -41,6 +42,7 @@ class TargetScoringTest {
                 OperationSign.DIVISION,
                 currentOperationDigit = 2,
                 TEST_FAILED_GROWTH_CAP,
+                GAME_TIME_MS,
             )
 
         val exact = updated.first { it.id == 1 }
@@ -65,6 +67,7 @@ class TargetScoringTest {
                 OperationSign.SUBTRACTION,
                 currentOperationDigit = 5,
                 TEST_FAILED_GROWTH_CAP,
+                GAME_TIME_MS,
             )
 
         val succeeded = updated.first { it.id == 1 }
@@ -86,6 +89,7 @@ class TargetScoringTest {
                 OperationSign.DIVISION,
                 currentOperationDigit = 2,
                 TEST_FAILED_GROWTH_CAP,
+                GAME_TIME_MS,
             )
 
         // 10/2 removes 5 and 4/2 removes 2; neither split fails.
@@ -102,6 +106,7 @@ class TargetScoringTest {
                 OperationSign.SUBTRACTION,
                 currentOperationDigit = 5,
                 TEST_FAILED_GROWTH_CAP,
+                GAME_TIME_MS,
             )
 
         assertEquals(10, score)
@@ -117,6 +122,7 @@ class TargetScoringTest {
                 OperationSign.DIVISION,
                 currentOperationDigit = 0,
                 TEST_FAILED_GROWTH_CAP,
+                GAME_TIME_MS,
             )
 
         assertEquals(10, updated.first().value)
@@ -137,12 +143,22 @@ class TargetScoringTest {
             listOf(
                 overshoot,
                 success,
-            ).performOperation(OperationSign.SUBTRACTION, currentOperationDigit = 5, TEST_FAILED_GROWTH_CAP)
+            ).performOperation(
+                OperationSign.SUBTRACTION,
+                currentOperationDigit = 5,
+                TEST_FAILED_GROWTH_CAP,
+                GAME_TIME_MS,
+            )
         val backward =
             listOf(
                 success,
                 overshoot,
-            ).performOperation(OperationSign.SUBTRACTION, currentOperationDigit = 5, TEST_FAILED_GROWTH_CAP)
+            ).performOperation(
+                OperationSign.SUBTRACTION,
+                currentOperationDigit = 5,
+                TEST_FAILED_GROWTH_CAP,
+                GAME_TIME_MS,
+            )
 
         assertEquals(forward.totalScore, backward.totalScore)
         assertEquals(forward.failed, backward.failed)
@@ -162,7 +178,14 @@ class TargetScoringTest {
             repeat(100) {
                 val sign = if (random.nextBoolean()) OperationSign.DIVISION else OperationSign.SUBTRACTION
                 val digit = random.nextInt(2, 6)
-                targets = targets.performOperation(sign, currentOperationDigit = digit, TEST_FAILED_GROWTH_CAP).targets
+                targets =
+                    targets
+                        .performOperation(
+                            sign,
+                            currentOperationDigit = digit,
+                            TEST_FAILED_GROWTH_CAP,
+                            GAME_TIME_MS,
+                        ).targets
                 val value = targets.first().value
                 assertTrue(value >= 0, "value went negative: $value")
                 assertTrue(value <= TEST_FAILED_GROWTH_CAP, "value exceeded the inflation cap: $value")

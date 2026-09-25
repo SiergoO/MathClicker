@@ -162,6 +162,7 @@ fun Field(
                                 gameState.value.field.currentOperationDigit,
                                 hintsEnabled = readinessHintsEnabled,
                             ),
+                        gameTimeMs = gameState.value.field.gameTimeMs,
                         onTargetClicked = onTargetClicked,
                     )
                 }

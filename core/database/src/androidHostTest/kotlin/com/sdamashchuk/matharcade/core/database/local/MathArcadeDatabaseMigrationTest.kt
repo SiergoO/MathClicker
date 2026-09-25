@@ -70,7 +70,7 @@ class MathArcadeDatabaseMigrationTest {
 
             MathArcadeDatabase.Schema.migrate(driver, oldVersion = 1, newVersion = MathArcadeDatabase.Schema.version)
 
-            assertEquals(5L, MathArcadeDatabase.Schema.version)
+            assertEquals(6L, MathArcadeDatabase.Schema.version)
             val database = MathArcadeDatabase(driver)
             val restoredField = FieldDao(database.fieldQueries, Dispatchers.Unconfined).getFieldById(1)
             assertEquals(
@@ -90,8 +90,10 @@ class MathArcadeDatabaseMigrationTest {
             )
             val restoredTarget =
                 TargetsDao(database.targetsQueries, Dispatchers.Unconfined).getTargets().single()
-            // 240 of a 480px column, halfway, against a 1000ms lifetime.
-            assertEquals(500, restoredTarget.fallenMs)
+            // 240 of a 480px column, halfway, against a 1000ms lifetime: 2.sqm converts that to a
+            // fallenMs of 500, and 5.sqm's backfill (gameTimeMs 0 + delay 0 - fallenMs) then reads
+            // the same halfway point back as position(0) against the restored gameTimeMs of 0.
+            assertEquals(0.5f, restoredTarget.position(0L))
         }
 
     // The pinned table from the design doc: an exact stored position, a corrupt negative one and an
@@ -116,7 +118,11 @@ class MathArcadeDatabaseMigrationTest {
                 TargetsDao(database.targetsQueries, Dispatchers.Unconfined)
                     .getTargets()
                     .sortedBy { it.id }
-            assertEquals(listOf(15000, 0, 30000, 0, 30000), restored.map { it.fallenMs })
+            // 5.sqm's backfill is gameTimeMs(0) + delay(0) - fallenMs, so negating appearsAtMs
+            // recovers exactly the fallenMs 2.sqm computed; finishesAtMs - appearsAtMs staying at
+            // the original 30000ms lifetime for every row proves the backfill never touched it.
+            assertEquals(listOf(15000L, 0L, 30000L, 0L, 30000L), restored.map { -it.appearsAtMs })
+            assertTrue(restored.all { it.finishesAtMs - it.appearsAtMs == 30000L })
         }
 
     // field empty while targets is not is reachable - nothing enforces referential integrity between
@@ -137,7 +143,7 @@ class MathArcadeDatabaseMigrationTest {
 
             val database = MathArcadeDatabase(driver)
             val restored = TargetsDao(database.targetsQueries, Dispatchers.Unconfined).getTargets()
-            assertTrue(restored.all { it.fallenMs == 0 })
+            assertTrue(restored.all { it.appearsAtMs == 0L })
         }
 
     // MC-53: finishedAt did not exist before this version, so an install upgrading straight from
@@ -212,6 +218,6 @@ class MathArcadeDatabaseMigrationTest {
 
             val database = MathArcadeDatabase(driver)
             val restored = TargetsDao(database.targetsQueries, Dispatchers.Unconfined).getTargets().single()
-            assertTrue(restored.fallenMs in 0..20000)
+            assertTrue(restored.position(0L) in 0f..1f)
         }
 }

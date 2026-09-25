@@ -1,0 +1,25 @@
+-- MC-72: a target's schedule is now two absolute moments on Field.gameTimeMs (see Target.kt)
+-- rather than a delay/lifetime pair counted down independently. appearsAtMs/finishesAtMs are the
+-- new state; fallenMs, appearanceDelayMs, lifetimeMs and isVisible are dead weight from here on -
+-- nothing reads or writes them (see TargetsDao) - and stay in the schema forever because minSdk
+-- 24's SQLite has no DROP COLUMN (3.35), the same reasoning 3.sqm and 4.sqm already documented.
+--
+-- ADD COLUMN only, no rebuild, same as 3.sqm/4.sqm. Defaulted to 0 and then backfilled below rather
+-- than left at the default: a target whose appearsAtMs/finishesAtMs land at 0 reads as scheduled
+-- for the very start of the clock, i.e. already broken out on the first tick after restore - the
+-- epic's headline risk (MC-71's design doc), the same failure a stale gameTimeMs would cause,
+-- just introduced from the other end. The backfill mirrors Game.recreateTargets' own creation-time
+-- translation (appearsAtMs = gameTimeMs + delay, finishesAtMs = appearsAtMs + lifetime), generalised
+-- with fallenMs to also cover a target already mid-fall: appearsAtMs = gameTimeMs + delay - fallen,
+-- which collapses to the creation-time formula exactly when fallenMs is 0. relatedFieldId is not
+-- enforced as a foreign key (2.sqm hit the same gap), so the COALESCE covers a target whose field
+-- row is missing entirely by anchoring it to gameTimeMs 0.
+ALTER TABLE `targets` ADD COLUMN `appearsAtMs` INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE `targets` ADD COLUMN `finishesAtMs` INTEGER NOT NULL DEFAULT 0;
+
+UPDATE `targets`
+SET
+    appearsAtMs = COALESCE((SELECT f.gameTimeMs FROM `field` f WHERE f.id = targets.relatedFieldId), 0)
+        + appearanceDelayMs - fallenMs,
+    finishesAtMs = COALESCE((SELECT f.gameTimeMs FROM `field` f WHERE f.id = targets.relatedFieldId), 0)
+        + appearanceDelayMs - fallenMs + lifetimeMs;

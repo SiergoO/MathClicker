@@ -1,22 +1,13 @@
 package com.sdamashchuk.matharcade.core.game.objectmapper
 
+import com.sdamashchuk.matharcade.core.game.scheduledTarget
 import com.sdamashchuk.matharcade.core.model.OperationSign
-import com.sdamashchuk.matharcade.core.model.Target
 import com.sdamashchuk.matharcade.core.model.isReadyFor
 import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-private fun target(value: Int) =
-    Target(
-        id = 1,
-        relatedFieldId = 0,
-        columnId = 0,
-        value = value,
-        fallenMs = 0,
-        appearanceDelayMs = 0,
-        lifetimeMs = 0,
-    )
+private fun target(value: Int) = scheduledTarget(id = 1, relatedFieldId = 0, value = value)
 
 // isReadyFor lives on :core:model - covered from here because :core:model has no test source set,
 // the same precedent as Target.isTelegraphingBreakout above and Field.appliedMultiplier in

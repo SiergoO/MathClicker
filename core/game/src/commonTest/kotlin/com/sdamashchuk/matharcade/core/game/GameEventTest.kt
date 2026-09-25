@@ -2,7 +2,6 @@ package com.sdamashchuk.matharcade.core.game
 
 import com.sdamashchuk.matharcade.core.game.model.GameEvent
 import com.sdamashchuk.matharcade.core.model.OperationSign
-import com.sdamashchuk.matharcade.core.model.Target
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
@@ -120,20 +119,7 @@ class GameEventTest {
             run {
                 val game = Game(FakeSessionHelper(targetAmount = 1, targetValue = 1000), backgroundScope, Random(1))
                 game.createField(1)
-                game.targetsRestored(
-                    listOf(
-                        Target(
-                            id = 1,
-                            relatedFieldId = 1,
-                            columnId = 0,
-                            value = 1000,
-                            fallenMs = 0,
-                            appearanceDelayMs = 0,
-                            lifetimeMs = 100_000,
-                            isVisible = true,
-                        ),
-                    ),
-                )
+                game.targetsRestored(listOf(scheduledTarget(id = 1, value = 1000)))
                 game.fieldRestored(
                     game.stateFlow.value.field.copy(
                         currentOperationSign = OperationSign.SUBTRACTION,
@@ -158,18 +144,7 @@ class GameEventTest {
                 val game = Game(FakeSessionHelper(targetAmount = 1), backgroundScope, Random(1))
                 game.createField(1)
                 game.targetsRestored(
-                    listOf(
-                        Target(
-                            id = 1,
-                            relatedFieldId = 1,
-                            columnId = 0,
-                            value = 5,
-                            fallenMs = 90,
-                            appearanceDelayMs = 0,
-                            lifetimeMs = 100,
-                            isVisible = true,
-                        ),
-                    ),
+                    listOf(scheduledTarget(id = 1, value = 5, fallenMs = 90, lifetimeMs = 100)),
                 )
                 val events = mutableListOf<GameEvent>()
                 backgroundScope.launch { game.events.collect { events.add(it) } }
@@ -238,18 +213,7 @@ class GameEventTest {
             // 40 simultaneous breakouts in one tick(), well past extraBufferCapacity of 32. tick runs
             // inside the mutex on the frame path, so it must return rather than block on a full buffer.
             val fallingTargets =
-                (1..40).map { id ->
-                    Target(
-                        id = id,
-                        relatedFieldId = 1,
-                        columnId = 0,
-                        value = 5,
-                        fallenMs = 99,
-                        appearanceDelayMs = 0,
-                        lifetimeMs = 100,
-                        isVisible = true,
-                    )
-                }
+                (1..40).map { id -> scheduledTarget(id = id, value = 5, fallenMs = 99, lifetimeMs = 100) }
             game.targetsRestored(fallingTargets)
 
             game.tick(1)
@@ -300,20 +264,7 @@ class GameEventTest {
         runTest {
             val game = Game(FakeSessionHelper(targetAmount = 1, targetValue = 1000), backgroundScope, Random(1))
             game.createField(1)
-            game.targetsRestored(
-                listOf(
-                    Target(
-                        id = 1,
-                        relatedFieldId = 1,
-                        columnId = 0,
-                        value = 1000,
-                        fallenMs = 0,
-                        appearanceDelayMs = 0,
-                        lifetimeMs = 100_000,
-                        isVisible = true,
-                    ),
-                ),
-            )
+            game.targetsRestored(listOf(scheduledTarget(id = 1, value = 1000)))
             game.fieldRestored(
                 game.stateFlow.value.field.copy(
                     currentOperationSign = OperationSign.SUBTRACTION,

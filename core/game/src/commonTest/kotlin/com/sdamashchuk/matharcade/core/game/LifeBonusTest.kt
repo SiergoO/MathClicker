@@ -2,7 +2,6 @@ package com.sdamashchuk.matharcade.core.game
 
 import com.sdamashchuk.matharcade.core.game.model.GameEvent
 import com.sdamashchuk.matharcade.core.model.Field
-import com.sdamashchuk.matharcade.core.model.Target
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
@@ -16,17 +15,7 @@ import kotlin.test.assertTrue
 // event - but kept the grant itself as Game.grantLife, the mechanism this file now exercises.
 @OptIn(ExperimentalCoroutinesApi::class)
 class LifeBonusTest {
-    private fun soleTarget(value: Int = 1) =
-        Target(
-            id = 1,
-            relatedFieldId = 1,
-            columnId = 0,
-            value = value,
-            fallenMs = 0,
-            appearanceDelayMs = 0,
-            lifetimeMs = 100_000,
-            isVisible = true,
-        )
+    private fun soleTarget(value: Int = 1) = scheduledTarget(id = 1, value = value)
 
     @Test
     fun `leveling across a former qualifying level changes lifeCount by nothing`() =
