@@ -6,18 +6,20 @@ import android.media.SoundPool
 import com.sdamashchuk.matharcade.core.ui.R
 import com.sdamashchuk.matharcade.core.ui.sound.model.SoundSample
 
-private const val MAX_STREAMS = 4
+// Eight, not four: the MC-78 samples carry a room tail, so a tap occupies a stream for 460ms
+// rather than 90ms and the level-up runs 1.2s. Four voices started stealing each other back.
+private const val MAX_STREAMS = 8
 private const val VOLUME = 1f
 private const val PRIORITY = 1
 private const val NO_LOOP = 0
 private const val PLAYBACK_RATE = 1f
 
 /**
- * SoundPool, not MediaPlayer: every sample here is under 600ms and can overlap itself (the tap
- * fires several times a second), which is exactly what SoundPool's low-latency, pre-decoded
- * playback is for. All six samples load eagerly in the constructor - callers create one of these
- * per game session (see GameComponent) and [release] it on the way out, rather than keeping a
- * single instance alive for the app's lifetime.
+ * SoundPool, not MediaPlayer: every sample here is well under two seconds and can overlap
+ * itself (the tap fires several times a second), which is exactly what SoundPool's low-latency,
+ * pre-decoded playback is for. All six samples load eagerly in the constructor - callers create
+ * one of these per game session (see GameComponent) and [release] it on the way out, rather than
+ * keeping a single instance alive for the app's lifetime.
  */
 class SoundPoolPlayer(
     context: Context,
