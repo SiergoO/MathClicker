@@ -497,35 +497,50 @@ class Game(
     // The redraw loop itself, shared with ensureOpeningOperationSucceeds above: the only thing that
     // differs between "the next press" and "the session's opening press" is which targets count as
     // visible, never this arithmetic.
+    //
+    // MC-93: the sign is drawn once and only its digit is redrawn. Redrawing both was quietly
+    // overriding the intended even mix - subtraction succeeds whenever value >= digit, division only
+    // on an exact multiple, so every retry was far likelier to settle on a minus and the owner saw
+    // subtraction dominate the early levels. The sign now gives way only when no digit of it works
+    // against the board at all.
     private fun drawSignAndDigit(
         visibleActiveTargets: List<Target>,
         level: Int,
     ): Pair<OperationSign, Int> {
-        var sign = OperationSign.values().random(random)
-        var digit = sessionHelper.getOperationDigitByLevel(sign, level)
-        var attempts = 1
-        while (
-            visibleActiveTargets.isNotEmpty() &&
-            visibleActiveTargets.none { it.succeedsAgainst(sign, digit) } &&
-            attempts < MAX_OPERATION_DRAW_ATTEMPTS
-        ) {
-            sign = OperationSign.values().random(random)
-            digit = sessionHelper.getOperationDigitByLevel(sign, level)
-            attempts++
+        val drawnSign = OperationSign.values().random(random)
+        val otherSign = OperationSign.values().first { it != drawnSign }
+        for (sign in listOf(drawnSign, otherSign)) {
+            val digit = digitThatSucceeds(sign, visibleActiveTargets, level)
+            if (digit != null) return Pair(sign, digit)
         }
-        if (visibleActiveTargets.isNotEmpty() && visibleActiveTargets.none { it.succeedsAgainst(sign, digit) }) {
-            // Exhausting the bound used to mean handing over the last draw, dud or not. MC-60 made
-            // that reachable: shaping values toward a residue of the current digit puts lone small
-            // values on the board, and a lone 1 is below every division digit and every subtraction
-            // digit past level 9. Subtracting the smallest visible value always succeeds - it zeroes
-            // that target exactly, and a target's value is never below 1 - so the dud stops being
-            // improbable and becomes impossible while anything is on screen. Off the level's own
-            // digit curve, deliberately: this fires in roughly 3 draws in 10 000, and a player with
-            // no move at all is worse than one handed a generous one.
-            sign = OperationSign.SUBTRACTION
-            digit = visibleActiveTargets.minOf { it.value }
+
+        // Exhausting both signs used to mean handing over the last draw, dud or not. MC-60 made
+        // that reachable: shaping values toward a residue of the current digit puts lone small
+        // values on the board, and a lone 1 is below every division digit and every subtraction
+        // digit past level 9. Subtracting the smallest visible value always succeeds - it zeroes
+        // that target exactly, and a target's value is never below 1 - so the dud stops being
+        // improbable and becomes impossible while anything is on screen. Off the level's own
+        // digit curve, deliberately: a player with no move at all is worse than one handed a
+        // generous one.
+        return Pair(OperationSign.SUBTRACTION, visibleActiveTargets.minOf { it.value })
+    }
+
+    // Null when MAX_OPERATION_DRAW_ATTEMPTS draws of this sign's own digit curve all come back duds.
+    // An empty or fully-hidden board (no visible active target at all) has no dud to avoid, so the
+    // first draw is taken unconditionally rather than looping - which is also what keeps the caller's
+    // minOf fallback from ever seeing an empty list.
+    private fun digitThatSucceeds(
+        sign: OperationSign,
+        visibleActiveTargets: List<Target>,
+        level: Int,
+    ): Int? {
+        repeat(MAX_OPERATION_DRAW_ATTEMPTS) {
+            val digit = sessionHelper.getOperationDigitByLevel(sign, level)
+            if (visibleActiveTargets.isEmpty() || visibleActiveTargets.any { it.succeedsAgainst(sign, digit) }) {
+                return digit
+            }
         }
-        return Pair(sign, digit)
+        return null
     }
 }
 

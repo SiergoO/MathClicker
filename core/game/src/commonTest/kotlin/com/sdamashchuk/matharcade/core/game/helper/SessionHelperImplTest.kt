@@ -158,10 +158,10 @@ class SessionHelperImplTest {
         // Literals on purpose. Every other test here derives its expectation from these same
         // properties, so none of them can notice a constant changing — a ten-fold rise in starting
         // target value would leave the suite green. This test is the only thing pinning the balance.
-        assertEquals(1..20, helper.initialTargetValueRange)
+        assertEquals(1..9, helper.initialTargetValueRange)
         assertEquals(9500..11875, helper.initialTargetFlightTimeMsRange)
         assertEquals(6..10, helper.initialTargetAmountRange)
-        assertEquals(2..5, helper.initialDivisionValueRange)
+        assertEquals(2..3, helper.initialDivisionValueRange)
         assertEquals(1..3, helper.initialSubtractionValueRange)
         assertEquals(1..999, helper.levelRange)
     }
@@ -174,7 +174,7 @@ class SessionHelperImplTest {
         // it for the range it drew from; MC-6 should add that seam.
         val level = 0
 
-        assertEquals((2..5).toSet(), sampled { helper.getDivisionDigitByLevel(level) })
+        assertEquals((2..3).toSet(), sampled { helper.getDivisionDigitByLevel(level) })
         assertEquals((1..3).toSet(), sampled { helper.getSubtractionDigitByLevel(level) })
         assertEquals((6..10).toSet(), sampled { helper.getTargetAmountByLevel(level) })
     }
@@ -187,7 +187,7 @@ class SessionHelperImplTest {
         val valueRange =
             IntRange(
                 helper.initialTargetValueRange.first + SAMPLE_LEVEL / 10,
-                helper.initialTargetValueRange.last + SAMPLE_LEVEL * 3,
+                helper.initialTargetValueRange.last + SAMPLE_LEVEL * 2,
             )
         val amountRange =
             IntRange(
@@ -353,7 +353,7 @@ class SessionHelperImplTest {
         var previousCap = 0
         for (level in listOf(1, 5, 10, 30, 50, 200, 500, 999)) {
             val cap = helper.failedGrowthCap(level)
-            val normalMax = helper.initialTargetValueRange.last + level * 3
+            val normalMax = helper.initialTargetValueRange.last + level * 2
             assertTrue(cap >= normalMax, "level $level: ceiling $cap fell below the normal maximum $normalMax")
             assertTrue(cap > previousCap, "level $level: ceiling $cap did not grow past $previousCap")
             previousCap = cap
@@ -362,10 +362,10 @@ class SessionHelperImplTest {
 
     @Test
     fun `the failed growth ceiling is pinned to exact values at levels 1 10 30 and 50`() {
-        assertEquals(92, helper.failedGrowthCap(1))
-        assertEquals(200, helper.failedGrowthCap(10))
-        assertEquals(440, helper.failedGrowthCap(30))
-        assertEquals(680, helper.failedGrowthCap(50))
+        assertEquals(44, helper.failedGrowthCap(1))
+        assertEquals(116, helper.failedGrowthCap(10))
+        assertEquals(276, helper.failedGrowthCap(30))
+        assertEquals(436, helper.failedGrowthCap(50))
     }
 
     @Test
@@ -429,7 +429,11 @@ class SessionHelperImplTest {
 
     @Test
     fun `MC-60 - preparation cost profile matches the level 1 table at generation`() {
-        assertProfileMatches(level = 1, expectedPercentages = listOf(25, 65, 10, 0))
+        // MC-93 narrowed level 1's divisors to 2..3, so half of that level's draws have a maxCost
+        // of 1 and the authored "2-3 taps" bucket collapses into the 1-tap one (see PreparationCost's
+        // costInClampedRange). The realized profile is what a player meets, so it is what this pins -
+        // the authored table stays PREPARATION_PROFILE_LEVEL_1's (25, 65, 10, 0).
+        assertProfileMatches(level = 1, expectedPercentages = listOf(25, 70, 5, 0))
     }
 
     @Test
@@ -479,7 +483,7 @@ class SessionHelperImplTest {
     @Test
     fun `MC-60 - getTargetValueByLevel is pinned to an exact seeded number at level 30`() {
         assertEquals(
-            105,
+            9,
             SessionHelperImpl(random = Random(PINNED_SEED)).getTargetValueByLevel(level = 30, operationDigit = 8),
         )
     }
@@ -490,7 +494,7 @@ class SessionHelperImplTest {
         repeat(SAMPLE_ITERATIONS) {
             for (level in listOf(1, 10, 30, 55, 999)) {
                 val minThreshold = seededHelper.initialTargetValueRange.first + level / 10
-                val maxThreshold = seededHelper.initialTargetValueRange.last + level * 3
+                val maxThreshold = seededHelper.initialTargetValueRange.last + level * 2
                 val expectedRange = IntRange(minThreshold, maxThreshold)
                 val divisor = seededHelper.getDivisionDigitByLevel(level)
                 val value = seededHelper.getTargetValueByLevel(level, divisor)
@@ -504,7 +508,7 @@ class SessionHelperImplTest {
         val seededHelper = SessionHelperImpl(random = Random(PINNED_SEED))
         for (level in seededHelper.levelRange) {
             val minThreshold = seededHelper.initialTargetValueRange.first + level / 10
-            val maxThreshold = seededHelper.initialTargetValueRange.last + level * 3
+            val maxThreshold = seededHelper.initialTargetValueRange.last + level * 2
             val expectedRange = IntRange(minThreshold, maxThreshold)
             val divisor = seededHelper.getDivisionDigitByLevel(level)
             val value = seededHelper.getTargetValueByLevel(level, divisor)
@@ -571,7 +575,7 @@ class SessionHelperImplTest {
         val seededHelper = SessionHelperImpl(random = Random(PINNED_SEED))
         for (level in listOf(1, 10, 30, 55, 999)) {
             val minThreshold = seededHelper.initialTargetValueRange.first + level / 10
-            val maxThreshold = seededHelper.initialTargetValueRange.last + level * 3
+            val maxThreshold = seededHelper.initialTargetValueRange.last + level * 2
             repeat(SAMPLE_ITERATIONS) {
                 val digit = seededHelper.getSubtractionDigitByLevel(level)
                 val value = seededHelper.getSubtractionTargetValueByLevel(level, digit)
@@ -608,7 +612,7 @@ class SessionHelperImplTest {
         // Re-pinned for MC-80: SubtractionTrapCost draws a different random sequence than the
         // desiredPreparationCost it replaces, so this is a fresh capture, not the old value carried over.
         assertEquals(
-            21,
+            6,
             SessionHelperImpl(
                 random = Random(PINNED_SEED),
             ).getSubtractionTargetValueByLevel(level = 1, operationDigit = 3),
@@ -618,7 +622,7 @@ class SessionHelperImplTest {
     @Test
     fun `MC-80 - getSubtractionTargetValueByLevel is pinned to an exact seeded number at level 30`() {
         assertEquals(
-            100,
+            31,
             SessionHelperImpl(
                 random = Random(PINNED_SEED),
             ).getSubtractionTargetValueByLevel(level = 30, operationDigit = 8),

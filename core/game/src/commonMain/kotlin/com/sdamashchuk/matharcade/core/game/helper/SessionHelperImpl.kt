@@ -17,8 +17,12 @@ class SessionHelperImpl(
         private const val LEVEL_MIN = 1
         private const val LEVEL_MAX = 999
 
+        // MC-93: was 1..20, which put a 4 and a 23 on the same level-1 board - a spread wide
+        // enough that the two targets barely read as the same game. Narrowed at the base and the
+        // per-level climb halved below, so level 1 is 1..11 and the range opens up as the player
+        // does rather than all at once.
         private const val INITIAL_TARGET_VALUE_MIN = 1
-        private const val INITIAL_TARGET_VALUE_MAX = 20
+        private const val INITIAL_TARGET_VALUE_MAX = 9
 
         // MC-73: the owner's 0...-20% speed spread. A speed multiplier drawn from
         // (MIN_SPEED_MULTIPLIER, 1] lands flight time in [base, base / MIN_SPEED_MULTIPLIER] = [base,
@@ -43,13 +47,15 @@ class SessionHelperImpl(
         private const val INITIAL_TARGET_AMOUNT_MIN = 6
         private const val INITIAL_TARGET_AMOUNT_MAX = 10
 
+        // MC-93: was 2..5. A divisor of 5 on level 1 asks for a multiple of 5 on a board whose
+        // values only reach 11, which is most of the board unreachable on the opening screen.
         private const val INITIAL_DIVISION_VALUE_MIN = 2
-        private const val INITIAL_DIVISION_VALUE_MAX = 5
+        private const val INITIAL_DIVISION_VALUE_MAX = 3
 
         private const val INITIAL_SUBTRACTION_VALUE_MIN = 1
         private const val INITIAL_SUBTRACTION_VALUE_MAX = 3
 
-        private const val TARGET_VALUE_LEVEL_SCALE = 3
+        private const val TARGET_VALUE_LEVEL_SCALE = 2
         private const val FAILED_GROWTH_FACTOR = 4
     }
 
