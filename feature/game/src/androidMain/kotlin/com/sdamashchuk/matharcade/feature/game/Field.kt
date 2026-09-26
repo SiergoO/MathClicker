@@ -24,6 +24,9 @@ import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -61,6 +64,27 @@ fun Field(
     // why a hint is off, and neither does this composable's own body beyond reading the flag.
     readinessHintsEnabled: Boolean = true,
 ) {
+    // MC-85: every one of these used to be a `gameState.value.field.X` read straight in this
+    // composable's body. GameViewModel.State is a fresh object on every tick because gameTimeMs
+    // moved, so each of those reads dragged the whole HUD, the life stripes and the dock through
+    // composition sixty times a second to render numbers that change once a second at most.
+    val level by remember { derivedStateOf { gameState.value.field.level } }
+    val score by remember { derivedStateOf { gameState.value.field.score } }
+    val lifeCount by remember { derivedStateOf { gameState.value.field.lifeCount } }
+    val appliedMultiplier by remember { derivedStateOf { gameState.value.field.appliedMultiplier } }
+    val currentOperation by
+        remember {
+            derivedStateOf {
+                gameState.value.field.let { "${it.currentOperationSign.sign}${it.currentOperationDigit}" }
+            }
+        }
+    val nextOperation by
+        remember {
+            derivedStateOf {
+                gameState.value.field.let { "${it.nextOperationSign.sign}${it.nextOperationDigit}" }
+            }
+        }
+
     LaunchedEffect(Unit) {
         var previousFrameNanos = withFrameNanos { it }
         while (true) {
@@ -86,10 +110,7 @@ fun Field(
                     .align(Alignment.CenterVertically),
             textAlign = TextAlign.Center,
             text =
-                stringResource(
-                    id = R.string.game_session_level,
-                    gameState.value.field.level,
-                ).toUpperCase(Locale.current),
+                stringResource(id = R.string.game_session_level, level).toUpperCase(Locale.current),
             style = MaterialTheme.typography.body1,
         )
         Text(
@@ -99,10 +120,7 @@ fun Field(
                     .align(Alignment.CenterVertically),
             textAlign = TextAlign.Center,
             text =
-                stringResource(
-                    id = R.string.game_session_score,
-                    gameState.value.field.score,
-                ).toUpperCase(Locale.current),
+                stringResource(id = R.string.game_session_score, score).toUpperCase(Locale.current),
             style = MaterialTheme.typography.body1,
         )
         // Fixed width, not weight(1f): Level and Score stay centred on each other regardless of
@@ -132,8 +150,8 @@ fun Field(
                     .fillMaxWidth(),
             verticalArrangement = Arrangement.Top,
         ) {
-            repeat(calculateLifeSlotCount(gameState.value.field.lifeCount)) {
-                Divider(color = if (it < gameState.value.field.lifeCount) Accent else AccentDeep, thickness = 3.dp)
+            repeat(calculateLifeSlotCount(lifeCount)) {
+                Divider(color = if (it < lifeCount) Accent else AccentDeep, thickness = 3.dp)
                 Spacer(modifier = Modifier.padding(bottom = 2.dp))
             }
         }
@@ -148,10 +166,8 @@ fun Field(
                 modifier = Modifier.weight(1f),
                 textAlign = TextAlign.Center,
                 text =
-                    stringResource(
-                        id = R.string.game_session_combo,
-                        gameState.value.field.appliedMultiplier,
-                    ).toUpperCase(Locale.current),
+                    stringResource(id = R.string.game_session_combo, appliedMultiplier)
+                        .toUpperCase(Locale.current),
                 style = MaterialTheme.typography.h2,
             )
             Button(
@@ -165,7 +181,7 @@ fun Field(
                         .height(100.dp),
             ) {
                 Text(
-                    text = gameState.value.field.let { "${it.currentOperationSign.sign}${it.currentOperationDigit}" },
+                    text = currentOperation,
                     fontSize = 36.sp,
                     color = Ink,
                 )
@@ -183,7 +199,7 @@ fun Field(
                         .alpha(NEXT_OPERATION_PREVIEW_ALPHA),
             ) {
                 Text(
-                    text = gameState.value.field.let { "${it.nextOperationSign.sign}${it.nextOperationDigit}" },
+                    text = nextOperation,
                     fontSize = 12.sp,
                     color = Ink,
                 )

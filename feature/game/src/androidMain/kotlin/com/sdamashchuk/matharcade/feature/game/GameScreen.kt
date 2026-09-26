@@ -27,7 +27,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 
-private const val BANNER_VISIBLE_MS = 500L
 private const val HAPTIC_REPEAT_GAP_MS = 80L
 private const val SHAKE_STEP_MS = 60
 private const val SHAKE_MAGNITUDE_PX = 24f
@@ -36,7 +35,6 @@ private const val SHAKE_MAGNITUDE_PX = 24f
 fun GameScreen(component: GameComponent) {
     val gameState = component.state.collectAsState()
     val hapticFeedback = LocalHapticFeedback.current
-    var currentEffect by remember { mutableStateOf<FeedbackEffect?>(null) }
     var targetZeroedSignal by remember { mutableStateOf<TargetZeroedSignal?>(null) }
     val shakeOffsetX = remember { Animatable(0f) }
 
@@ -46,7 +44,6 @@ fun GameScreen(component: GameComponent) {
     // the feedback for exactly the events this task cares most about.
     LaunchedEffect(Unit) {
         val scope = this
-        var bannerToken = 0
         var zeroedSequence = 0
         component.feedback.receiveAsFlow().collect { effect ->
             repeat(effect.hapticRepeatCount) { repeatIndex ->
@@ -59,12 +56,6 @@ fun GameScreen(component: GameComponent) {
             }
             if (effect is FeedbackEffect.TargetZeroed) {
                 targetZeroedSignal = TargetZeroedSignal(effect.targetId, ++zeroedSequence)
-            }
-            currentEffect = effect
-            val myToken = ++bannerToken
-            scope.launch {
-                delay(BANNER_VISIBLE_MS)
-                if (bannerToken == myToken) currentEffect = null
             }
         }
     }
@@ -146,7 +137,6 @@ fun GameScreen(component: GameComponent) {
                     }
                 }
             }
-            FeedbackBanner(currentEffect)
         }
         BackHandler {
             component.sendAction(GameViewModel.Action.PauseGame)
