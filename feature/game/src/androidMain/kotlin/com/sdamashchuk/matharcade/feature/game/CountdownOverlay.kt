@@ -10,8 +10,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.unit.dp
+import com.sdamashchuk.matharcade.core.ui.theme.Ink
 import com.sdamashchuk.matharcade.core.ui.theme.Scrim
 import io.github.alexzhirkevich.compottie.DotLottie
 import io.github.alexzhirkevich.compottie.LottieCompositionSpec
@@ -37,6 +39,10 @@ fun CountdownOverlay(onFinish: () -> Unit) {
         Image(
             painter = rememberLottiePainter(composition = composition, progress = { progress }),
             contentDescription = null,
+            // The colour is baked into the .lottie file and was a dull red left over from the old
+            // palette. Tinting flattens the animation to one colour, which for a 3-2-1 counter is
+            // all it ever needed.
+            colorFilter = ColorFilter.tint(Ink),
         )
         LaunchedEffect(progress) {
             if (progress >= 1f) {
