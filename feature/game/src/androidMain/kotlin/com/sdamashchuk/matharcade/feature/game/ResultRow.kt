@@ -1,20 +1,24 @@
 package com.sdamashchuk.matharcade.feature.game
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.sdamashchuk.matharcade.core.model.Field
-import com.sdamashchuk.matharcade.core.ui.theme.Success
+import com.sdamashchuk.matharcade.core.ui.theme.Accent
+import com.sdamashchuk.matharcade.core.ui.theme.Ink
+import com.sdamashchuk.matharcade.core.ui.theme.InkHud
 
 /**
  * One row of the results table - a single closed run. [isBest] marks the player's record among
@@ -28,42 +32,50 @@ fun ResultRow(
     isBest: Boolean,
     modifier: Modifier = Modifier,
 ) {
+    val supportColor = if (isBest) Accent else InkHud
+    val scoreColor = if (isBest) Accent else Ink
     Row(
-        modifier = modifier.fillMaxWidth().padding(vertical = 4.dp),
+        modifier = modifier.fillMaxWidth().padding(vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            modifier = Modifier.width(ResultsColumns.STAR_WIDTH),
-            text = if (isBest) "★" else "",
-            color = Success,
-            textAlign = TextAlign.Center,
+        Cell(
+            text = formatResultDate(field.finishedAt, stringResource(id = R.string.results_no_date)),
+            weight = ResultsColumns.DATE_WEIGHT,
+            alignment = ResultsColumns.DATE_ALIGNMENT,
+            color = supportColor,
             style = MaterialTheme.typography.body2,
         )
-        Text(
-            modifier = Modifier.weight(ResultsColumns.DATE_WEIGHT),
-            text = formatResultDate(field.finishedAt, stringResource(id = R.string.results_no_date)),
-            textAlign = TextAlign.Center,
-            style = rowStyle(isBest),
-        )
-        Text(
-            modifier = Modifier.weight(ResultsColumns.LEVEL_WEIGHT),
+        Cell(
             text = field.level.toString(),
-            textAlign = TextAlign.Center,
-            style = rowStyle(isBest),
+            weight = ResultsColumns.LEVEL_WEIGHT,
+            alignment = ResultsColumns.NUMBER_ALIGNMENT,
+            color = supportColor,
+            style = MaterialTheme.typography.body2,
         )
-        Text(
-            modifier = Modifier.weight(ResultsColumns.SCORE_WEIGHT),
+        // The score carries the row: it is the one number the player came to this screen for, so it
+        // is the only cell at full Ink and the only one that changes weight on the record run.
+        Cell(
             text = field.score.toString(),
-            textAlign = TextAlign.Center,
-            style = rowStyle(isBest),
+            weight = ResultsColumns.SCORE_WEIGHT,
+            alignment = ResultsColumns.NUMBER_ALIGNMENT,
+            color = scoreColor,
+            style =
+                MaterialTheme.typography.body1.copy(
+                    fontWeight = if (isBest) FontWeight.Bold else FontWeight.Medium,
+                ),
         )
     }
 }
 
 @Composable
-private fun rowStyle(isBest: Boolean) =
-    if (isBest) {
-        MaterialTheme.typography.body2.copy(fontWeight = FontWeight.Bold)
-    } else {
-        MaterialTheme.typography.body2
+private fun RowScope.Cell(
+    text: String,
+    weight: Float,
+    alignment: Alignment,
+    color: Color,
+    style: TextStyle,
+) {
+    Box(modifier = Modifier.weight(weight), contentAlignment = alignment) {
+        Text(text = text, color = color, style = style)
     }
+}

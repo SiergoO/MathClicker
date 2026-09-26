@@ -78,7 +78,7 @@ fun ResultsScreen(
                         .padding(horizontal = 24.dp, vertical = 8.dp),
             )
             MenuButton(
-                modifier = Modifier.padding(bottom = 12.dp),
+                modifier = Modifier.padding(top = 20.dp, bottom = 12.dp),
                 text = stringResource(id = R.string.restart),
                 onClick = onRestartClicked,
             )
