@@ -49,6 +49,12 @@ import com.sdamashchuk.matharcade.core.ui.theme.Red200
 import com.sdamashchuk.matharcade.core.ui.theme.Red500
 import com.sdamashchuk.matharcade.core.ui.theme.White
 
+private const val HUD_HEIGHT_FRACTION = 0.05f
+private const val PLAY_AREA_HEIGHT_FRACTION = 0.75f
+
+// The next-operation button is a preview, not a control - dimmed so it reads as one.
+private const val NEXT_OPERATION_PREVIEW_ALPHA = 0.8f
+
 @Composable
 fun Field(
     gameState: State<GameViewModel.State>,
@@ -80,7 +86,7 @@ fun Field(
             Modifier
                 .statusBarsPadding()
                 .fillMaxWidth()
-                .fillMaxHeight(0.05f),
+                .fillMaxHeight(HUD_HEIGHT_FRACTION),
     ) {
         Text(
             modifier =
@@ -125,7 +131,7 @@ fun Field(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(0.75f)
+                .fillMaxHeight(PLAY_AREA_HEIGHT_FRACTION)
                 .onGloballyPositioned { coordinates ->
                     val measuredWidthDp =
                         with(localDensity) {
@@ -234,7 +240,7 @@ fun Field(
                         .clip(CircleShape)
                         .width(48.dp)
                         .height(48.dp)
-                        .alpha(0.8f),
+                        .alpha(NEXT_OPERATION_PREVIEW_ALPHA),
             ) {
                 Text(
                     text = gameState.value.field.let { "${it.nextOperationSign.sign}${it.nextOperationDigit}" },

@@ -26,6 +26,8 @@ import io.github.alexzhirkevich.compottie.LottieCompositionSpec
 import io.github.alexzhirkevich.compottie.rememberLottieComposition
 import io.github.alexzhirkevich.compottie.rememberLottiePainter
 
+private const val PROMPT_ANCHOR_HEIGHT_FRACTION = 0.5f
+
 /**
  * GamePhase.ReadyToPlay's pre-game screen - a game that hasn't started can't be "paused", so this
  * carries no pause label. The tap-highlight animation plus the hint below it already say what to do.
@@ -42,7 +44,7 @@ fun ReadyToPlayOverlay(onClick: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(
-            modifier = Modifier.fillMaxHeight(0.5f),
+            modifier = Modifier.fillMaxHeight(PROMPT_ANCHOR_HEIGHT_FRACTION),
             contentAlignment = Alignment.Center,
         ) {
             val resources = LocalResources.current

@@ -17,6 +17,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 
+private const val DIALOG_HEIGHT_FRACTION = 0.9f
+
 @Composable
 fun MathArcadeDialog(
     headerText: String,
@@ -34,7 +36,7 @@ fun MathArcadeDialog(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .fillMaxHeight(0.9f),
+                        .fillMaxHeight(DIALOG_HEIGHT_FRACTION),
             ) {
                 Column(
                     modifier = Modifier.fillMaxSize(),

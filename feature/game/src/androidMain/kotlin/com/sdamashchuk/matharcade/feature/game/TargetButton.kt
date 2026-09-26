@@ -34,6 +34,8 @@ import com.sdamashchuk.matharcade.core.ui.theme.Red500
 // a surprise. Deliberately not colour-coded - isProfitable already owns that channel below, and a
 // second meaning on the same channel would make both unreadable - so the cue is a size pulse plus a
 // ring, both legible independent of hue. Verified on device: see the MC-54 task report.
+// A target fills most of its column but never touches the column's edges.
+private const val TARGET_DIAMETER_FRACTION = 0.8
 private const val TELEGRAPH_PULSE_SCALE = 1.15f
 private const val TELEGRAPH_PULSE_MS = 300
 private const val TELEGRAPH_BORDER_WIDTH_DP = 3
@@ -78,8 +80,8 @@ fun TargetButton(
         Button(
             modifier =
                 Modifier
-                    .width((gameColumnSize.width * 0.8).dp)
-                    .height((gameColumnSize.width * 0.8).dp)
+                    .width((gameColumnSize.width * TARGET_DIAMETER_FRACTION).dp)
+                    .height((gameColumnSize.width * TARGET_DIAMETER_FRACTION).dp)
                     .offset(0.dp, targetButtonYOffset.dp)
                     .scale(telegraphScale)
                     .clip(CircleShape),

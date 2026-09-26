@@ -50,6 +50,11 @@ internal const val MAX_TICK_MS = 250
 // or not, which is exactly what every press already tolerated before this task.
 private const val MAX_OPERATION_DRAW_ATTEMPTS = 20
 
+// Ten of the nineteen are the engine's public contract - start/stop, the four session and restore
+// entry points, the two inputs, tick and grantLife - so the threshold is unreachable without
+// collapsing that contract, which is a bigger change than a counting rule should drive. Suppressed
+// here rather than in a baseline file so the next reader sees it, and so anything new still fails.
+@Suppress("TooManyFunctions")
 class Game(
     private val sessionHelper: SessionHelper,
     private val scope: CoroutineScope,
