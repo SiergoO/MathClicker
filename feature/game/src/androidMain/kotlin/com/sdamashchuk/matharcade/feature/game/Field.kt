@@ -1,6 +1,5 @@
 package com.sdamashchuk.matharcade.feature.game
 
-import android.util.Size
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -25,32 +24,24 @@ import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.intl.Locale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.toUpperCase
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.sdamashchuk.matharcade.core.model.GAME_COLUMN_COUNT
 import com.sdamashchuk.matharcade.core.model.INITIAL_LIFE_COUNT
 import com.sdamashchuk.matharcade.core.ui.theme.Red200
 import com.sdamashchuk.matharcade.core.ui.theme.Red500
 import com.sdamashchuk.matharcade.core.ui.theme.White
 
 private const val HUD_HEIGHT_FRACTION = 0.05f
-private const val PLAY_AREA_HEIGHT_FRACTION = 0.75f
 
 // The next-operation button is a preview, not a control - dimmed so it reads as one.
 private const val NEXT_OPERATION_PREVIEW_ALPHA = 0.8f
@@ -67,9 +58,6 @@ fun Field(
     // why a hint is off, and neither does this composable's own body beyond reading the flag.
     readinessHintsEnabled: Boolean = true,
 ) {
-    var gameColumnSize by remember { mutableStateOf(Size(0, 0)) }
-    val localDensity = LocalDensity.current
-
     LaunchedEffect(Unit) {
         var previousFrameNanos = withFrameNanos { it }
         while (true) {
@@ -127,58 +115,7 @@ fun Field(
         }
     }
     Divider()
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .fillMaxHeight(PLAY_AREA_HEIGHT_FRACTION)
-                .onGloballyPositioned { coordinates ->
-                    val measuredWidthDp =
-                        with(localDensity) {
-                            coordinates.size.width
-                                .toDp()
-                                .value
-                                .toInt()
-                        }
-                    val gameColumnWidth = calculateGameColumnWidth(measuredWidthDp)
-                    val gameColumnHeight =
-                        with(localDensity) {
-                            coordinates.size.height
-                                .toDp()
-                                .value
-                                .toInt() - (gameColumnWidth * 0.8).toInt()
-                        }
-                    gameColumnSize = Size(gameColumnWidth, gameColumnHeight)
-                },
-    ) {
-        repeat(GAME_COLUMN_COUNT) { columnId ->
-            Box(
-                Modifier
-                    .fillMaxHeight()
-                    .width(gameColumnSize.width.dp),
-                contentAlignment = Alignment.TopCenter,
-            ) {
-                gameState.value.targetList.filter { target -> target.columnId == columnId }.forEach {
-                    TargetButton(
-                        it,
-                        gameColumnSize,
-                        isReady =
-                            shouldShowReadinessHint(
-                                it,
-                                gameState.value.field.currentOperationSign,
-                                gameState.value.field.currentOperationDigit,
-                                hintsEnabled = readinessHintsEnabled,
-                            ),
-                        gameTimeMs = gameState.value.field.gameTimeMs,
-                        onTargetClicked = onTargetClicked,
-                    )
-                }
-            }
-            if (shouldDrawDividerAfterColumn(columnId)) {
-                VerticalDivider()
-            }
-        }
-    }
+    PlayArea(gameState, onTargetClicked, readinessHintsEnabled)
 
     Box(
         modifier =
@@ -255,11 +192,3 @@ fun Field(
 // maxOf, not the bare cap: a lifeCount above INITIAL_LIFE_COUNT (a future random-event grant -
 // see LifeBonusTest) must still get a slot, or the extra life stays invisible.
 internal fun calculateLifeSlotCount(lifeCount: Int): Int = maxOf(INITIAL_LIFE_COUNT, lifeCount)
-
-// The dividers between columns cost one gap fewer than there are columns.
-internal fun calculateGameColumnWidth(measuredWidthDp: Int): Int =
-    (measuredWidthDp - (GAME_COLUMN_COUNT - 1)) / GAME_COLUMN_COUNT
-
-// A divider sits between columns, not after the last one: GAME_COLUMN_COUNT columns need
-// GAME_COLUMN_COUNT - 1 of them.
-internal fun shouldDrawDividerAfterColumn(columnId: Int): Boolean = columnId < GAME_COLUMN_COUNT - 1
