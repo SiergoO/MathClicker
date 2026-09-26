@@ -23,19 +23,14 @@ import com.sdamashchuk.matharcade.core.ui.theme.Accent
 import com.sdamashchuk.matharcade.core.ui.theme.Scrim
 import kotlinx.coroutines.delay
 
-// MC-87: half the old 800ms, and the scrim barely darkens the board. A level change is news, not
-// an interruption - the player should read it without losing the targets already falling behind it.
 private const val FADE_IN_MS = 120
 private const val HOLD_MS = 180
 private const val FADE_OUT_MS = 120
 private const val SCRIM_ALPHA = 0.28f
 
 /**
- * The 800ms `LEVEL N` announcement gating a level-up: no flag stops the fall while this is on
- * screen, the field composable simply isn't in this branch (see GameScreen).
- *
- * Accent, not Ink: the scrim went dark in MC-84, but the announcement still wants to read as the
- * game's own voice rather than as body text, and cyan on near-black is what does that.
+ * The `LEVEL N` announcement gating a level-up: nothing stops the fall while this is on screen, the
+ * field composable simply isn't in this branch (see GameScreen).
  */
 @Composable
 fun LevelIntroOverlay(

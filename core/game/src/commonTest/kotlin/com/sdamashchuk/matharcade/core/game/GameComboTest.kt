@@ -9,9 +9,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 
-// MC-95: the combo is how many targets one press scored on, carried on Field.bonusMultiplier. It was
-// a streak over presses until this task, which made it unreachable in practice - see the mixed-board
-// test below. Split out of GameTest to keep both files under detekt's LargeClass threshold.
+// Split out of GameTest to keep both files under detekt's LargeClass threshold.
 @OptIn(ExperimentalCoroutinesApi::class)
 class GameComboTest {
     @Test
@@ -35,7 +33,6 @@ class GameComboTest {
 
             fireClean()
             fireClean()
-            // A lone target can only ever be a combo of one - repetition is not what earns a combo.
             assertEquals(1, game.stateFlow.value.field.bonusMultiplier)
             assertEquals(3, game.stateFlow.value.field.score)
         }
@@ -57,7 +54,6 @@ class GameComboTest {
             game.fireButtonClicked()
 
             assertEquals(2, game.stateFlow.value.field.bonusMultiplier)
-            // Two targets at a digit of 1 is 2 raw, multiplied by the combo those same two targets are.
             assertEquals(4, game.stateFlow.value.field.score)
         }
 
@@ -83,8 +79,6 @@ class GameComboTest {
             assertEquals(2, game.stateFlow.value.field.score)
 
             // Reveal dormant and overshoot it (2 - 5 < 0) in the same press steady still succeeds in.
-            // The offered operation is only ever guaranteed against one target, so this board is the
-            // normal case, not the exceptional one - it used to leave the combo at zero every time.
             game.targetsRestored(
                 game.stateFlow.value.targets
                     .map { if (it.id == 2) it.copy(appearsAtMs = 0) else it },
@@ -169,8 +163,7 @@ class GameComboTest {
                     scheduledTarget(id = 2, columnId = 1, value = 2_000_000_000),
                 ),
             )
-            // Each subtraction scores its own digit, so the raw award is 2e9 - just inside Int - and
-            // the combo of two takes the product to 4e9, which is not.
+            // Raw award 2e9 is just inside Int; the combo of two takes the product to 4e9, which is not.
             game.fieldRestored(
                 game.stateFlow.value.field.copy(
                     currentOperationSign = OperationSign.SUBTRACTION,

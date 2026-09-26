@@ -17,10 +17,6 @@ class SessionHelperImpl(
         private const val LEVEL_MIN = 1
         private const val LEVEL_MAX = 999
 
-        // MC-93: was 1..20, which put a 4 and a 23 on the same level-1 board - a spread wide
-        // enough that the two targets barely read as the same game. Narrowed at the base and the
-        // per-level climb halved below, so level 1 is 1..11 and the range opens up as the player
-        // does rather than all at once.
         private const val INITIAL_TARGET_VALUE_MIN = 1
         private const val INITIAL_TARGET_VALUE_MAX = 9
 
@@ -31,42 +27,17 @@ class SessionHelperImpl(
         private const val FLIGHT_SPEED_SPREAD = 0.2f
         private const val MIN_SPEED_MULTIPLIER = 1f - FLIGHT_SPEED_SPREAD
 
-        // Fraction of the level's own base flight time, floored at MIN_FINISH_SPACING_MS below.
-        //
-        // MC-73 set this to 0.7 and pinned it with a flight-relative invariant: three lives lost to
-        // breakouts (INITIAL_LIFE_COUNT - 1 gaps between them) had to together span at least one
-        // level's worst-case flight time. That closed the bug it was written for - three lives gone
-        // within milliseconds - but it also fixed how many targets can be on screen at once, since
-        // that number is flight time divided by this spacing. At 0.7 it was 1.4: the owner's board
-        // held barely more than one falling target.
-        //
-        // MC-94 keeps the guarantee and stops expressing it as a ratio. What the player actually
-        // needs between two breakouts is time to react, which is a wall-clock quantity and has
-        // nothing to do with how long a fall happens to last at this level. So the spacing is now a
-        // smaller fraction with an absolute floor under it, and the invariant below is stated in
-        // milliseconds. Never lower MIN_FINISH_SPACING_MS without re-reading that check.
         private const val FINISH_SPACING_FRACTION = 0.38f
-
-        // The reaction window between two consecutive breakouts, and so the thing that makes losing
-        // every life take at least (INITIAL_LIFE_COUNT - 1) * this - 3.6 seconds, not milliseconds.
         private const val MIN_FINISH_SPACING_MS = 1800
-
-        // The floor under the floor: whatever the curve above says, a full life bar must never be
-        // spendable faster than this. Three and a half seconds is the shortest span in which a player
-        // can watch three targets leave the board and understand that they did.
         private const val MIN_TOTAL_LIFE_LOSS_MS = 3500
 
         // Authoring unit for getTargetSpeedByLevel: one whole fall, so speed is "fraction of a fall
         // covered per millisecond" rather than a unit tied to any real screen dimension.
         private const val SPAN_UNITS = 1f
 
-        // MC-94: was 6..10. More targets per level, each worth less and each on screen alongside
-        // more of its neighbours - which is also what gives the MC-95 combo something to aim at.
         private const val INITIAL_TARGET_AMOUNT_MIN = 9
         private const val INITIAL_TARGET_AMOUNT_MAX = 14
 
-        // MC-93: was 2..5. A divisor of 5 on level 1 asks for a multiple of 5 on a board whose
-        // values only reach 11, which is most of the board unreachable on the opening screen.
         private const val INITIAL_DIVISION_VALUE_MIN = 2
         private const val INITIAL_DIVISION_VALUE_MAX = 3
 
@@ -89,10 +60,6 @@ class SessionHelperImpl(
     override val initialSubtractionValueRange = IntRange(INITIAL_SUBTRACTION_VALUE_MIN, INITIAL_SUBTRACTION_VALUE_MAX)
 
     init {
-        // MC-73's fix, restated by MC-94 and still checked once here rather than only in a test:
-        // three breakouts (INITIAL_LIFE_COUNT - 1 gaps) must take real time, or the bug this exists
-        // for - three lives lost within milliseconds - comes back. A future edit that drops the floor
-        // below a usable reaction window fails fast at construction, not silently in production.
         check(MIN_FINISH_SPACING_MS * (INITIAL_LIFE_COUNT - 1) >= MIN_TOTAL_LIFE_LOSS_MS) {
             "MIN_FINISH_SPACING_MS is too small: losing every life must take at least $MIN_TOTAL_LIFE_LOSS_MS ms"
         }

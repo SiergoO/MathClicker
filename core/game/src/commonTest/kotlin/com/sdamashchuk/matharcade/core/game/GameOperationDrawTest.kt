@@ -57,16 +57,11 @@ private const val TICK_STEP_MS = 250
 
 private const val SIGN_MIX_TRIALS = 2000
 
-// The engine and the session helper must not share a seed here, or the sign drawn from one and the
-// digit drawn from the other move together and the measured mix is an artefact of that, not the mix.
+// A shared seed would correlate the sign drawn from one Random with the digit drawn from the other.
 private const val SIGN_MIX_HELPER_SALT = 7919L
 
-// What one offer costs against AlwaysDudSessionHelper, whose digits are constants and so draw no
-// randomness at all: only the sign draw is counted. MC-93 made that exactly one - the sign is drawn
-// once and each sign's own digit curve is then retried in turn, where before every retry redrew the
-// sign too and a dud board cost the full MAX_OPERATION_DRAW_ATTEMPTS of 20. Kept here rather than
-// exported, since the bound is an implementation detail of the redraw loop, not part of Game's public
-// contract - but the termination tests below need a concrete number, not just "some finite number".
+// AlwaysDudSessionHelper's digits are constants, so a dud board costs exactly one counted draw -
+// the sign's.
 private const val EXPECTED_DRAW_BOUND = 1
 
 // Always fails, regardless of which sign is drawn: subtraction's digit is pinned above the sole
@@ -234,7 +229,6 @@ class GameOperationDrawTest {
 
             // AlwaysDudSessionHelper's sole target is visible at creation (see its own comment), so
             // this bound is spent inside createTargets() itself, not deferred to a later tick or press.
-            // MC-93: one sign draw, not twenty - both signs are now tried from a single draw.
             // MC-79 leaves nextOperationSign/Digit untouched here by design (see ensureOpeningOperationSucceeds's
             // own comment), so this count is unchanged by that task - only current is fixed at creation.
             assertEquals(EXPECTED_DRAW_BOUND, countingRandom.drawCount - drawsBeforeCreatingTargets)
@@ -265,17 +259,9 @@ class GameOperationDrawTest {
     @Test
     fun `both signs are offered about equally on a board that supports either - MC-93`() =
         runTest {
-            // Every target is 9: a multiple of one level-1 divisor (3) but not the other (2), and
-            // above every level-1 subtraction digit (1..3). So neither sign is impossible, but the
-            // first draw is a dud often enough to put the redraw loop to work - which is where the
-            // skew lived. A board of, say, all 12s proves nothing here: every first draw succeeds,
-            // the loop never runs, and old and new code both measure 50%.
-            //
-            // Redrawing the sign together with the digit meant every retry re-rolled the sign, and
-            // subtraction succeeds far more readily than division, so the loop quietly walked the mix
-            // toward minus - the owner saw it dominate the early levels. This board measures 33% on
-            // the pre-MC-93 loop against 50% after it; the window is wide enough for sampling noise
-            // and far tighter than the skew it guards against.
+            // 9 is a multiple of one level-1 divisor (3) but not the other (2), so the first draw
+            // is a dud often enough to exercise the redraw loop. Measured at 50% here; a loop that
+            // re-rolls the sign on every retry measures 33%, which is what the window must exclude.
             var divisionOffers = 0
             repeat(SIGN_MIX_TRIALS) { trial ->
                 val seed = trial.toLong()
@@ -340,8 +326,8 @@ class GameOperationDrawTest {
             // MC-79: this is the session's first press, so pendingOpeningPromotionCheck also spends a
             // full EXPECTED_DRAW_BOUND fixing the about-to-be-promoted next (recreateField's own draw,
             // equally a dud against AlwaysDudSessionHelper) before getNextSignAndDigit spends a second
-            // one on the fresh next below - 2 * EXPECTED_DRAW_BOUND (was EXPECTED_DRAW_BOUND before
-            // that task). The bound is spent in full each time and no attempt is made past it - but what
+            // one on the fresh next below - 2 * EXPECTED_DRAW_BOUND. The bound is spent in full each
+            // time and no attempt is made past it - but what
             // comes back is a move, not the last dud. Subtracting the smallest visible value is always
             // valid, so a board this helper can never satisfy by drawing is still never handed a dead
             // press, promoted or fresh.

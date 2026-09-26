@@ -51,9 +51,6 @@ class TargetScoringTest {
         assertTrue(exact.isProfitable)
         assertEquals(14, inexact.value)
         assertFalse(inexact.isProfitable)
-        // MC-39 reverses ASK-7: totalScore is a plain per-target sum, not gated by a shared
-        // multiplier, so the failed split does not erase the exact split's own contribution. MC-95:
-        // the failure does not erase the combo either - one target scored, so the combo is one.
         assertEquals(5, outcome.totalScore)
         assertEquals(1, outcome.scored)
         assertTrue(outcome.failedCount > 0)

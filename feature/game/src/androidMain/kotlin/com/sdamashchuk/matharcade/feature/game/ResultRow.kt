@@ -52,8 +52,6 @@ fun ResultRow(
             color = supportColor,
             style = MaterialTheme.typography.body2,
         )
-        // The score carries the row: it is the one number the player came to this screen for, so it
-        // is the only cell at full Ink and the only one that changes weight on the record run.
         Cell(
             text = field.score.toString(),
             weight = ResultsColumns.SCORE_WEIGHT,

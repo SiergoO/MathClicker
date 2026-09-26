@@ -280,13 +280,8 @@ class SessionHelperImplTest {
         }
     }
 
-    // The invariant MC-73 exists to close, restated by MC-94: three breakouts (INITIAL_LIFE_COUNT - 1
-    // gaps) must take real time. MC-73 measured that against the level's own flight time, which also
-    // pinned the board to ~1.4 targets on screen; what the player actually needs is a reaction window,
-    // which is wall-clock and independent of how long this level's fall happens to be. Looped over the
-    // whole range the same way "no level from 1 to 999 produces an empty range" already does below,
-    // for the same reason - a spot check can't catch a curve that only crosses somewhere it wasn't
-    // asked about (the pre-MC-52 precedent this file was already written to guard against).
+    // Looped over the whole range, not spot-checked: a curve can cross somewhere it wasn't asked
+    // about - the pre-MC-52 precedent this file was written to guard against.
     @Test
     fun `losing every life takes real time at every level - not milliseconds`() {
         for (level in helper.levelRange) {
@@ -298,9 +293,7 @@ class SessionHelperImplTest {
         }
     }
 
-    // MC-94's own half of the change: the spacing had to come down for the board to hold more than
-    // one falling target at a time, and that is the number this pins. Flight time divided by spacing
-    // is how many targets are in the air at once.
+    // Flight time divided by spacing is how many targets are in the air at once.
     @Test
     fun `the early levels keep more than two targets in the air at once`() {
         for (level in listOf(1, 5, 10, 20, 30)) {
@@ -445,10 +438,8 @@ class SessionHelperImplTest {
 
     @Test
     fun `MC-60 - preparation cost profile matches the level 1 table at generation`() {
-        // MC-93 narrowed level 1's divisors to 2..3, so half of that level's draws have a maxCost
-        // of 1 and the authored "2-3 taps" bucket collapses into the 1-tap one (see PreparationCost's
-        // costInClampedRange). The realized profile is what a player meets, so it is what this pins -
-        // the authored table stays PREPARATION_PROFILE_LEVEL_1's (25, 65, 10, 0).
+        // The realized profile, not the authored one: at a divisor of 2 the "2-3 taps" bucket has
+        // no reachable cost and collapses into 1-tap (see PreparationCost's costInClampedRange).
         assertProfileMatches(level = 1, expectedPercentages = listOf(25, 70, 5, 0))
     }
 

@@ -42,12 +42,6 @@ import kotlin.math.abs
 
 // MC-54: telegraphs the final 15% of a fall (Target.isTelegraphingBreakout) so a breakout is never
 // a surprise. The cue is a size pulse plus a ring.
-//
-// MC-88 walked back MC-84's amber. Warm-against-cool was a free channel on paper, but on the board
-// a yellow ring reads as a different kind of object rather than as the same bubble in trouble, and
-// the 1.15 pulse was loud enough to pull the eye off every other target. The ring is now the
-// bubble's own light pushed to full brightness, and the pulse is small enough to notice without
-// being looked at.
 private const val TARGET_DIAMETER_FRACTION = 0.8
 private const val TELEGRAPH_PULSE_SCALE = 1.06f
 private const val TELEGRAPH_PULSE_MS = 300
@@ -90,12 +84,8 @@ private const val DIGIT_SIZE_FRACTION = 0.28f
 
 // A target that cannot be reduced by the armed operation is fully idle; one that can, but is not
 // yet a single press from zero, sits partway. One number drives every layer, so the three states
-// are one animatable value rather than three branches.
-//
-// MC-90: the floor was 0.45 and the two lower states were not told apart on a real board - the
-// owner had to read the number to know which was which. Raised so a reachable target is already
-// clearly blue, and an unreachable one loses its highlight core entirely, which is the cue that
-// separates them at a glance rather than on inspection.
+// are one animatable value rather than three branches. An unreachable target additionally loses its
+// highlight core, which is what separates it from a merely unready one at a glance.
 private const val LIVELINESS_PROFITABLE_FLOOR = 0.62f
 private const val UNREACHABLE_CORE_ALPHA = 0.06f
 private const val UNREACHABLE_FILL_ALPHA = 0.16f

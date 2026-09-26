@@ -82,17 +82,9 @@ internal fun Field.updateActionButtons(
         nextOperationDigit = nextOperationDigit,
     )
 
-// MC-95: the combo is how many targets one press closed, not how long a run of flawless presses
-// has lasted. A press is broadcast to every visible target, and the offered operation is only ever
-// guaranteed to succeed against one of them, so the old "any target failed resets to zero" wiped the
-// streak on nearly every multi-target board - the HUD sat at x1 for a whole session. Counting the
-// press instead makes the combo something the player can aim for: hold fire until one operation
-// clears several bubbles at once.
-//
-// Uncapped, per ASK-18, though the board now bounds it in practice - the multiplier cannot exceed
-// the number of targets on screen. The arithmetic it feeds is still saturated in updateScore.
+/**
+ * Replaces the multiplier with this press's own count, rather than accumulating across presses.
+ */
 internal fun Field.applyCombo(scored: Int): Field = this.copy(bonusMultiplier = scored)
 
-// A breakout still clears the HUD, so a stale multiplier from the last press never sits next to a
-// life the player just lost.
 internal fun Field.resetStreak(): Field = this.copy(bonusMultiplier = 0)

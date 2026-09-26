@@ -369,10 +369,8 @@ class GameTest {
                     nextOperationDigit = 2,
                     isClosed = true,
                     finishedAt = 0L,
-                    // MC-94: 61 of the 200 250ms ticks land before the field closes and freezes the
-                    // clock with the rest - the same terminal instant GameSimulationTest's pinned
-                    // 15104 elapsedMs reaches at 16ms steps, off by the coarser step size here. It was
-                    // 25000 while the fall was 9.5s and the spacing 70% of it.
+                    // 61 of the 200 250ms ticks land before the field closes and freezes the clock -
+                    // GameSimulationTest's 15104 is the same instant reached at 16ms steps.
                     gameTimeMs = 15250L,
                 ),
                 firstField,

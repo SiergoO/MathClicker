@@ -14,10 +14,6 @@ import com.sdamashchuk.matharcade.presentation.navigation.RootContent
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // MC-86: draw under the system bars rather than beside them. windowTranslucentStatus used
-        // to do half of this, but it also asks the platform for its own grey scrim, which is what
-        // put a band of not-quite-water at each end of the screen. The layout already reserves the
-        // insets with statusBarsPadding/navigationBarsPadding.
         WindowCompat.setDecorFitsSystemWindows(window, false)
         window.statusBarColor = Color.TRANSPARENT
         window.navigationBarColor = Color.TRANSPARENT

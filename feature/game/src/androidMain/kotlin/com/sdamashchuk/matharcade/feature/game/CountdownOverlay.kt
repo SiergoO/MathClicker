@@ -39,9 +39,7 @@ fun CountdownOverlay(onFinish: () -> Unit) {
         Image(
             painter = rememberLottiePainter(composition = composition, progress = { progress }),
             contentDescription = null,
-            // The colour is baked into the .lottie file and was a dull red left over from the old
-            // palette. Tinting flattens the animation to one colour, which for a 3-2-1 counter is
-            // all it ever needed.
+            // The .lottie asset has its own colour baked in; this overrides it.
             colorFilter = ColorFilter.tint(Ink),
         )
         LaunchedEffect(progress) {

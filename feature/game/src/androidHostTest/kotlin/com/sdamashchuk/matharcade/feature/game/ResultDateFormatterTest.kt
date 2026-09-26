@@ -22,8 +22,6 @@ class ResultDateFormatterTest {
 
     @Test
     fun `formatResultDate carries a time of day, so two runs on the same day are told apart`() {
-        // The whole point of MC-92's timestamp: a history of ten rows that all read 26.09.26 says
-        // nothing about which run is which. Two instants eleven minutes apart must not render alike.
         val morning = 1_790_208_000_000L
         val elevenMinutesLater = morning + 11 * 60 * 1000L
         assertNotEquals(
@@ -34,11 +32,8 @@ class ResultDateFormatterTest {
 
     @Test
     fun `formatResultDate agrees with the device's own clock`() {
-        // Derived rather than a literal: this is one device's own history, so the assertion is "what
-        // this device's clock calls that instant", which a hardcoded string cannot state without also
-        // hardcoding a zone - the exact thing the format stopped doing. On a host that happens to run
-        // in UTC this cannot tell the current format from the old UTC-pinned one; the zone itself is
-        // carried by the absence of a setTimeZone call in ResultDateFormatter, not proven here.
+        // A host running in UTC cannot tell this from the old UTC-pinned format; the zone is
+        // carried by the absent setTimeZone call, not proven here.
         val instant = 1_790_208_000_000L
         assertEquals(expected(instant), formatResultDate(instant, noDateText = "—"))
     }

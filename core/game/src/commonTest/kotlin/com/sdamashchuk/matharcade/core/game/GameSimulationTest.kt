@@ -105,9 +105,7 @@ class GameSimulationTest {
             // instead of summing an independently-rolled appearance delay and lifetime, with a finish
             // spacing floor derived from (INITIAL_LIFE_COUNT - 1) surviving one flight time - almost
             // exactly double the old wave-gap-derived spacing, which is why this moved up from 12496
-            // to 24896 rather than down. MC-94 then shortened the fall and cut the spacing to a third
-            // of it, so a no-input session now ends in 15104 - the faster early pace, measured
-            // end to end rather than asserted.
+            // to 24896 rather than down. A shorter fall and tighter spacing later took it to 15104.
             assertEquals(15104, elapsedMs)
         }
 
@@ -172,11 +170,8 @@ class GameSimulationTest {
             assertFalse(game.stateFlow.value.field.isClosed)
         }
 
-    // MC-68's acceptance criterion, restated as MC-73's closing proof and again by MC-94: a no-input
-    // session's three life losses must be spread out, not clustered within a couple of milliseconds of
-    // each other - the measured device bug this whole epic exists to close. MC-73 measured that span
-    // against the level's own flight time; MC-94 measures it against the level's own finish spacing,
-    // because the guarantee is now a reaction window rather than a ratio to how long a fall lasts.
+    // MC-68's acceptance criterion: a no-input session's life losses must be spread out, not
+    // clustered within a couple of milliseconds of each other - the device bug this epic closes.
     @Test
     fun `a no-input session spreads its three life losses out - across several levels`() =
         runTest {
@@ -204,13 +199,8 @@ class GameSimulationTest {
 
                 assertTrue(lifeLossTimes.size >= 2, "level $level: fewer than two life losses recorded")
                 val interval = lifeLossTimes.last() - lifeLossTimes.first()
-                // One gap per loss actually recorded, at this level's own spacing - not a global
-                // floor, which at level 1 would sit well under the real spacing and let a regression
-                // that halved it still pass. Two losses landing on the same tick collapse a gap and
-                // fail this, which is exactly the clustering the epic exists to close.
-                //
-                // Less one tick: a breakout is detected on the first tick at or after its scheduled
-                // finish, so the recorded interval can sit up to one tick short of the scheduled one.
+                // Less one tick: a breakout is detected on the first tick at or after its
+                // scheduled finish, so the recorded interval can sit one tick short of the schedule.
                 val expectedSpanMs =
                     (lifeLossTimes.size - 1).toLong() * sessionHelper.getFinishSpacingMsByLevel(level) - TICK_MS
                 assertTrue(
