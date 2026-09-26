@@ -18,7 +18,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.sdamashchuk.matharcade.core.ui.theme.Red500
+import com.sdamashchuk.matharcade.core.ui.theme.Accent
 
 private val LOGO_MARK_SIZE = 96.dp
 private val LOGO_MARK_GUTTER = 16.dp
@@ -55,7 +55,7 @@ fun MenuLogo(modifier: Modifier = Modifier) {
                 stringResource(id = R.string.logo_wordmark_line_1) + "\n" +
                     stringResource(id = R.string.logo_wordmark_line_2),
             modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.h1.copy(color = Red500),
+            style = MaterialTheme.typography.h1.copy(color = Accent),
             maxLines = 2,
             autoSize = WORDMARK_AUTO_SIZE,
         )

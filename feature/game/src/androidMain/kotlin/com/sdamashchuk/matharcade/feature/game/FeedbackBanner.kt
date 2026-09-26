@@ -20,9 +20,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.sdamashchuk.matharcade.core.ui.theme.Green200
-import com.sdamashchuk.matharcade.core.ui.theme.Red700
-import com.sdamashchuk.matharcade.core.ui.theme.White
+import com.sdamashchuk.matharcade.core.ui.theme.AccentDeep
+import com.sdamashchuk.matharcade.core.ui.theme.Success
+import com.sdamashchuk.matharcade.core.ui.theme.Warning
 import com.sdamashchuk.matharcade.feature.game.model.FeedbackEffect
 
 // Both already have a screen of their own - LevelIntroOverlay for one, ResultsScreen (MC-53,
@@ -67,7 +67,7 @@ fun FeedbackBanner(effect: FeedbackEffect?) {
             textAlign = TextAlign.Center,
             modifier =
                 Modifier
-                    .background(White, RoundedCornerShape(BANNER_CORNER_DP.dp))
+                    .background(AccentDeep, RoundedCornerShape(BANNER_CORNER_DP.dp))
                     .padding(horizontal = BANNER_PADDING_DP.dp),
         )
     }
@@ -77,19 +77,19 @@ fun FeedbackBanner(effect: FeedbackEffect?) {
 private fun bannerContent(effect: FeedbackEffect): Pair<String, Color> =
     when (effect) {
         is FeedbackEffect.TargetZeroed -> {
-            stringResource(id = R.string.game_feedback_award, effect.awarded) to Green200
+            stringResource(id = R.string.game_feedback_award, effect.awarded) to Success
         }
 
         is FeedbackEffect.OperationResolved -> {
             if (effect.gained > 0) {
-                stringResource(id = R.string.game_feedback_streak, effect.gained, effect.streak) to Green200
+                stringResource(id = R.string.game_feedback_streak, effect.gained, effect.streak) to Success
             } else {
-                stringResource(id = R.string.game_feedback_miss) to Red700
+                stringResource(id = R.string.game_feedback_miss) to Warning
             }
         }
 
         is FeedbackEffect.TargetBrokeOut -> {
-            stringResource(id = R.string.game_feedback_life_lost) to Red700
+            stringResource(id = R.string.game_feedback_life_lost) to Warning
         }
 
         FeedbackEffect.LevelUp -> {
@@ -97,7 +97,7 @@ private fun bannerContent(effect: FeedbackEffect): Pair<String, Color> =
         }
 
         is FeedbackEffect.LifeGranted -> {
-            stringResource(id = R.string.game_feedback_life_gained) to Green200
+            stringResource(id = R.string.game_feedback_life_gained) to Success
         }
 
         FeedbackEffect.GameOver -> {

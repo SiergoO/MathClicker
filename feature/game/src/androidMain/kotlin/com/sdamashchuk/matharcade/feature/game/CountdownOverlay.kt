@@ -12,7 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.unit.dp
-import com.sdamashchuk.matharcade.core.ui.theme.Translucent
+import com.sdamashchuk.matharcade.core.ui.theme.Scrim
 import io.github.alexzhirkevich.compottie.DotLottie
 import io.github.alexzhirkevich.compottie.LottieCompositionSpec
 import io.github.alexzhirkevich.compottie.animateLottieCompositionAsState
@@ -26,7 +26,7 @@ fun CountdownOverlay(onFinish: () -> Unit) {
         modifier =
             Modifier
                 .fillMaxSize()
-                .background(Translucent)
+                .background(Scrim)
                 .padding(40.dp),
     ) {
         val resources = LocalResources.current

@@ -20,8 +20,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.sdamashchuk.matharcade.core.model.Field
 import com.sdamashchuk.matharcade.core.ui.component.MenuButton
-import com.sdamashchuk.matharcade.core.ui.theme.Green200
-import com.sdamashchuk.matharcade.core.ui.theme.Red500
+import com.sdamashchuk.matharcade.core.ui.theme.Success
+import com.sdamashchuk.matharcade.core.ui.theme.Warning
 import com.sdamashchuk.matharcade.feature.game.model.ResultsSummary
 import kotlinx.collections.immutable.ImmutableList
 
@@ -91,19 +91,19 @@ fun ResultsScreen(
     }
 }
 
-// The near-miss line itself: a new record reads as a win (Green200), falling short reads as the
-// gap left to close (Red500) - the same two colours FeedbackBanner already uses for the same two
+// The near-miss line itself: a new record reads as a win (Success), falling short reads as the
+// gap left to close (Warning) - the same two colours FeedbackBanner already uses for the same two
 // meanings elsewhere on this screen's own flow.
 @Composable
 private fun SummaryText(summary: ResultsSummary) {
     val (text, color) =
         when (summary) {
             is ResultsSummary.NewRecord -> {
-                stringResource(id = R.string.results_new_record) to Green200
+                stringResource(id = R.string.results_new_record) to Success
             }
 
             is ResultsSummary.ShortOfBest -> {
-                stringResource(id = R.string.results_short_of_best, summary.deltaToBest) to Red500
+                stringResource(id = R.string.results_short_of_best, summary.deltaToBest) to Warning
             }
 
             is ResultsSummary.NoHistory -> {

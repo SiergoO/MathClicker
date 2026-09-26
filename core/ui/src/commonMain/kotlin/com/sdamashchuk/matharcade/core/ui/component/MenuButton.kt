@@ -10,7 +10,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
-import com.sdamashchuk.matharcade.core.ui.theme.Red500
+import com.sdamashchuk.matharcade.core.ui.theme.Accent
 import com.sdamashchuk.matharcade.core.ui.theme.Shapes
 
 @Composable
@@ -21,7 +21,7 @@ fun MenuButton(
 ) {
     Button(
         onClick = onClick,
-        colors = ButtonDefaults.buttonColors(backgroundColor = Red500),
+        colors = ButtonDefaults.buttonColors(backgroundColor = Accent),
         modifier =
             modifier
                 .width(200.dp)

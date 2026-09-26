@@ -13,7 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import com.sdamashchuk.matharcade.core.ui.theme.Red500
+import com.sdamashchuk.matharcade.core.ui.theme.Accent
 import com.sdamashchuk.matharcade.feature.game.model.TargetScreenPosition
 
 // MC-83: pulled well back from MC-82's 96dp / 4dp / 0.6 alpha. At that weight a zeroing threw a
@@ -50,7 +50,7 @@ fun BurstRing(
                 },
     ) {
         drawCircle(
-            color = Red500.copy(alpha = burstAlpha(progress.value)),
+            color = Accent.copy(alpha = burstAlpha(progress.value)),
             radius = (size.minDimension / 2f) * progress.value,
             style = Stroke(width = BURST_STROKE_WIDTH_DP.dp.toPx()),
         )
