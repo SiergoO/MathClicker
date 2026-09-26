@@ -1,14 +1,12 @@
 package com.sdamashchuk.matharcade.feature.game
 
 import android.util.Size
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
@@ -21,23 +19,29 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.sdamashchuk.matharcade.core.model.GAME_COLUMN_COUNT
+import com.sdamashchuk.matharcade.core.ui.theme.WaterDeep
+import com.sdamashchuk.matharcade.core.ui.theme.WaterShaft
+import com.sdamashchuk.matharcade.core.ui.theme.WaterSurface
 import com.sdamashchuk.matharcade.feature.game.model.TargetScreenPosition
 import com.sdamashchuk.matharcade.feature.game.model.TargetZeroedBurst
 import com.sdamashchuk.matharcade.feature.game.model.TargetZeroedSignal
 
 private const val PLAY_AREA_HEIGHT_FRACTION = 0.75f
 
-private const val LANE_GUIDE_ALPHA = 0.12f
-private const val LANE_GUIDE_WIDTH_DP = 1
+// MC-84: the brightest band of the water sits here, not at the top - it reads as a shaft of light
+// from above and is what stops the column from looking like a flat wash.
+private const val WATER_SHAFT_STOP = 0.62f
 
-// Four falling-target columns and the hairlines that separate them.
+// MC-84: four falling-target columns over the water. The reference art has no lane separators at
+// all: the bubbles carry the columns on their own, and a hairline grid over water reads as a
+// spreadsheet.
 @Composable
 fun PlayArea(
     gameState: State<GameViewModel.State>,
@@ -47,7 +51,7 @@ fun PlayArea(
 ) {
     var gameColumnSize by remember { mutableStateOf(Size(0, 0)) }
     val localDensity = LocalDensity.current
-    val laneGuideColor = MaterialTheme.colors.onSurface.copy(alpha = LANE_GUIDE_ALPHA)
+    val depthFactor = waterDepthFactor(gameState.value.field.level)
 
     // Where a target last was, kept around after it leaves the composition: TargetButton reports
     // its own position on every active frame (see SideEffect there), and a zeroed target's last
@@ -70,15 +74,17 @@ fun PlayArea(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(PLAY_AREA_HEIGHT_FRACTION),
+                .fillMaxHeight(PLAY_AREA_HEIGHT_FRACTION)
+                .drawBehind {
+                    drawRect(
+                        Brush.verticalGradient(
+                            0f to sink(WaterSurface, depthFactor),
+                            WATER_SHAFT_STOP to sink(WaterShaft, depthFactor),
+                            1f to sink(WaterDeep, depthFactor),
+                        ),
+                    )
+                },
     ) {
-        Canvas(modifier = Modifier.matchParentSize()) {
-            repeat(GAME_COLUMN_COUNT) { columnId ->
-                if (shouldDrawDividerAfterColumn(columnId)) {
-                    drawLaneGuide(laneGuideColor, boundaryIndex = columnId + 1, columnWidth = gameColumnSize.width)
-                }
-            }
-        }
         Row(
             modifier =
                 Modifier
@@ -138,26 +144,14 @@ fun PlayArea(
     }
 }
 
-// The dividers between columns cost one gap fewer than there are columns.
-internal fun calculateGameColumnWidth(measuredWidthDp: Int): Int =
-    (measuredWidthDp - (GAME_COLUMN_COUNT - 1)) / GAME_COLUMN_COUNT
+// An even split. The subtraction this used to carry reserved width for 1dp lane separators; MC-81
+// moved those into an overlay and MC-84 removed them, so reserving for them left the row 3dp short
+// and every column fractionally left of where it belongs.
+internal fun calculateGameColumnWidth(measuredWidthDp: Int): Int = measuredWidthDp / GAME_COLUMN_COUNT
 
-// A divider sits between columns, not after the last one: GAME_COLUMN_COUNT columns need
-// GAME_COLUMN_COUNT - 1 of them.
-internal fun shouldDrawDividerAfterColumn(columnId: Int): Boolean = columnId < GAME_COLUMN_COUNT - 1
-
-// boundaryIndex is 1-based: the boundary after column 0 is boundary 1. The Row packs its columns
-// from the left edge, so a boundary sits at exactly that many column widths in.
-private fun DrawScope.drawLaneGuide(
+// MC-84: darkens one water stop toward the abyss. Multiplying every channel by the same factor
+// keeps the hue and only removes light, which is what water actually does with depth.
+private fun sink(
     color: Color,
-    boundaryIndex: Int,
-    columnWidth: Int,
-) {
-    val x = (boundaryIndex * columnWidth).dp.toPx()
-    drawLine(
-        color = color,
-        start = Offset(x, 0f),
-        end = Offset(x, size.height),
-        strokeWidth = LANE_GUIDE_WIDTH_DP.dp.toPx(),
-    )
-}
+    factor: Float,
+): Color = Color(color.red * factor, color.green * factor, color.blue * factor, color.alpha)

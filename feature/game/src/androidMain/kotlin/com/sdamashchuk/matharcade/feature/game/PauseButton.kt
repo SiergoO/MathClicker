@@ -16,7 +16,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import com.sdamashchuk.matharcade.core.ui.theme.Red500
+import com.sdamashchuk.matharcade.core.ui.theme.Accent
 
 // Two bars rather than the word: "Pause" needs more width than the HUD has beside Level and Score,
 // and it clipped against the screen edge at 56dp. A glyph also survives translation, which the word
@@ -39,7 +39,7 @@ fun PauseButton(onClick: () -> Unit) {
                         Modifier
                             .width(5.dp)
                             .height(18.dp)
-                            .background(Red500, RoundedCornerShape(2.dp)),
+                            .background(Accent, RoundedCornerShape(2.dp)),
                 )
             }
         }

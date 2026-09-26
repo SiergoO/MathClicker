@@ -20,9 +20,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.sdamashchuk.matharcade.core.ui.theme.Accent
+import com.sdamashchuk.matharcade.core.ui.theme.AccentSoft
 import com.sdamashchuk.matharcade.core.ui.theme.MathArcadeTheme
-import com.sdamashchuk.matharcade.core.ui.theme.Red200
-import com.sdamashchuk.matharcade.core.ui.theme.Red500
 
 @Composable
 fun SettingsScreen(component: SettingsComponent) {
@@ -54,7 +54,7 @@ fun SettingsScreen(component: SettingsComponent) {
                     style = MaterialTheme.typography.body1,
                 )
                 // Material's default switch colours are teal; every other control in this app is
-                // Red500, and an off-brand accent on the only settings screen reads as unfinished.
+                // Accent, and an off-brand accent on the only settings screen reads as unfinished.
                 Switch(
                     checked = state.value.soundEnabled,
                     onCheckedChange = {
@@ -62,8 +62,8 @@ fun SettingsScreen(component: SettingsComponent) {
                     },
                     colors =
                         SwitchDefaults.colors(
-                            checkedThumbColor = Red500,
-                            checkedTrackColor = Red200,
+                            checkedThumbColor = Accent,
+                            checkedTrackColor = AccentSoft,
                         ),
                 )
             }

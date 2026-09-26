@@ -37,9 +37,10 @@ import androidx.compose.ui.text.toUpperCase
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.sdamashchuk.matharcade.core.model.INITIAL_LIFE_COUNT
-import com.sdamashchuk.matharcade.core.ui.theme.Red200
-import com.sdamashchuk.matharcade.core.ui.theme.Red500
-import com.sdamashchuk.matharcade.core.ui.theme.White
+import com.sdamashchuk.matharcade.core.ui.theme.Accent
+import com.sdamashchuk.matharcade.core.ui.theme.AccentDeep
+import com.sdamashchuk.matharcade.core.ui.theme.AccentSoft
+import com.sdamashchuk.matharcade.core.ui.theme.Ink
 import com.sdamashchuk.matharcade.feature.game.model.TargetZeroedSignal
 
 private const val HUD_HEIGHT_FRACTION = 0.05f
@@ -132,7 +133,7 @@ fun Field(
             verticalArrangement = Arrangement.Top,
         ) {
             repeat(calculateLifeSlotCount(gameState.value.field.lifeCount)) {
-                Divider(color = if (it < gameState.value.field.lifeCount) Red500 else Color.LightGray, thickness = 3.dp)
+                Divider(color = if (it < gameState.value.field.lifeCount) Accent else AccentDeep, thickness = 3.dp)
                 Spacer(modifier = Modifier.padding(bottom = 2.dp))
             }
         }
@@ -166,12 +167,12 @@ fun Field(
                 Text(
                     text = gameState.value.field.let { "${it.currentOperationSign.sign}${it.currentOperationDigit}" },
                     fontSize = 36.sp,
-                    color = White,
+                    color = Ink,
                 )
             }
             Button(
                 onClick = {},
-                colors = ButtonDefaults.buttonColors(backgroundColor = Red200),
+                colors = ButtonDefaults.buttonColors(backgroundColor = AccentSoft),
                 modifier =
                     Modifier
                         .weight(1f)
@@ -184,7 +185,7 @@ fun Field(
                 Text(
                     text = gameState.value.field.let { "${it.nextOperationSign.sign}${it.nextOperationDigit}" },
                     fontSize = 12.sp,
-                    color = White,
+                    color = Ink,
                 )
             }
         }

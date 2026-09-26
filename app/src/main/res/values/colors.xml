@@ -7,4 +7,7 @@
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+    <!-- MC-84: the window beneath Compose. Matches WaterDeep so a cold start opens on
+         water rather than flashing a white page first. -->
+    <color name="water_deep">#FF17303E</color>
 </resources>

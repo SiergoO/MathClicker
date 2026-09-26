@@ -14,7 +14,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.sdamashchuk.matharcade.core.model.Field
-import com.sdamashchuk.matharcade.core.ui.theme.Green200
+import com.sdamashchuk.matharcade.core.ui.theme.Success
 
 /**
  * One row of the results table - a single closed run. [isBest] marks the player's record among
@@ -35,7 +35,7 @@ fun ResultRow(
         Text(
             modifier = Modifier.width(ResultsColumns.STAR_WIDTH),
             text = if (isBest) "★" else "",
-            color = Green200,
+            color = Success,
             textAlign = TextAlign.Center,
             style = MaterialTheme.typography.body2,
         )

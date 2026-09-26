@@ -18,8 +18,8 @@ import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.intl.Locale
 import androidx.compose.ui.text.toUpperCase
-import com.sdamashchuk.matharcade.core.ui.theme.Red200
-import com.sdamashchuk.matharcade.core.ui.theme.Translucent
+import com.sdamashchuk.matharcade.core.ui.theme.AccentSoft
+import com.sdamashchuk.matharcade.core.ui.theme.Scrim
 import io.github.alexzhirkevich.compottie.Compottie
 import io.github.alexzhirkevich.compottie.DotLottie
 import io.github.alexzhirkevich.compottie.LottieCompositionSpec
@@ -38,7 +38,7 @@ fun ReadyToPlayOverlay(onClick: () -> Unit) {
         modifier =
             Modifier
                 .fillMaxSize()
-                .background(Translucent)
+                .background(Scrim)
                 .clickable(onClick = onClick),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -59,7 +59,7 @@ fun ReadyToPlayOverlay(onClick: () -> Unit) {
         Text(
             text = stringResource(id = R.string.ready_to_pay_overlay_hint).toUpperCase(Locale.current),
             style = MaterialTheme.typography.h2,
-            color = Red200,
+            color = AccentSoft,
         )
     }
 }
