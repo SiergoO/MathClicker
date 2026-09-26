@@ -64,14 +64,14 @@ private const val PROFILE_SAMPLE_ITERATIONS = 10_000
 private const val PROFILE_TOLERANCE_PP = 5
 private const val PROFILE_SEED = 4242L
 
-// Looser than PROFILE_TOLERANCE_PP: subtraction's own digit range (initialSubtractionValueRange,
-// 1..3 unscaled) is narrower than division's (2..5), so digit 2 - excluded from neither range but a
-// much larger share of subtraction's draws than of division's - clamps both "2-3 taps" and "4+ taps"
-// down into "1 tap" outright (maxCost 1 can realize neither bucket). Measured once against
-// PROFILE_SEED: the largest observed gap was ~6pp (level 10's "2-3 taps"). 10 is generous against
-// that without being wide enough to pass mutation M2 (a swapped or inverted profile moves every
-// bucket by tens of points, not single digits).
-private const val SUBTRACTION_PROFILE_TOLERANCE_PP = 10
+// MC-80: subtraction's own axis is trap share, not division's four tap-cost buckets - n=10_000
+// keeps binomial noise for a share this size well under 1pp, so this tolerance is mostly headroom
+// against the 15pp gaps between SubtractionTrapCost's own profile rows, not sampling slack.
+private const val SUBTRACTION_TRAP_SAMPLE_ITERATIONS = 10_000
+
+// At n=10_000 the sampling error on a share is well under a point, so 3 is loose enough never
+// to flake and tight enough that any real profile edit - the smallest step here is 15pp - fails.
+private const val SUBTRACTION_TRAP_TOLERANCE_PP = 3
 
 private data class CostBuckets(
     val readyNow: Int,
@@ -125,47 +125,19 @@ private fun assertProfileMatches(
     }
 }
 
-// MC-70's subtraction generator (getSubtractionTargetValueByLevel) spends desiredPreparationCost
-// directly as the value itself whenever the digit allows a trap at all (digit >= 2) - so a value
-// below the digit is desiredCost read back exactly, not a shift, and buckets the same way division's
-// remainder does. digit == 1 is excluded here (as division's own digit range structurally never
-// produces one): no trap can exist against it, so including it would just dilute every bucket toward
-// ready-now and hide a shape change rather than reveal one.
-private fun sampleSubtractionCostBuckets(
+// MC-80's own axis: the fraction of draws that land below operationDigit at all, at a fixed digit
+// so the share measured is the profile's, not a mix of digits with different trap headroom.
+private fun sampleSubtractionTrapShare(
     level: Int,
+    operationDigit: Int,
     seed: Long,
-): CostBuckets {
+): Int {
     val seededHelper = SessionHelperImpl(random = Random(seed))
-    var readyNow = 0
-    var oneTap = 0
-    var twoOrThreeTaps = 0
-    var fourPlusTaps = 0
-    repeat(PROFILE_SAMPLE_ITERATIONS) {
-        val digit = seededHelper.getSubtractionDigitByLevel(level)
-        if (digit < 2) return@repeat
-        val value = seededHelper.getSubtractionTargetValueByLevel(level, digit)
-        when (val cost = if (value >= digit) 0 else value) {
-            0 -> readyNow++
-            1 -> oneTap++
-            in 2..3 -> twoOrThreeTaps++
-            else -> fourPlusTaps++
-        }
+    var traps = 0
+    repeat(SUBTRACTION_TRAP_SAMPLE_ITERATIONS) {
+        if (seededHelper.getSubtractionTargetValueByLevel(level, operationDigit) < operationDigit) traps++
     }
-    return CostBuckets(readyNow, oneTap, twoOrThreeTaps, fourPlusTaps)
-}
-
-private fun assertSubtractionProfileMatches(
-    level: Int,
-    expectedPercentages: List<Int>,
-) {
-    val actual = sampleSubtractionCostBuckets(level, PROFILE_SEED).percentages
-    val labels = listOf("ready now", "1 tap", "2-3 taps", "4+ taps")
-    for (i in actual.indices) {
-        assertTrue(
-            kotlin.math.abs(actual[i] - expectedPercentages[i]) <= SUBTRACTION_PROFILE_TOLERANCE_PP,
-            "level $level ${labels[i]}: expected ~${expectedPercentages[i]}%, measured ${actual[i]}%",
-        )
-    }
+    return traps * 100 / SUBTRACTION_TRAP_SAMPLE_ITERATIONS
 }
 
 private fun failedGrowthCapTarget(value: Int) =
@@ -540,18 +512,57 @@ class SessionHelperImplTest {
     }
 
     @Test
-    fun `MC-70 - subtraction preparation cost profile matches the level 1 table when the digit allows it`() {
-        assertSubtractionProfileMatches(level = 1, expectedPercentages = listOf(25, 65, 10, 0))
+    fun `MC-80 - subtraction trap share rises with level and stays well under half at level 1`() {
+        val digit = 5
+        var previousShare = -1
+        for (level in listOf(1, 10, 30, 50)) {
+            val share = sampleSubtractionTrapShare(level, digit, PROFILE_SEED)
+            assertTrue(
+                share >= previousShare,
+                "level $level: trap share $share% fell below the previous level's $previousShare%",
+            )
+            if (level == 1) {
+                assertTrue(share < 50, "level 1: trap share $share% is not well under half")
+            }
+            previousShare = share
+        }
+    }
+
+    // Monotonicity alone lets the middle of the curve drift: moving level 10 from 35% to 45% keeps
+    // the order intact and passes every other assertion here, which is exactly the strength the
+    // deleted MC-70 bucket tests used to provide. Each step is pinned to the declared profile.
+    @Test
+    fun `MC-80 - each level's subtraction trap share matches its declared profile`() {
+        val digit = 5
+        val expectedByLevel = listOf(1 to 20, 10 to 35, 30 to 50, 50 to 65)
+        for ((level, expected) in expectedByLevel) {
+            val share = sampleSubtractionTrapShare(level, digit, PROFILE_SEED)
+            assertTrue(
+                kotlin.math.abs(share - expected) <= SUBTRACTION_TRAP_TOLERANCE_PP,
+                "level $level: trap share $share% is not within $SUBTRACTION_TRAP_TOLERANCE_PP pp of $expected%",
+            )
+        }
     }
 
     @Test
-    fun `MC-70 - subtraction preparation cost profile matches the level 10 table when the digit allows it`() {
-        assertSubtractionProfileMatches(level = 10, expectedPercentages = listOf(25, 45, 30, 0))
-    }
-
-    @Test
-    fun `MC-70 - subtraction preparation cost profile matches the level 30 table when the digit allows it`() {
-        assertSubtractionProfileMatches(level = 30, expectedPercentages = listOf(30, 30, 30, 10))
+    fun `MC-80 - subtraction trap values are spread across the digit's range - not concentrated on 1`() {
+        // digit 10 gives traps nine possible values (1..9); uniform would put ~11% on each, so a
+        // share this far below half proves the value isn't collapsing to 1 the way desiredPreparationCost's
+        // oneTapPercent bucket did.
+        val level = 50
+        val digit = 10
+        val seededHelper = SessionHelperImpl(random = Random(PROFILE_SEED))
+        var traps = 0
+        var onesAmongTraps = 0
+        repeat(SUBTRACTION_TRAP_SAMPLE_ITERATIONS) {
+            val value = seededHelper.getSubtractionTargetValueByLevel(level, digit)
+            if (value < digit) {
+                traps++
+                if (value == 1) onesAmongTraps++
+            }
+        }
+        val onePercentOfTraps = onesAmongTraps * 100 / traps
+        assertTrue(onePercentOfTraps < 25, "value 1 is $onePercentOfTraps% of traps, still concentrated")
     }
 
     @Test
@@ -592,9 +603,11 @@ class SessionHelperImplTest {
     }
 
     @Test
-    fun `MC-70 - getSubtractionTargetValueByLevel is pinned to an exact seeded number at level 1`() {
+    fun `MC-80 - getSubtractionTargetValueByLevel is pinned to an exact seeded number at level 1`() {
+        // Re-pinned for MC-80: SubtractionTrapCost draws a different random sequence than the
+        // desiredPreparationCost it replaces, so this is a fresh capture, not the old value carried over.
         assertEquals(
-            2,
+            21,
             SessionHelperImpl(
                 random = Random(PINNED_SEED),
             ).getSubtractionTargetValueByLevel(level = 1, operationDigit = 3),
@@ -602,9 +615,9 @@ class SessionHelperImplTest {
     }
 
     @Test
-    fun `MC-70 - getSubtractionTargetValueByLevel is pinned to an exact seeded number at level 30`() {
+    fun `MC-80 - getSubtractionTargetValueByLevel is pinned to an exact seeded number at level 30`() {
         assertEquals(
-            6,
+            100,
             SessionHelperImpl(
                 random = Random(PINNED_SEED),
             ).getSubtractionTargetValueByLevel(level = 30, operationDigit = 8),

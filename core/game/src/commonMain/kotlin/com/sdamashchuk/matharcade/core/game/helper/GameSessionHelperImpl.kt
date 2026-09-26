@@ -144,13 +144,13 @@ class SessionHelperImpl(
     /**
      * Calculates the target value for a subtraction-armed board (MC-70). Subtraction succeeds
      * whenever value >= digit - not modular like division, so there is no remainder to shift toward.
-     * Instead, desiredPreparationCost's level profile picks the fraction of targets that are genuine
-     * traps: a value below the digit outright, which tapping can only shrink further and never lift
-     * back to ready, so it must be cleared by hand rather than fired on. The rest are generated ready
-     * to fire immediately.
+     * Instead, desiredSubtractionTrapValue's own level profile (MC-80) picks the fraction of targets
+     * that are genuine traps: a value below the digit outright, which tapping can only shrink further
+     * and never lift back to ready, so it must be cleared by hand rather than fired on. The rest are
+     * generated ready to fire immediately.
      * @param level
      * @param operationDigit the subtraction digit the value is generated against.
-     * @return random target value, ready or a trap according to the level's preparation profile.
+     * @return random target value, ready or a trap according to the level's trap profile.
      */
     override fun getSubtractionTargetValueByLevel(
         level: Int,
@@ -162,15 +162,12 @@ class SessionHelperImpl(
             // Every target value is at least 1, so nothing can ever fall below this digit.
             IntRange(minThreshold, maxThreshold).random(random)
         } else {
-            val desiredCost = desiredPreparationCost(level, operationDigit, random)
-            if (desiredCost == 0) {
+            val trapValue = desiredSubtractionTrapValue(level, operationDigit, random)
+            if (trapValue == null) {
                 val readyLower = maxOf(minThreshold, operationDigit).coerceAtMost(maxThreshold)
                 IntRange(readyLower, maxThreshold).random(random)
             } else {
-                // A trap: desiredCost is spent directly as the value, not a shift - the number of
-                // plain taps this target costs to clear by hand, since firing on it would only fail
-                // and grow it.
-                desiredCost
+                trapValue
             }
         }
     }
