@@ -4,7 +4,7 @@ import com.sdamashchuk.matharcade.core.game.helper.SessionHelper
 import com.sdamashchuk.matharcade.core.game.model.GameEvent
 import com.sdamashchuk.matharcade.core.game.model.GameState
 import com.sdamashchuk.matharcade.core.game.objectmapper.advanceClock
-import com.sdamashchuk.matharcade.core.game.objectmapper.advanceStreak
+import com.sdamashchuk.matharcade.core.game.objectmapper.applyCombo
 import com.sdamashchuk.matharcade.core.game.objectmapper.changeActiveness
 import com.sdamashchuk.matharcade.core.game.objectmapper.closeIfNecessary
 import com.sdamashchuk.matharcade.core.game.objectmapper.decrementLifeCount
@@ -206,9 +206,9 @@ class Game(
             // (MC-65) - straight to current below. Revalidated here, once, against updatedTargets: the
             // same freshest-available board the line above already trusts for the new next draw, so a
             // target this same press just cleared or retired can't rescue it either.
-            val streakedField =
+            val comboField =
                 current.field
-                    .advanceStreak(pressOutcome.failed)
+                    .applyCombo(pressOutcome.scored)
                     .let { field ->
                         if (pendingOpeningPromotionCheck) {
                             pendingOpeningPromotionCheck = false
@@ -220,15 +220,15 @@ class Game(
             // In Long: totalScore is bounded by the board, but appliedMultiplier is not, so the
             // product is the first place an uncapped streak can overflow.
             val gained =
-                (pressOutcome.totalScore.toLong() * streakedField.appliedMultiplier)
+                (pressOutcome.totalScore.toLong() * comboField.appliedMultiplier)
                     .coerceAtMost(Int.MAX_VALUE.toLong())
                     .toInt()
             val updatedField =
-                streakedField
+                comboField
                     .updateActionButtons(nextOperationSign, nextOperationDigit)
                     .updateScore(gained)
             _stateFlow.value = GameState(updatedField, updatedTargets)
-            _events.tryEmit(GameEvent.OperationResolved(gained, streakedField.bonusMultiplier))
+            _events.tryEmit(GameEvent.OperationResolved(gained, comboField.bonusMultiplier))
         }
 
     // The engine's own clock: advances gameTimeMs by elapsedMs and resolves whatever that step

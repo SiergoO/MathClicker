@@ -83,17 +83,16 @@ class FieldMapperTest {
     }
 
     @Test
-    fun `advanceStreak increments a clean press and resets a failed one`() {
-        assertEquals(1, Field(bonusMultiplier = 0).advanceStreak(pressFailed = false).bonusMultiplier)
-        assertEquals(6, Field(bonusMultiplier = 5).advanceStreak(pressFailed = false).bonusMultiplier)
-        assertEquals(0, Field(bonusMultiplier = 5).advanceStreak(pressFailed = true).bonusMultiplier)
+    fun `applyCombo is the number of targets the press scored on - not a running streak`() {
+        assertEquals(3, Field(bonusMultiplier = 0).applyCombo(3).bonusMultiplier)
+        assertEquals(1, Field(bonusMultiplier = 7).applyCombo(1).bonusMultiplier)
+        assertEquals(0, Field(bonusMultiplier = 7).applyCombo(0).bonusMultiplier)
     }
 
     @Test
-    fun `advanceStreak has no ceiling`() {
-        assertEquals(10, Field(bonusMultiplier = 9).advanceStreak(pressFailed = false).bonusMultiplier)
-        assertEquals(11, Field(bonusMultiplier = 10).advanceStreak(pressFailed = false).bonusMultiplier)
-        assertEquals(1001, Field(bonusMultiplier = 1000).advanceStreak(pressFailed = false).bonusMultiplier)
+    fun `applyCombo has no ceiling of its own`() {
+        assertEquals(10, Field(bonusMultiplier = 0).applyCombo(10).bonusMultiplier)
+        assertEquals(1000, Field(bonusMultiplier = 0).applyCombo(1000).bonusMultiplier)
     }
 
     @Test

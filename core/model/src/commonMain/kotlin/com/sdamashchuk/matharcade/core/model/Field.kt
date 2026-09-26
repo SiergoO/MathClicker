@@ -5,6 +5,7 @@ data class Field(
     val level: Int = 1,
     val score: Int = 0,
     val lifeCount: Int = INITIAL_LIFE_COUNT,
+    // MC-95: how many targets the last press scored on, not a streak over presses. See applyCombo.
     val bonusMultiplier: Int = 0,
     val currentOperationSign: OperationSign = OperationSign.DIVISION,
     val currentOperationDigit: Int = 0,
@@ -23,7 +24,9 @@ data class Field(
 ) {
     // Computed here rather than in the engine's mapper: the HUD renders this number, and a label
     // should not have to import :core:game to lay itself out (the same reason Target.position
-    // lives on the model). A resting streak of 0 must still score, hence the floor at 1.
+    // lives on the model). MC-95: bonusMultiplier is how many targets the last press scored on, so
+    // 0 means the press scored on nothing - the floor at 1 keeps that from erasing an award, which
+    // is the same role it played when this was a streak.
     val appliedMultiplier: Int
         get() = maxOf(1, bonusMultiplier)
 }

@@ -9,20 +9,17 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 
-// MC-39: the combo is a streak over presses, carried on Field.bonusMultiplier. Split out of
-// GameTest to keep both files under detekt's LargeClass threshold.
+// MC-95: the combo is how many targets one press scored on, carried on Field.bonusMultiplier. It was
+// a streak over presses until this task, which made it unreachable in practice - see the mixed-board
+// test below. Split out of GameTest to keep both files under detekt's LargeClass threshold.
 @OptIn(ExperimentalCoroutinesApi::class)
-class GameStreakTest {
+class GameComboTest {
     @Test
-    fun `a clean press raises the streak by one - three in a row give three`() =
+    fun `a press that scores on one target gives a combo of one however many presses precede it`() =
         runTest {
             val game = Game(FakeSessionHelper(targetAmount = 1, targetValue = 1000), backgroundScope, Random(1))
             game.createField(1)
-            game.targetsRestored(
-                listOf(
-                    scheduledTarget(id = 1, value = 1000),
-                ),
-            )
+            game.targetsRestored(listOf(scheduledTarget(id = 1, value = 1000)))
 
             suspend fun fireClean() {
                 val field = game.stateFlow.value.field
@@ -33,17 +30,18 @@ class GameStreakTest {
             }
 
             fireClean()
-            // Streak was 0 going in: max(1, streak) must still apply so this scores 1, not 0.
             assertEquals(1, game.stateFlow.value.field.bonusMultiplier)
             assertEquals(1, game.stateFlow.value.field.score)
 
             fireClean()
             fireClean()
-            assertEquals(3, game.stateFlow.value.field.bonusMultiplier)
+            // A lone target can only ever be a combo of one - repetition is not what earns a combo.
+            assertEquals(1, game.stateFlow.value.field.bonusMultiplier)
+            assertEquals(3, game.stateFlow.value.field.score)
         }
 
     @Test
-    fun `a press with two successful targets raises the streak by one - not per target`() =
+    fun `a press that scores on two targets gives a combo of two and pays the square`() =
         runTest {
             val game = Game(FakeSessionHelper(targetAmount = 2, targetValue = 1000), backgroundScope, Random(1))
             game.createField(1)
@@ -58,11 +56,13 @@ class GameStreakTest {
 
             game.fireButtonClicked()
 
-            assertEquals(1, game.stateFlow.value.field.bonusMultiplier)
+            assertEquals(2, game.stateFlow.value.field.bonusMultiplier)
+            // Two targets at a digit of 1 is 2 raw, multiplied by the combo those same two targets are.
+            assertEquals(4, game.stateFlow.value.field.score)
         }
 
     @Test
-    fun `a press with one failure among successes resets the streak without reducing the score`() =
+    fun `a failure alongside a success no longer wipes the combo - the MC-95 bug`() =
         runTest {
             val game = Game(FakeSessionHelper(targetAmount = 2, targetValue = 1000), backgroundScope, Random(1))
             game.createField(1)
@@ -78,12 +78,13 @@ class GameStreakTest {
                 game.fireButtonClicked()
             }
 
-            fire(1) // dormant is not visible yet: a clean press against steady alone, streak 0 -> 1
-            fire(1) // streak 1 -> 2
-            assertEquals(2, game.stateFlow.value.field.bonusMultiplier)
-            assertEquals(3, game.stateFlow.value.field.score)
+            fire(1)
+            fire(1)
+            assertEquals(2, game.stateFlow.value.field.score)
 
             // Reveal dormant and overshoot it (2 - 5 < 0) in the same press steady still succeeds in.
+            // The offered operation is only ever guaranteed against one target, so this board is the
+            // normal case, not the exceptional one - it used to leave the combo at zero every time.
             game.targetsRestored(
                 game.stateFlow.value.targets
                     .map { if (it.id == 2) it.copy(appearsAtMs = 0) else it },
@@ -91,10 +92,8 @@ class GameStreakTest {
 
             fire(5)
 
-            assertEquals(0, game.stateFlow.value.field.bonusMultiplier)
-            // Only steady's digit counts, at the floored multiplier of one - never negative, never a
-            // drop from what the run already had (the MC-47 bug this task closes).
-            assertEquals(8, game.stateFlow.value.field.score)
+            assertEquals(1, game.stateFlow.value.field.bonusMultiplier)
+            assertEquals(7, game.stateFlow.value.field.score)
             assertFalse(
                 game.stateFlow.value.targets
                     .first { it.id == 2 }
@@ -103,7 +102,28 @@ class GameStreakTest {
         }
 
     @Test
-    fun `a breakout resets the streak - driven through tick`() =
+    fun `a press that scores on nothing drops the combo to zero`() =
+        runTest {
+            val game = Game(FakeSessionHelper(targetAmount = 1, targetValue = 2), backgroundScope, Random(1))
+            game.createField(1)
+            game.targetsRestored(listOf(scheduledTarget(id = 1, value = 2)))
+            val field = game.stateFlow.value.field
+            game.fieldRestored(
+                field.copy(
+                    currentOperationSign = OperationSign.SUBTRACTION,
+                    currentOperationDigit = 5,
+                    bonusMultiplier = 4,
+                ),
+            )
+
+            game.fireButtonClicked()
+
+            assertEquals(0, game.stateFlow.value.field.bonusMultiplier)
+            assertEquals(0, game.stateFlow.value.field.score)
+        }
+
+    @Test
+    fun `a breakout clears the combo - driven through tick`() =
         runTest {
             val game = Game(FakeSessionHelper(targetAmount = 2, targetValue = 1000), backgroundScope, Random(1))
             game.createField(1)
@@ -113,7 +133,7 @@ class GameStreakTest {
             val field = game.stateFlow.value.field
             game.fieldRestored(field.copy(currentOperationSign = OperationSign.SUBTRACTION, currentOperationDigit = 1))
             game.fireButtonClicked()
-            assertEquals(1, game.stateFlow.value.field.bonusMultiplier)
+            assertEquals(2, game.stateFlow.value.field.bonusMultiplier)
 
             game.tick(50) // fallingOut's fallenMs (90) + 50 clears its lifetimeMs of 100
 
@@ -122,52 +142,39 @@ class GameStreakTest {
         }
 
     @Test
-    fun `the streak has no ceiling and keeps paying past ten`() =
+    fun `the combo has no ceiling of its own - only the board bounds it`() =
         runTest {
-            val game = Game(FakeSessionHelper(targetAmount = 1, targetValue = 1000), backgroundScope, Random(1))
+            val game = Game(FakeSessionHelper(targetAmount = 12, targetValue = 1000), backgroundScope, Random(1))
             game.createField(1)
             game.targetsRestored(
-                listOf(
-                    scheduledTarget(id = 1, value = 1000),
-                ),
+                (1..12).map { scheduledTarget(id = it, columnId = it % 3, value = 1000) },
             )
+            val field = game.stateFlow.value.field
+            game.fieldRestored(field.copy(currentOperationSign = OperationSign.SUBTRACTION, currentOperationDigit = 1))
 
-            suspend fun fireClean() {
-                val field = game.stateFlow.value.field
-                game.fieldRestored(
-                    field.copy(currentOperationSign = OperationSign.SUBTRACTION, currentOperationDigit = 1),
-                )
-                game.fireButtonClicked()
-            }
+            game.fireButtonClicked()
 
-            repeat(11) { fireClean() }
-            assertEquals(11, game.stateFlow.value.field.bonusMultiplier)
-
-            fireClean()
-
-            // Each press scores 1 raw, multiplied by the streak it lands on, so twelve clean presses
-            // are 1+2+...+12. Under the old ceiling of ten this was 75.
             assertEquals(12, game.stateFlow.value.field.bonusMultiplier)
-            assertEquals(78, game.stateFlow.value.field.score)
+            assertEquals(144, game.stateFlow.value.field.score)
         }
 
     @Test
     fun `a press whose award overflows Int saturates instead of wrapping`() =
         runTest {
-            val game = Game(FakeSessionHelper(targetAmount = 1), backgroundScope, Random(1))
+            val game = Game(FakeSessionHelper(targetAmount = 2), backgroundScope, Random(1))
             game.createField(1)
             game.targetsRestored(
                 listOf(
-                    scheduledTarget(id = 1, value = 1_000_000),
+                    scheduledTarget(id = 1, value = 2_000_000_000),
+                    scheduledTarget(id = 2, columnId = 1, value = 2_000_000_000),
                 ),
             )
-            // A subtraction scores its own digit, so this press is worth 100 000 raw against a
-            // streak of three million - about 3e11, well past what an Int holds.
+            // Each subtraction scores its own digit, so the raw award is 2e9 - just inside Int - and
+            // the combo of two takes the product to 4e9, which is not.
             game.fieldRestored(
                 game.stateFlow.value.field.copy(
                     currentOperationSign = OperationSign.SUBTRACTION,
-                    currentOperationDigit = 100_000,
-                    bonusMultiplier = 3_000_000,
+                    currentOperationDigit = 1_000_000_000,
                 ),
             )
 

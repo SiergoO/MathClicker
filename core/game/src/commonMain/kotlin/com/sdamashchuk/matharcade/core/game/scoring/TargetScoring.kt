@@ -14,7 +14,8 @@ internal fun List<Target>.performOperation(
     gameTimeMs: Long,
 ): PressOutcome {
     var totalScore = 0
-    var pressFailed = false
+    var scored = 0
+    var failedCount = 0
     val updatedList =
         this.map { target ->
             if (target.isActive && target.isVisible(gameTimeMs)) {
@@ -27,17 +28,20 @@ internal fun List<Target>.performOperation(
                                 // failed split rather than dividing by zero: no crash, the target
                                 // simply survives unchanged.
                                 isProfitable = false
-                                pressFailed = true
+                                failedCount++
                                 target.value
                             } else {
                                 val remainder = target.value % currentOperationDigit
                                 if (remainder == 0) {
                                     val result = target.value / currentOperationDigit
-                                    totalScore += if (target.isProfitable) target.value - result else 0
+                                    if (target.isProfitable) {
+                                        totalScore += target.value - result
+                                        scored++
+                                    }
                                     result
                                 } else {
                                     isProfitable = false
-                                    pressFailed = true
+                                    failedCount++
                                     (target.value.toLong() * currentOperationDigit)
                                         .coerceAtMost(failedGrowthCap.toLong())
                                         .toInt()
@@ -45,22 +49,16 @@ internal fun List<Target>.performOperation(
                             }
                         } else {
                             val result = target.value - currentOperationDigit
-                            return@run when {
-                                result > 0 -> {
-                                    totalScore += if (target.isProfitable) currentOperationDigit else 0
-                                    result
+                            return@run if (result >= 0) {
+                                if (target.isProfitable) {
+                                    totalScore += currentOperationDigit
+                                    scored++
                                 }
-
-                                result == 0 -> {
-                                    totalScore += if (target.isProfitable) currentOperationDigit else 0
-                                    0
-                                }
-
-                                else -> {
-                                    isProfitable = false
-                                    pressFailed = true
-                                    target.value + currentOperationDigit
-                                }
+                                result
+                            } else {
+                                isProfitable = false
+                                failedCount++
+                                target.value + currentOperationDigit
                             }
                         }
                     }
@@ -72,5 +70,5 @@ internal fun List<Target>.performOperation(
                 target
             }
         }
-    return PressOutcome(updatedList, totalScore, pressFailed)
+    return PressOutcome(updatedList, totalScore, scored, failedCount)
 }

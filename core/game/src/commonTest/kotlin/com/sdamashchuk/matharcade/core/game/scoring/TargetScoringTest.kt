@@ -37,7 +37,7 @@ class TargetScoringTest {
     fun `division rewards an exact split and marks a non-exact one unprofitable in the same batch`() {
         val targets = listOf(target(id = 1, value = 10), target(id = 2, value = 7))
 
-        val (updated, score, failed) =
+        val outcome =
             targets.performOperation(
                 OperationSign.DIVISION,
                 currentOperationDigit = 2,
@@ -45,24 +45,25 @@ class TargetScoringTest {
                 GAME_TIME_MS,
             )
 
-        val exact = updated.first { it.id == 1 }
-        val inexact = updated.first { it.id == 2 }
+        val exact = outcome.targets.first { it.id == 1 }
+        val inexact = outcome.targets.first { it.id == 2 }
         assertEquals(5, exact.value)
         assertTrue(exact.isProfitable)
         assertEquals(14, inexact.value)
         assertFalse(inexact.isProfitable)
-        // MC-39 reverses ASK-7: totalScore is a plain per-target sum now, not gated by a shared
-        // multiplier, so the failed split no longer erases the exact split's own contribution here -
-        // the streak that used to live in this function resets on Field instead.
-        assertEquals(5, score)
-        assertTrue(failed)
+        // MC-39 reverses ASK-7: totalScore is a plain per-target sum, not gated by a shared
+        // multiplier, so the failed split does not erase the exact split's own contribution. MC-95:
+        // the failure does not erase the combo either - one target scored, so the combo is one.
+        assertEquals(5, outcome.totalScore)
+        assertEquals(1, outcome.scored)
+        assertTrue(outcome.failedCount > 0)
     }
 
     @Test
     fun `subtraction succeeds for one target while an overshoot on another still fails the press`() {
         val targets = listOf(target(id = 1, value = 10), target(id = 2, value = 2))
 
-        val (updated, score, failed) =
+        val outcome =
             targets.performOperation(
                 OperationSign.SUBTRACTION,
                 currentOperationDigit = 5,
@@ -70,21 +71,22 @@ class TargetScoringTest {
                 GAME_TIME_MS,
             )
 
-        val succeeded = updated.first { it.id == 1 }
-        val overshot = updated.first { it.id == 2 }
+        val succeeded = outcome.targets.first { it.id == 1 }
+        val overshot = outcome.targets.first { it.id == 2 }
         assertEquals(5, succeeded.value)
         assertTrue(succeeded.isProfitable)
         assertEquals(7, overshot.value)
         assertFalse(overshot.isProfitable)
-        assertEquals(5, score)
-        assertTrue(failed)
+        assertEquals(5, outcome.totalScore)
+        assertEquals(1, outcome.scored)
+        assertTrue(outcome.failedCount > 0)
     }
 
     @Test
     fun `two exact splits earn the sum of what was removed`() {
         val targets = listOf(target(id = 1, value = 10), target(id = 2, value = 4))
 
-        val (_, score, failed) =
+        val outcome =
             targets.performOperation(
                 OperationSign.DIVISION,
                 currentOperationDigit = 2,
@@ -93,15 +95,16 @@ class TargetScoringTest {
             )
 
         // 10/2 removes 5 and 4/2 removes 2; neither split fails.
-        assertEquals(7, score)
-        assertFalse(failed)
+        assertEquals(7, outcome.totalScore)
+        assertEquals(2, outcome.scored)
+        assertEquals(0, outcome.failedCount)
     }
 
     @Test
     fun `two successful subtractions each award the operation digit`() {
         val targets = listOf(target(id = 1, value = 10), target(id = 2, value = 8))
 
-        val (_, score, failed) =
+        val outcome =
             targets.performOperation(
                 OperationSign.SUBTRACTION,
                 currentOperationDigit = 5,
@@ -109,15 +112,16 @@ class TargetScoringTest {
                 GAME_TIME_MS,
             )
 
-        assertEquals(10, score)
-        assertFalse(failed)
+        assertEquals(10, outcome.totalScore)
+        assertEquals(2, outcome.scored)
+        assertEquals(0, outcome.failedCount)
     }
 
     @Test
     fun `division by a zero digit fails the target instead of throwing`() {
         val targets = listOf(target(id = 1, value = 10))
 
-        val (updated, score, failed) =
+        val outcome =
             targets.performOperation(
                 OperationSign.DIVISION,
                 currentOperationDigit = 0,
@@ -125,10 +129,11 @@ class TargetScoringTest {
                 GAME_TIME_MS,
             )
 
-        assertEquals(10, updated.first().value)
-        assertFalse(updated.first().isProfitable)
-        assertEquals(0, score)
-        assertTrue(failed)
+        assertEquals(10, outcome.targets.first().value)
+        assertFalse(outcome.targets.first().isProfitable)
+        assertEquals(0, outcome.totalScore)
+        assertEquals(0, outcome.scored)
+        assertTrue(outcome.failedCount > 0)
     }
 
     @Test

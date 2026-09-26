@@ -376,11 +376,12 @@ class SessionHelperImplTest {
         // ceiling by a wide margin without the clamp.
         val targets = listOf(failedGrowthCapTarget(cap))
 
-        val (updated, _, failed) =
+        val outcome =
             targets.performOperation(OperationSign.DIVISION, currentOperationDigit = 7, cap, gameTimeMs = 0)
 
-        assertTrue(failed)
-        assertEquals(cap, updated.first().value)
+        assertEquals(0, outcome.scored)
+        assertTrue(outcome.failedCount > 0)
+        assertEquals(cap, outcome.targets.first().value)
     }
 
     @Test
