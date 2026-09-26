@@ -3,12 +3,7 @@ package com.sdamashchuk.matharcade.feature.game
 import android.util.Size
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -19,7 +14,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
@@ -27,12 +21,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -45,6 +39,7 @@ import com.sdamashchuk.matharcade.core.ui.theme.BubbleRimReady
 import com.sdamashchuk.matharcade.core.ui.theme.Ink
 import com.sdamashchuk.matharcade.core.ui.theme.Warning
 import com.sdamashchuk.matharcade.feature.game.model.TargetScreenPosition
+import kotlin.math.abs
 
 // MC-54: telegraphs the final 15% of a fall (Target.isTelegraphingBreakout) so a breakout is never
 // a surprise. The cue is a size pulse plus a ring. MC-84 gave that ring a warm colour, which MC-54
@@ -108,79 +103,93 @@ fun TargetButton(
     target: Target,
     gameColumnSize: Size,
     isReady: Boolean,
-    gameTimeMs: Long,
+    // MC-85: a provider, not a Long. Passing the clock by value would make this composable read a
+    // per-frame value during composition, and every target on the board would recompose 60 times a
+    // second. Read inside the layout and draw lambdas below, the same clock costs a relayout and a
+    // redraw and no recomposition at all.
+    gameTimeMsProvider: () -> Long,
     onTargetClicked: (id: Int) -> Unit,
     onTargetPositioned: (id: Int, position: TargetScreenPosition) -> Unit,
 ) {
-    val fallFraction = target.position(gameTimeMs)
-    val targetButtonYOffset = fallFraction * gameColumnSize.height
-    if (target.isActive && targetButtonYOffset.dp > 0.dp) {
-        val squashScale = remember(target.id) { Animatable(1f) }
-        var lastKnownValue by remember(target.id) { mutableIntStateOf(target.value) }
-        // Keyed on both id and value: a tap that doesn't change value (a no-op click) never
-        // relaunches this, and a fresh target reusing this slot never compares against a stale
-        // predecessor's value.
-        LaunchedEffect(target.id, target.value) {
-            if (shouldSquashTarget(target.value, lastKnownValue)) squashTarget(squashScale)
-            lastKnownValue = target.value
-        }
-        val telegraphTransition = rememberInfiniteTransition(label = "breakoutTelegraph")
-        val isTelegraphing = target.isTelegraphingBreakout(gameTimeMs)
-        val telegraphScale by
-            telegraphTransition.animateFloat(
-                initialValue = 1f,
-                targetValue = if (isTelegraphing) TELEGRAPH_PULSE_SCALE else 1f,
-                animationSpec =
-                    infiniteRepeatable(
-                        animation = tween(TELEGRAPH_PULSE_MS, easing = LinearEasing),
-                        repeatMode = RepeatMode.Reverse,
-                    ),
-                label = "breakoutTelegraphScale",
-            )
-        val readinessFraction by
-            animateFloatAsState(
-                targetValue = if (isReady) 1f else 0f,
-                animationSpec = tween(READINESS_TRANSITION_MS),
-                label = "readinessFraction",
-            )
-        val liveliness = liveliness(target.isProfitable, readinessFraction)
-        val depthScale = DEPTH_SCALE_AT_TOP + (DEPTH_SCALE_AT_BOTTOM - DEPTH_SCALE_AT_TOP) * fallFraction
-        val buttonDiameterDp = (gameColumnSize.width * TARGET_DIAMETER_FRACTION).toFloat()
-        val columnCenterXDp = target.columnId * gameColumnSize.width + gameColumnSize.width * LANE_CENTER_FRACTION
-        // Reported every active frame, not just on click: the target leaves the composition the
-        // instant it zeroes (isActive flips false above), so a burst fired from that same event has
-        // nothing left to ask for its position - this is that position's only record.
-        SideEffect {
-            onTargetPositioned(
-                target.id,
-                TargetScreenPosition(
-                    xDp = columnCenterXDp,
-                    yDp = targetButtonYOffset + buttonDiameterDp / 2f,
-                ),
-            )
-        }
-        Box(
-            modifier =
-                Modifier
-                    .width(buttonDiameterDp.dp)
-                    .height(buttonDiameterDp.dp)
-                    .offset { IntOffset(x = 0, y = targetButtonYOffset.dp.roundToPx()) }
-                    .scale(telegraphScale * depthScale * squashScale.value)
-                    .bubble(liveliness, isTelegraphing)
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        onClick = { onTargetClicked.invoke(target.id) },
-                    ),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = target.value.toString(),
-                fontSize = (buttonDiameterDp * DIGIT_SIZE_FRACTION).sp,
-                color = Ink,
-            )
-        }
+    val squashScale = remember(target.id) { Animatable(1f) }
+    var lastKnownValue by remember(target.id) { mutableIntStateOf(target.value) }
+    // Keyed on both id and value: a tap that doesn't change value (a no-op click) never
+    // relaunches this, and a fresh target reusing this slot never compares against a stale
+    // predecessor's value.
+    LaunchedEffect(target.id, target.value) {
+        if (shouldSquashTarget(target.value, lastKnownValue)) squashTarget(squashScale)
+        lastKnownValue = target.value
     }
+    val readinessFraction by
+        animateFloatAsState(
+            targetValue = if (isReady) 1f else 0f,
+            animationSpec = tween(READINESS_TRANSITION_MS),
+            label = "readinessFraction",
+        )
+    val liveliness = liveliness(target.isProfitable, readinessFraction)
+    val buttonDiameterDp = (gameColumnSize.width * TARGET_DIAMETER_FRACTION).toFloat()
+    val columnCenterXDp = target.columnId * gameColumnSize.width + gameColumnSize.width * LANE_CENTER_FRACTION
+    val columnHeight = gameColumnSize.height
+
+    Box(
+        modifier =
+            Modifier
+                .width(buttonDiameterDp.dp)
+                .height(buttonDiameterDp.dp)
+                .offset {
+                    val fallFraction = target.position(gameTimeMsProvider())
+                    val yDp = fallFraction * columnHeight
+                    // Recorded from the layout lambda rather than a per-frame SideEffect. The
+                    // effect only ran after a recomposition, which this task's whole point is to
+                    // stop happening every frame - and it wrote to a snapshot map, which allocates
+                    // a record per write. This is the same number, taken where it is already being
+                    // computed, into a plain map.
+                    onTargetPositioned(
+                        target.id,
+                        TargetScreenPosition(xDp = columnCenterXDp, yDp = yDp + buttonDiameterDp / 2f),
+                    )
+                    IntOffset(x = 0, y = yDp.dp.roundToPx())
+                }.graphicsLayer {
+                    val gameTimeMs = gameTimeMsProvider()
+                    val fallFraction = target.position(gameTimeMs)
+                    val depthScale =
+                        DEPTH_SCALE_AT_TOP + (DEPTH_SCALE_AT_BOTTOM - DEPTH_SCALE_AT_TOP) * fallFraction
+                    val combined =
+                        depthScale *
+                            telegraphPulse(gameTimeMs, target.isTelegraphingBreakout(gameTimeMs)) *
+                            squashScale.value
+                    scaleX = combined
+                    scaleY = combined
+                }.bubble(liveliness, target, gameTimeMsProvider)
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = { onTargetClicked.invoke(target.id) },
+                ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = target.value.toString(),
+            fontSize = (buttonDiameterDp * DIGIT_SIZE_FRACTION).sp,
+            color = Ink,
+        )
+    }
+}
+
+// Derived from the engine clock instead of an InfiniteTransition. One transition plus one
+// animateFloat per target was running permanently whether or not that target was telegraphing,
+// each scheduling its own frame callback; the engine already advances a clock every frame, and a
+// triangle wave off it is the same 300ms linear reverse pulse for no objects at all.
+internal fun telegraphPulse(
+    gameTimeMs: Long,
+    isTelegraphing: Boolean,
+): Float {
+    if (!isTelegraphing) return 1f
+    val period = TELEGRAPH_PULSE_MS * 2f
+    // Parenthesised deliberately: % and * bind left to right, so dropping these brackets gives
+    // (t % 300) * 2 - a pulse at double speed that never reaches its peak.
+    val phase = (gameTimeMs % (TELEGRAPH_PULSE_MS * 2L)).toFloat() / period
+    return 1f + (TELEGRAPH_PULSE_SCALE - 1f) * (1f - abs(2f * phase - 1f))
 }
 
 internal fun liveliness(
@@ -211,7 +220,8 @@ private suspend fun squashTarget(scale: Animatable<Float, AnimationVector1D>) {
 // actually changes - that is, during a 200ms readiness transition and not once otherwise.
 private fun Modifier.bubble(
     liveliness: Float,
-    isTelegraphing: Boolean,
+    target: Target,
+    gameTimeMsProvider: () -> Long,
 ) = drawWithCache {
     val radius = size.minDimension / 2f
     val center = Offset(size.width / 2f, size.height / 2f)
@@ -270,7 +280,9 @@ private fun Modifier.bubble(
             drawCircle(coreBrush, radius = radius * HIGHLIGHT_CORE_RADIUS_FRACTION, center = highlightCenter)
         }
         drawCircle(rim, radius = radius - rimWidth / 2f, center = center, style = Stroke(rimWidth))
-        if (isTelegraphing) {
+        // Read here, not in the cache block above: the ring's colour and width are constant, so
+        // a telegraph switching on has to re-draw but must never rebuild four shaders.
+        if (target.isTelegraphingBreakout(gameTimeMsProvider())) {
             val ringWidth = size.minDimension * TELEGRAPH_RING_WIDTH_FRACTION
             drawCircle(Warning, radius = radius - ringWidth / 2f, center = center, style = Stroke(ringWidth))
         }

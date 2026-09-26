@@ -6,12 +6,15 @@ import androidx.compose.ui.graphics.Color
 // layers were fitted numerically against it - mean absolute channel error 3.4% for the ready
 // state, 3.3% for the idle one. See .claude/specs/math-bubbles-ds.html for the derivation.
 
-// The water column. Three stops, vertical only - the reference does not vary by a single unit
-// horizontally. It is deliberately not a monotonic darkening: the brightest band sits at 62% of
-// the height and reads as a shaft of light from above, which is what gives the water its volume.
-val WaterSurface = Color(0xFF10202D)
-val WaterShaft = Color(0xFF285066)
-val WaterDeep = Color(0xFF17303E)
+// The water column: light at the top, a little deeper at the bottom, and the step between them
+// deliberately small. An obvious gradient draws the eye to the background, which is the one place
+// in this game the eye should never go.
+val WaterSurface = Color(0xFF2C5D74)
+val WaterDeep = Color(0xFF234C61)
+
+// Drifting motes and bubbles in the water. Barely above the background on purpose - they carry the
+// sense of being submerged, not information.
+val WaterMote = Color(0xFF9FD8E8)
 
 // The only fully opaque colour in the world: the life stripes and the operation button.
 val Accent = Color(0xFF47B9E2)

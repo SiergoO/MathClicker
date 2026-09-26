@@ -1,7 +1,7 @@
 <resources>
-    <string name="logo_content_description">Math Arcade</string>
+    <string name="logo_content_description">Math Bubbles</string>
     <string name="logo_wordmark_line_1">MATH</string>
-    <string name="logo_wordmark_line_2">ARCADE</string>
+    <string name="logo_wordmark_line_2">BUBBLES</string>
 
     <string name="menu_button_play">PLAY</string>
     <string name="menu_button_settings">SETTINGS</string>
