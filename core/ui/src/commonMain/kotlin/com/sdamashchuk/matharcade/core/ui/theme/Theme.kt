@@ -7,7 +7,7 @@ import androidx.compose.material.darkColors
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 
-// MC-84: one palette, not a light/dark pair. The game is set underwater, and a light variant of
+// One palette, not a light/dark pair. The game is set underwater, and a light variant of
 // that is not a theme - it is a different world. Following the system setting here would have the
 // board flip to white paper on half the devices.
 private val WaterPalette =

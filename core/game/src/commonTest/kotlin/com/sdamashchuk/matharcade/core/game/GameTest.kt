@@ -46,9 +46,7 @@ class GameTest {
             game.createTargets()
             testScheduler.runCurrent()
 
-            // level 1's flightTimeMs is 1000 and id 0 always appears immediately (MC-73:
-            // appearsAtMs == gameTimeMs at creation), so four 250ms ticks reveal and then break the
-            // sole target out in the same locked step.
+            // level 1's flightTimeMs is 1000 and id 0 always appears immediately.
             repeat(4) { game.tick(250) }
             testScheduler.runCurrent()
 
@@ -73,10 +71,6 @@ class GameTest {
             val game = Game(FakeSessionHelper(), backgroundScope, countingRandom)
             game.start()
             game.createField(1)
-            // MC-73: per-id delay staggering is no longer something SessionHelper can express -
-            // getFinishSpacingMsByLevel is uniform by construction, which is the whole fix. Built
-            // directly rather than through createTargets() to keep this test's own staggered
-            // fixture.
             game.targetsRestored(
                 delays.mapIndexed { index, delayMs ->
                     scheduledTarget(id = index + 1, value = 1, appearanceDelayMs = delayMs)
@@ -92,9 +86,6 @@ class GameTest {
 
             val gameTimeMs = game.stateFlow.value.field.gameTimeMs
             assertEquals(1000L, gameTimeMs)
-            // MC-72: the schedule itself (appearsAtMs) never moves - what "decrements" is the gap
-            // to it, read back off the clock, the same 4000/5000/6000 the old stored delay counted
-            // down to over the same 1000 ticks.
             assertEquals(
                 listOf(4000L, 5000L, 6000L),
                 game.stateFlow.value.targets
@@ -126,15 +117,8 @@ class GameTest {
             game.fireButtonClicked()
             testScheduler.runCurrent()
 
-            // Random(10)'s third draw (after recreateField's two) is pinned here, not derived from
-            // the field under test: reading nextOperationSign back out of the result being asserted
-            // let a hardcoded sign in getNextSignAndDigit survive undetected. Seeded specifically to
-            // draw SUBTRACTION so a hardcoded DIVISION is also caught - the real-helper determinism
-            // test below happens to draw DIVISION at its own call site, so between the two, a
-            // hardcoded sign of either value fails at least one test. Reaching level 2 by ticking
-            // rather than by the old targetRevealed/targetDidBreakout calls draws no extra
-            // randomness: the sole target reveals with no draw, and shortenAppearanceDelay never
-            // fires because it has already broken out (isActive false) by the time the board empties.
+            // Pinned from the seed, not read back out of the field under test - that let a hardcoded sign
+            // survive. Seeded to draw SUBTRACTION; the real-helper test below draws DIVISION.
             assertEquals(OperationSign.SUBTRACTION, game.stateFlow.value.field.nextOperationSign)
             assertEquals(4, game.stateFlow.value.field.nextOperationDigit)
         }
@@ -142,15 +126,8 @@ class GameTest {
     @Test
     fun `tick decrements life count per breakout and closes the field once it hits zero`() =
         runTest {
-            // Staggered appearance delays (0, 500, 1000ms) make each of the three targets break out
-            // on its own tick, so lifeCount can be observed decrementing one at a time up to closure.
-            // Each successor is already visible before its predecessor breaks out (uniform 1000ms
-            // lifetime, 500ms delay gaps), so the board is never briefly empty of visible targets
-            // mid-sequence - if it were, tick()'s edge-triggered shortenAppearanceDelay would consume
-            // the staggering by pulling the next one forward.
-            // MC-73: built directly rather than through FakeSessionHelper/createTargets(), since
-            // per-id delay staggering is no longer expressible through SessionHelper (spacing is
-            // uniform by construction).
+            // Staggered delays (0, 500, 1000ms) break each target out on its own tick. Each successor is
+            // visible before its predecessor goes, or edge-triggered shortenAppearanceDelay would eat the stagger.
             val game = Game(FakeSessionHelper(), backgroundScope, Random(3))
             game.start()
             game.createField(1)
@@ -305,12 +282,8 @@ class GameTest {
     @Test
     fun `seeded Game reproduces the same session with the real session helper`() =
         runTest {
-            // The fake above proves Game's own Random is seeded; this proves the session as a
-            // whole is, by routing the same seed through the production SessionHelperImpl - the
-            // six call sites this task fixes - instead of a fake that never drew from it.
-            // Fixed rather than Clock.System: two calls to runSession() below are otherwise a real
-            // clock apart, which would put a different finishedAt on the field seed 99 closes -
-            // breaking the very reproducibility this test exists to pin.
+            // A fixed clock, not Clock.System: two runSession() calls are a real clock apart, which would put
+            // a different finishedAt on the field seed 99 closes.
             val fixedClock =
                 object : Clock {
                     override fun now() = Instant.fromEpochMilliseconds(0)
@@ -322,19 +295,13 @@ class GameTest {
                 game.createField(1)
                 game.createTargets()
 
-                // The very first target's own appearsAtMs always equals gameTimeMs at creation (id 0
-                // draws finishesAtMs = gameTimeMs + openingOffset, and openingOffset is at least the
-                // level's own max flight time - see SessionHelperImpl.getOpeningOffsetMsByLevel), so
-                // it is already visible before this tick. The tick itself is still load-bearing for
-                // the pinned literals below - it is one real step of the simulation being
-                // reproduced, not a reveal.
+                // id 0 is already visible before this tick, so the tick is one real step of the simulation being
+                // reproduced rather than a reveal.
                 game.tick(TICK_STEP_MS)
                 game.fireButtonClicked()
 
-                // Fixed step, fixed count: seed 99's level-1 board runs out its own clock (the field
-                // closes at lifeCount 0 partway through), and tick()'s isClosed guard then freezes
-                // every target in place, so this count only needs to reach that frozen state, not
-                // land on it exactly.
+                // The field closes partway through and tick()'s isClosed guard freezes every target, so this count
+                // only has to reach that frozen state, not land on it exactly.
                 repeat(SEED_99_SESSION_TICKS - 1) { game.tick(TICK_STEP_MS) }
 
                 return game.stateFlow.value.field to game.stateFlow.value.targets
@@ -346,16 +313,8 @@ class GameTest {
             assertEquals(firstField, secondField)
             assertEquals(firstTargets, secondTargets)
 
-            // Comparing the two runs to each other cannot fail on a range narrow enough that an
-            // unseeded draw coincides by chance (getSubtractionDigitByLevel's 1..3 at level 1 agrees
-            // roughly one run in four). Pinning exact seed-99 values is what actually catches that.
-            // Unlike the old UI-driven path (which forced every target to break out regardless of
-            // elapsed time), the engine's own clock plays this out to a real game over. MC-73 assigns
-            // finishesAtMs directly instead of summing an independently-rolled delay and lifetime,
-            // which reshuffles every value, schedule and later draw off the same seed - every literal
-            // below moved, and the field now survives twice as many ticks before closing (the fix
-            // itself: GameSimulationTest's own pinned elapsedMs moved from 12496 to 24896 for the
-            // same reason).
+            // Comparing the two runs to each other cannot fail on a range narrow enough for an unseeded draw to
+            // coincide (1..3 agrees about one run in four), so the exact seed-99 values are pinned instead.
             assertEquals(
                 Field(
                     id = 1,
@@ -375,11 +334,8 @@ class GameTest {
                 ),
                 firstField,
             )
-            // MC-72: appearsAtMs/finishesAtMs replace fallenMs/appearanceDelayMs/lifetimeMs as the
-            // pinned representation - each target's schedule is now the two absolute instants it was
-            // given at creation, not the countdown state a tick would have advanced it to. MC-73:
-            // consecutive finishesAtMs now differ by exactly getFinishSpacingMsByLevel(1) (6573ms) -
-            // by construction, not by luck of this particular seed.
+            // Consecutive finishesAtMs differ by exactly getFinishSpacingMsByLevel(1) by construction, not by
+            // luck of this seed.
             assertEquals(
                 listOf(
                     Target(
@@ -498,11 +454,8 @@ class GameTest {
     @Test
     fun `start called twice does not leak a collector that outlives stop`() =
         runTest {
-            // If start() doesn't cancel the earlier job, stop() only cancels the second one, and the
-            // first keeps collecting: the level-up below would still fire after stop(). Driven with
-            // targetsRestored rather than a breakout, because tick() now levels up inline regardless
-            // of whether the collector is running - the collector's only remaining trigger is exactly
-            // this kind of externally-supplied, already-empty target list.
+            // If start() does not cancel the earlier job, stop() cancels only the second and the level-up below
+            // still fires. Driven with targetsRestored: an externally-supplied empty list is the collector's only trigger.
             val game = Game(FakeSessionHelper(targetAmount = 1), backgroundScope, Random(5))
             game.start()
             game.start()
@@ -583,11 +536,8 @@ class GameTest {
             game.tick(1)
             testScheduler.runCurrent()
 
-            // Random(42) used to draw SUBTRACTION/3 here (pinned by the seeded-reproducibility test
-            // above), a guaranteed fail against value 1 - which was exactly MC-65's bug: an opening
-            // draw with no target to validate against. createTargets() now corrects that draw on its
-            // own, so the losing operation this test needs has to be forced explicitly instead, the
-            // same way GameOperationDrawTest pins one for the same reason.
+            // The losing operation is forced explicitly: createTargets() corrects an opening draw that would
+            // fail against every target, so the seed can no longer supply one.
             game.fieldRestored(
                 game.stateFlow.value.field.copy(
                     currentOperationSign = OperationSign.SUBTRACTION,
@@ -643,9 +593,6 @@ class GameTest {
                 game.stateFlow.value.targets
                     .first { it.id == targetId }
             assertEquals(0, cleared.value)
-            // MC-72: isVisible is derived from the clock alone, so retiring a target no longer
-            // forces it off - isActive false is what every consumer (TargetButton, performOperation)
-            // actually gates on, and that is what targetClicked's ensureAlive(id) sets here.
             assertFalse(cleared.isActive)
             assertEquals(1, game.stateFlow.value.field.score)
         }
@@ -679,12 +626,8 @@ class GameTest {
     @Test
     fun `fireButtonClicked scores a successful hit and retires a target cleared to zero`() =
         runTest {
-            // A second, never-revealed target stays active throughout so clearing the first one
-            // doesn't leave the board fully inactive - that would level up and regenerate the whole
-            // target set out from under the id being asserted on below. MC-73: a huge finish spacing
-            // (rather than a per-id delay, no longer expressible) pushes the second target's own
-            // appearsAtMs far past this test's window, so the reveal tick below only reveals the
-            // first target.
+            // A second target keeps the board non-empty, so clearing the first does not level up and regenerate
+            // the id being asserted on. Its finish spacing pushes its own reveal past this window.
             val game =
                 Game(
                     FakeSessionHelper(
@@ -704,8 +647,6 @@ class GameTest {
                     .sortedBy { it.id }
                     .first()
                     .id
-            // See the MC-72 note above: this tick is no longer load-bearing for the reveal, kept
-            // only to mirror real play.
             game.tick(1)
             testScheduler.runCurrent()
 
@@ -718,7 +659,6 @@ class GameTest {
                 game.stateFlow.value.targets
                     .first { it.id == targetId }
             assertEquals(0, cleared.value)
-            // See the MC-72 note on the same pair of assertions above.
             assertFalse(cleared.isActive)
             assertEquals(3, game.stateFlow.value.field.score)
         }
@@ -765,9 +705,7 @@ class GameTest {
             assertEquals(restoredField, game.stateFlow.value.field)
         }
 
-    // MC-71's named risk: a restored session must keep ticking forward from the clock it was saved
-    // with, not from zero - a mutant that dropped gameTimeMs from fieldRestored's copy (or reset it
-    // some other way) would fail this by landing on 250, not 5250.
+    // A restored session must keep ticking forward from the clock it was saved with.
     @Test
     fun `a restored session resumes ticking from its saved gameTimeMs rather than zero`() =
         runTest {
@@ -783,12 +721,8 @@ class GameTest {
             assertEquals(5250L, game.stateFlow.value.field.gameTimeMs)
         }
 
-    // MC-72's own headline risk, sibling to the test above: a target created after a restore must
-    // be scheduled against the restored gameTimeMs, not a fresh zero. M4 in the mutation ledger -
-    // appearsAtMs written as the raw delay, without adding gameTimeMs - lands this at 300, already
-    // 4700ms in the past against a restored clock of 5000, breaking the target out before the first
-    // tick after restore even runs. That is the exact failure mode the design doc calls "the whole
-    // board vylets one tick" if the clock (or, as here, the schedule built off it) comes back wrong.
+    // A target created after a restore must be scheduled against the restored gameTimeMs, not a fresh
+    // zero: writing appearsAtMs as the raw delay lands it 4700ms in the past and breaks it out at once.
     @Test
     fun `a target created after restore is scheduled against the restored gameTimeMs not zero`() =
         runTest {

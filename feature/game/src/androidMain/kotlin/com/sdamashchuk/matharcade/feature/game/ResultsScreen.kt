@@ -58,7 +58,7 @@ fun ResultsScreen(
         SummaryText(resultsSummaryOf(field, bestResult))
         // Table and buttons are one group centred in the space left below the header, so a
         // two-row history (new install) and a ten-row one both read as deliberate instead of the
-        // table stranding the buttons above an empty half-screen (MC-75). verticalScroll is the
+        // table stranding the buttons above an empty half-screen. verticalScroll is the
         // fallback if a large font scale ever makes the group taller than that space.
         Column(
             modifier =

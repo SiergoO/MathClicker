@@ -1,6 +1,6 @@
 package com.sdamashchuk.matharcade.feature.game
 
-// MC-85: the water is not still. Everything here is a pure function of the engine clock and a
+// The water is not still. Everything here is a pure function of the engine clock and a
 // bubble's index, so the drift needs no animation objects, no remembered state and no
 // recomposition - the play area's draw phase reads the clock and asks for a position.
 internal const val AMBIENT_BUBBLE_COUNT = 14

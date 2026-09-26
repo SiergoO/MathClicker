@@ -5,7 +5,7 @@ package com.sdamashchuk.matharcade.core.model
 // property below so the two can't drift apart.
 private const val BREAKOUT_TELEGRAPH_THRESHOLD = 0.85f
 
-// MC-72: a target's schedule is two absolute moments on Field.gameTimeMs, not a delay/lifetime pair
+// A target's schedule is two absolute moments on Field.gameTimeMs, not a delay/lifetime pair
 // counted down independently - see the MC-71 design doc. finishesAtMs is assigned directly rather
 // than derived as appearsAtMs + a separately-rolled lifetime, which is what closed the bug this
 // task exists for: two independent random draws summing to a finish is what let an intra-wave

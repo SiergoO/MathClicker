@@ -13,23 +13,11 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-// MC-50: getNextSignAndDigit must never offer a sign/digit that fails against every visible active
-// target on the board - a press the player had no way to win, decided before they touched anything.
-// MC-65: the same guarantee for the operation a session opens with - recreateField draws it before a
-// single target exists to check it against, so MC-50's redraw never covered it. createTargets now
-// validates against the first wave of targets to become visible (not "now": none of them are visible
-// yet at creation - see ensureOpeningOperationSucceeds's own comment in Game.kt).
-// MC-79: the session's second operation - recreateField's nextOperationSign/Digit, promoted to current
-// by the first press's updateActionButtons - was still a blind draw MC-65 never covered. Validated at
-// promotion time instead of at creation (see ensurePromotedOperationSucceeds's own comment in Game.kt):
-// validating it against the opening wave the same way current is was tried and measured first, and
-// left 12.5% of seeded first presses still promoting a dud once real ticks separated creation from the
-// press.
+// The engine must never offer a sign/digit that fails against every visible target - a press the
+// player had no way to win. Covers the opening draw and the one promoted by the first press too.
 
-// Counts every draw made through the delegate, the same pattern GameTest's own CountingRandom uses
-// (a separate, identically-shaped class - top-level private names collide across files in the same
-// package even though visibility is file-scoped), so a test can assert exactly how many attempts a
-// redraw cost instead of inferring it from state.
+// A separate, identically-shaped class from GameTest's: top-level private names collide across files
+// in the same package even though visibility is file-scoped.
 private class DrawCountingRandom(
     private val delegate: Random,
 ) : Random() {
@@ -64,10 +52,8 @@ private const val SIGN_MIX_HELPER_SALT = 7919L
 // the sign's.
 private const val EXPECTED_DRAW_BOUND = 1
 
-// Always fails, regardless of which sign is drawn: subtraction's digit is pinned above the sole
-// target's value (never true that value - 999 >= 0), and division's digit is pinned to 0 - the
-// Field() sentinel that performOperation already treats as a failed split rather than a crash, and
-// which the validity check must reject the same way, without ever evaluating value % 0.
+// Always fails: the subtraction digit is pinned above the sole target's value, and the division digit
+// is 0 - the sentinel the validity check must reject without ever evaluating value % 0.
 private class AlwaysDudSessionHelper : SessionHelper {
     override val levelRange = 1..999
     override val initialTargetValueRange = 1..20
@@ -111,11 +97,7 @@ class GameOperationDrawTest {
     @Test
     fun `10000 seeded draws never offer a board-wide dud`() =
         runTest {
-            // Zero, not a tolerance. MC-60 briefly made this 3-in-10000 by shaping values toward
-            // a residue of the current digit: a lone 1 is below every division digit and every
-            // subtraction digit past level 9, so the bounded redraw could spend all its attempts and
-            // hand over the dud it started with. The exhaustion fallback in getNextSignAndDigit
-            // closes that by construction rather than by luck.
+            // Zero, not a tolerance: the exhaustion fallback closes this by construction rather than by luck.
             var duds = 0
             repeat(10_000) { trial ->
                 val seed = trial.toLong()
@@ -144,12 +126,8 @@ class GameOperationDrawTest {
             assertEquals(0, duds, "seeded draws produced $duds board-wide duds")
         }
 
-    // MC-79: recreateField's next was a blind draw the same way current was before MC-65 - the very
-    // first press promotes it to current via updateActionButtons with no validation of its own ever
-    // having run against it. Checked here on the promoted field, after the first press, against
-    // whatever the press itself left on the board - the same shape as the 10000-draw test above, but
-    // reading currentOperationSign/Digit (what updateActionButtons just promoted next into) instead of
-    // nextOperationSign/Digit (the fresh draw MC-50 already covers).
+    // Read on the promoted field after the first press - currentOperationSign, what updateActionButtons
+    // just promoted into, not the fresh next draw.
     @Test
     fun `the first press never promotes an operation that duds every target still on the board`() =
         runTest {
@@ -183,10 +161,8 @@ class GameOperationDrawTest {
     @Test
     fun `a seeded session opens with an operation that succeeds against its first visible targets`() =
         runTest {
-            // Several levels, not just the level every fresh session actually starts at: createTargets
-            // is also the recovery path a restored field with an arbitrary level routes through when
-            // its persisted targets are gone (GameViewModel.updateSession), and the validation this
-            // covers applies there identically.
+            // Several levels: createTargets is also the recovery path a restored field with an arbitrary level
+            // routes through when its persisted targets are gone.
             var duds = 0
             var trials = 0
             for (level in listOf(1, 10, 30, 100, 999)) {
@@ -227,10 +203,7 @@ class GameOperationDrawTest {
 
             game.createTargets()
 
-            // AlwaysDudSessionHelper's sole target is visible at creation (see its own comment), so
-            // this bound is spent inside createTargets() itself, not deferred to a later tick or press.
-            // MC-79 leaves nextOperationSign/Digit untouched here by design (see ensureOpeningOperationSucceeds's
-            // own comment), so this count is unchanged by that task - only current is fixed at creation.
+            // The sole target is visible at creation, so this bound is spent inside createTargets itself.
             assertEquals(EXPECTED_DRAW_BOUND, countingRandom.drawCount - drawsBeforeCreatingTargets)
             val target =
                 game.stateFlow.value.targets
@@ -290,10 +263,8 @@ class GameOperationDrawTest {
             val countingRandom = DrawCountingRandom(Random(1))
             val game = Game(SessionHelperImpl(random = Random(1)), backgroundScope, countingRandom)
             game.createField(1)
-            // MC-72: game.createTargets() no longer produces this case - the real session helper
-            // always schedules the first target's appearsAtMs at field.gameTimeMs (delay 0), so it is
-            // visible immediately, not hidden until a tick advances the clock past it. A genuinely
-            // fully-hidden board is now built directly: every target scheduled to appear in the future.
+            // createTargets never produces this case - the first target is always visible immediately - so a
+            // fully-hidden board is built directly instead.
             game.targetsRestored(listOf(scheduledTarget(id = 1, columnId = 0, value = 5, appearanceDelayMs = 1)))
             val drawsBeforeFiring = countingRandom.drawCount
 
@@ -323,14 +294,8 @@ class GameOperationDrawTest {
 
             game.fireButtonClicked()
 
-            // MC-79: this is the session's first press, so pendingOpeningPromotionCheck also spends a
-            // full EXPECTED_DRAW_BOUND fixing the about-to-be-promoted next (recreateField's own draw,
-            // equally a dud against AlwaysDudSessionHelper) before getNextSignAndDigit spends a second
-            // one on the fresh next below - 2 * EXPECTED_DRAW_BOUND. The bound is spent in full each
-            // time and no attempt is made past it - but what
-            // comes back is a move, not the last dud. Subtracting the smallest visible value is always
-            // valid, so a board this helper can never satisfy by drawing is still never handed a dead
-            // press, promoted or fresh.
+            // The session's first press fixes the about-to-be-promoted operation as well as drawing a fresh one,
+            // so the bound is spent twice. What comes back is a move, not the last dud.
             assertEquals(2 * EXPECTED_DRAW_BOUND, countingRandom.drawCount - drawsBeforeFiring)
             val target =
                 game.stateFlow.value.targets
@@ -369,7 +334,7 @@ class GameOperationDrawTest {
 
             game.fireButtonClicked()
 
-            // MC-79: this is also the session's first press, so both redraw loops (the promotion-time
+            // This is also the session's first press, so both redraw loops (the promotion-time
             // check and the fresh next draw) see the same hidden target and can't be rescued by it -
             // 2 * EXPECTED_DRAW_BOUND (40, was EXPECTED_DRAW_BOUND before this task).
             assertEquals(2 * EXPECTED_DRAW_BOUND, countingRandom.drawCount - drawsBeforeFiring)

@@ -1,6 +1,6 @@
 package com.sdamashchuk.matharcade.feature.game
 
-// MC-84: the board sinks as the player climbs. Every water stop is multiplied by this factor, so
+// The board sinks as the player climbs. Every water stop is multiplied by this factor, so
 // the whole column darkens together and the shaft of light keeps its shape.
 private const val DEPTH_DARKENING_PER_LEVEL = 0.018f
 

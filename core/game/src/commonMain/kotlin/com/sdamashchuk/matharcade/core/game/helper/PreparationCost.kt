@@ -2,7 +2,7 @@ package com.sdamashchuk.matharcade.core.game.helper
 
 import kotlin.random.Random
 
-// MC-60: step table, not a curve - each row is a level bracket's cost profile, looked up by the
+// Step table, not a curve - each row is a level bracket's cost profile, looked up by the
 // highest breakpoint at or below the level. Levels between two named rows (the spec only names
 // 1-3, 10, 30, 50+) inherit the row below them; this is what "one edit per row" means in practice.
 private val PREPARATION_PROFILE_LEVEL_1 = PreparationProfile(25, 65, 10, 0)

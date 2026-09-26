@@ -45,7 +45,7 @@ class GameViewModelLogicTest {
         assertTrue(shouldRefreshTargets(emptySet(), setOf(1, 2, 3)))
     }
 
-    // MC-72: a target's schedule (appearsAtMs/finishesAtMs) is fixed once created - nothing on
+    // A target's schedule (appearsAtMs/finishesAtMs) is fixed once created - nothing on
     // Target moves on its own between ticks any more, only Field.gameTimeMs does - so there is no
     // longer a clock-only field for an unchanged board to exclude. shouldPersistTargets is now
     // plain equality end to end; these pin that directly rather than a since-removed exclusion.
@@ -161,7 +161,7 @@ class GameViewModelLogicTest {
 
     @Test
     fun `nextPhase for RestartGame always lands on ReadyToPlay`() {
-        // MC-77: Paused specifically must not map to Paused - that is the case where the player
+        // Paused specifically must not map to Paused - that is the case where the player
         // pressed Restart and saw nothing change, while the session had in fact restarted.
         assertEquals(GamePhase.ReadyToPlay, nextPhase(GamePhase.ReadyToPlay, Action.RestartGame))
         assertEquals(GamePhase.ReadyToPlay, nextPhase(GamePhase.CountingDown, Action.RestartGame))

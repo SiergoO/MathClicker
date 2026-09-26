@@ -30,9 +30,8 @@ class GameViewModel(
     private val _uiEvents = Channel<UiEvent>(capacity = Channel.UNLIMITED)
     val uiEvents: ReceiveChannel<UiEvent> = _uiEvents
 
-    // A dedicated channel, not routed through _uiEvents: GameComponent forwards uiEvents to
-    // navigation and consumes them itself, but feedback needs to reach the composable that owns
-    // LocalHapticFeedback, so it is exposed and collected there instead (see GameScreen).
+    // Not routed through _uiEvents: feedback has to reach the composable that owns LocalHapticFeedback,
+    // while GameComponent consumes uiEvents itself.
     private val _feedback = Channel<FeedbackEffect>(capacity = Channel.UNLIMITED)
     val feedback: ReceiveChannel<FeedbackEffect> = _feedback
 
@@ -42,16 +41,13 @@ class GameViewModel(
             updateSession()
         }
         viewModelScope.launch {
-            // One collector for the game session: game.events replays nothing (replay = 0), so a
-            // second subscriber here would just never see anything - this is the only one.
+            // game.events replays nothing, so a second subscriber would never see anything - this is the only one.
             game.events.collect { event ->
                 _feedback.trySend(effectFor(event))
             }
         }
         viewModelScope.launch {
-            // A single collector on Game's combined state, not one per half: two collectors each
-            // doing a read-modify-write copy() on the same _state could interleave and have one
-            // clobber the other's field (MC-42). One assignment below publishes both halves at once.
+            // One collector, not one per half: two read-modify-write copy() calls on _state could clobber each other.
             game.stateFlow.collect { gameState ->
                 val (field, targets) = gameState
                 if (field.id == 0) return@collect
@@ -60,18 +56,12 @@ class GameViewModel(
                 val fieldChanged = field != previousField
                 val targetsChanged = targets.isNotEmpty() && targets != previousTargets
                 val justClosed = field.isClosed && !previousField.isClosed
-                // Every one of these frames needs the UI to see it, so this assignment stays
-                // unconditional; only the persistence below is throttled.
                 _state.value =
                     state.value.copy(
                         field = field,
                         targetList = if (targets.isNotEmpty()) targets.toImmutableList() else previousTargets,
-                        // Neither branch is a player action, so both bypass nextPhase and are applied
-                        // directly here. isClosed stays first regardless: GameOver must always win over
-                        // LevelIntro. MC-59 means the engine itself no longer levels up a field that
-                        // closes on the same step (see Game.tick's and activeTargetsAbsent's isClosed
-                        // guards), so the two can no longer actually land together - this ordering is
-                        // now a defensive invariant rather than a reachable race.
+                        // Neither branch is a player action, so both bypass nextPhase. isClosed stays first: GameOver must
+                        // always win over LevelIntro.
                         phase =
                             if (field.isClosed) {
                                 GamePhase.GameOver
@@ -92,9 +82,7 @@ class GameViewModel(
                         gameRepository.updateTargets(targets)
                     }
                 }
-                // After updateField above, not before: the just-finished run has to be on disk
-                // before either query below can see it, or it would neither appear in the recent
-                // list nor be eligible to be the best.
+                // After updateField: the just-finished run has to be on disk before either query below can see it.
                 if (justClosed) {
                     loadResults()
                 }
@@ -156,18 +144,15 @@ class GameViewModel(
         }
     }
 
-    // Positions reach disk exactly on pause and on ON_STOP, not on every frame: writes unconditionally
-    // (the throttle in the collector above exists to skip this call, not to skip inside it) so a
-    // background/kill right after a fall that never triggered shouldPersistTargets isn't lost.
+    // Writes unconditionally - the throttle in the collector exists to skip this call, not to skip inside
+    // it - so a kill right after an untracked fall is not lost.
     private suspend fun persistTargetsNow() {
         val targets = state.value.targetList
         if (targets.isEmpty()) return
         gameRepository.updateTargets(targets)
     }
 
-    // getBestClosedField reads all history, not gameRepository's own recent window - a best
-    // outside the last ten must still be found (see GameRepository.getBestClosedField's own
-    // contract, and resultsSummaryOf below which is what turns this into the near-miss delta).
+    // All history, not the recent window: a best outside the last ten must still be found.
     private suspend fun loadResults() {
         _state.value =
             state.value.copy(
@@ -176,12 +161,8 @@ class GameViewModel(
             )
     }
 
-    // Restart from Paused otherwise hands the open field straight back: getUnfinishedField() in
-    // updateSession() below would restore the very session Restart was asked to discard (MC-66).
-    // From GameOver the field is already closed by Game itself, so this is a no-op there - the two
-    // call sites end up meaning the same thing without a phase check. The abandoned run is left
-    // closed rather than deleted, so it can still surface in results history the same way a run
-    // that ended in GameOver does - the player still reached this score, they just chose to stop.
+    // Closes the open field first, or updateSession would restore the very session Restart was asked to
+    // discard. Left closed rather than deleted, so it still surfaces in results history.
     private suspend fun abandonUnfinishedField() {
         val field = state.value.field
         if (field.id == 0 || field.isClosed) return
@@ -201,12 +182,8 @@ class GameViewModel(
             } else {
                 game.fieldRestored(unfinishedField)
                 if (unfinishedTargets.isEmpty()) {
-                    // refreshTargets is now one transaction, so this shouldn't arise from persistence
-                    // going forward — but an old install or a corrupt row can still hand back zero
-                    // targets for an open field. targetsRestored(emptyList()) would be a no-op here
-                    // (the flow already starts empty, so setting it to an equal value never emits and
-                    // Game's own recovery guard never sees it), so recreate the level directly instead
-                    // of relying on that.
+                    // An old install or a corrupt row can hand back zero targets for an open field. targetsRestored with
+                    // an empty list would be a no-op - the flow already starts empty - so recreate the level directly.
                     game.createTargets()
                     refreshTargets(game.stateFlow.value.targets)
                 } else {
@@ -257,9 +234,8 @@ class GameViewModel(
     }
 }
 
-// The near-miss delta the results screen exists for (see the MC-53 spec): always against best,
-// never against recentResults' own first entry, which is only the most recent run and can be a
-// worse score than a best sitting further back in history.
+// Always against best, never against recentResults' first entry: the most recent run can be worse
+// than a best sitting further back.
 internal fun resultsSummaryOf(
     current: Field,
     best: Field?,
@@ -270,46 +246,34 @@ internal fun resultsSummaryOf(
         else -> ResultsSummary.ShortOfBest(current.score, best.score - current.score)
     }
 
-// A level-up hands the engine an entirely new id set, so an UPDATE alone would silently drop the
-// grown rows or leave the shrunk ones behind as ghosts (MC-34). Only the cheaper UPDATE is safe
-// when the ids are exactly what was last persisted.
+// A level-up hands the engine a new id set, so an UPDATE alone would drop the grown rows or leave the
+// shrunk ones as ghosts. Only safe when the ids are exactly what was last persisted.
 internal fun shouldRefreshTargets(
     previousIds: Set<Int>,
     nextIds: Set<Int>,
 ) = previousIds != nextIds
 
-// MC-72: a target's schedule (appearsAtMs/finishesAtMs) is fixed at creation and only ever shifted
-// by an event (shorten, level-up) - unlike the old fallenMs/appearanceDelayMs pair, nothing on
-// Target itself moves on every tick() any more, only Field.gameTimeMs does. Plain equality is
-// therefore already the right check; no clock-only fields are left to exclude.
+// Nothing on Target moves per tick - only Field.gameTimeMs does - so plain equality is the right check.
 internal fun shouldPersistTargets(
     previousTargets: List<Target>,
     nextTargets: List<Target>,
 ): Boolean = previousTargets != nextTargets
 
-// Level-up arrives from two call sites inside Game - tick() and activeTargetsAbsent() - so the
-// trigger is this delta on the field the collector already sees, not either call site directly.
-// previousField.id != 0 excludes the very first emission after a restore, where previousField is
-// still the default Field(level = 1) State() started with: without it, restoring a level-7 session
-// would compare 7 > 1 and fire the intro on launch for a level-up that never happened.
+// previousField.id != 0 excludes the first emission after a restore, where previousField is still the
+// default Field(level = 1): without it, restoring a level-7 session would fire the intro on launch.
 internal fun shouldShowLevelIntro(
     previousField: Field,
     nextField: Field,
 ): Boolean = previousField.id != 0 && nextField.level > previousField.level
 
-// Moves the `if (current == X) to else current` shape used below out of nextPhase's own body:
-// each guard counted directly against nextPhase's cyclomatic complexity, and LevelIntroFinished
-// was the one branch that tipped it over detekt's threshold.
+// Extracted because each guard counted against nextPhase's own cyclomatic complexity.
 private fun GamePhase.transitionTo(
     vararg from: GamePhase,
     to: GamePhase,
 ): GamePhase = if (this in from) to else this
 
-// The single source of truth for what an action does to the screen's phase, replacing the
-// isGamePaused/isGameStarted pair whose implicit branch order in GameScreen's old `when` made
-// "not started yet" and "paused" the same state (MC-55). field.isClosed -> GamePhase.GameOver and
-// shouldShowLevelIntro -> GamePhase.LevelIntro are not here: neither is a player action, and both
-// are applied directly where the field is collected.
+// The single source of truth for what an action does to the phase. isClosed and shouldShowLevelIntro
+// are not here: neither is a player action, and both are applied where the field is collected.
 internal fun nextPhase(
     current: GamePhase,
     action: GameViewModel.Action,
@@ -331,18 +295,13 @@ internal fun nextPhase(
             current.transitionTo(GamePhase.LevelIntro, to = GamePhase.Playing)
         }
 
-        // Only Playing can be paused: there is nothing running to pause from GameOver, and the
-        // other phases are already showing their own "not playing yet" screen.
+        // Only Playing can be paused: the other phases are already showing their own not-playing screen.
         GameViewModel.Action.PauseGame -> {
             current.transitionTo(GamePhase.Playing, to = GamePhase.Paused)
         }
 
-        // MC-77: ReadyToPlay, not Paused. Landing on Paused was invisible from Paused itself - the
-        // session really did restart underneath (score 1 -> 0 on a device) while the pause menu
-        // stayed up, so Restart read as a dead button until the player pressed Resume. The old
-        // comment argued ReadyToPlay could never be reached again once a session had started, which
-        // was true only while that phase shared the paused overlay's composable; MC-64 split them,
-        // and a fresh session showing "touch screen to start" is exactly what this phase is for.
+        // ReadyToPlay, not Paused: landing on Paused left the pause menu up over a session that really had
+        // restarted underneath, so Restart read as a dead button until the player pressed Resume.
         GameViewModel.Action.RestartGame -> {
             GamePhase.ReadyToPlay
         }

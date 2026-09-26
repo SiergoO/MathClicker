@@ -47,7 +47,7 @@ sealed interface FeedbackEffect {
         override val severity = SEVERITY_BROKE_OUT
     }
 
-    // LevelIntroOverlay (MC-57) already announces this; the haptic is the entire response here.
+    // LevelIntroOverlay already announces this; the haptic is the entire response here.
     data object LevelUp : FeedbackEffect {
         override val haptic = HapticFeedbackType.Confirm
         override val hapticRepeatCount = 1

@@ -16,7 +16,7 @@ import androidx.compose.ui.unit.dp
 import com.sdamashchuk.matharcade.core.ui.theme.Accent
 import com.sdamashchuk.matharcade.feature.game.model.TargetScreenPosition
 
-// MC-83: pulled well back from MC-82's 96dp / 4dp / 0.6 alpha. At that weight a zeroing threw a
+// Pulled well back from MC-82's 96dp / 4dp / 0.6 alpha. At that weight a zeroing threw a
 // saturated red hoop across two neighbouring lanes, which read as a second game object rather
 // than as the target's own departure.
 private const val BURST_DIAMETER_DP = 72

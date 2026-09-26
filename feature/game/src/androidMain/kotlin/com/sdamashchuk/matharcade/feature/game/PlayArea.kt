@@ -42,7 +42,7 @@ import androidx.compose.ui.geometry.Size as GeometrySize
 
 private const val PLAY_AREA_HEIGHT_FRACTION = 0.75f
 
-// MC-84: four falling-target columns over the water. The reference art has no lane separators at
+// Four falling-target columns over the water. The reference art has no lane separators at
 // all: the bubbles carry the columns on their own, and a hairline grid over water reads as a
 // spreadsheet.
 @Composable
@@ -55,7 +55,7 @@ fun PlayArea(
     var gameColumnSize by remember { mutableStateOf(Size(0, 0)) }
     val localDensity = LocalDensity.current
 
-    // MC-85: the clock reaches the draw and layout phases through this and is never read during
+    // The clock reaches the draw and layout phases through this and is never read during
     // composition. GameViewModel.State is a new object on every tick because gameTimeMs moved, so
     // a single `gameState.value` read anywhere in this composable's body would have put the entire
     // board back through composition sixty times a second.
@@ -183,7 +183,7 @@ fun PlayArea(
 // and every column fractionally left of where it belongs.
 internal fun calculateGameColumnWidth(measuredWidthDp: Int): Int = measuredWidthDp / GAME_COLUMN_COUNT
 
-// MC-84: darkens one water stop toward the abyss. Multiplying every channel by the same factor
+// Darkens one water stop toward the abyss. Multiplying every channel by the same factor
 // keeps the hue and only removes light, which is what water actually does with depth.
 private fun sink(
     color: Color,

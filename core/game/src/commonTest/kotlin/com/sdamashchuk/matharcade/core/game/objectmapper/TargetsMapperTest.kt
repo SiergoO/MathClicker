@@ -93,7 +93,7 @@ class TargetsMapperTest {
         assertFalse(invertedSpan.isTelegraphingBreakout(500))
     }
 
-    // MC-73: a single uniform shift of the whole waiting schedule - shiftMs is fixed by the closest
+    // A single uniform shift of the whole waiting schedule - shiftMs is fixed by the closest
     // waiting target alone, then every waiting target's appearsAtMs and finishesAtMs move by exactly
     // that constant. No Random draw: see this function's own doc comment for why the old per-target
     // reveal (which needed one) reintroduced the bug this whole epic exists to kill.

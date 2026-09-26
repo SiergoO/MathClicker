@@ -7,7 +7,7 @@ enum class GamePhase {
     Paused,
 
     // Entered from Playing on a level-up delta and left after the 800ms LEVEL N announcement
-    // (MC-57). Field is only composed for Playing, so this phase stops the engine by itself.
+    // . Field is only composed for Playing, so this phase stops the engine by itself.
     LevelIntro,
     GameOver,
 }

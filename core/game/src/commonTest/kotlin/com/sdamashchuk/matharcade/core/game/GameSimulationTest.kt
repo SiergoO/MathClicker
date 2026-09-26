@@ -78,12 +78,8 @@ private suspend fun Game.tickToGameOver(stepMs: Int = TICK_MS): Int {
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class GameSimulationTest {
-    // The definition of done for MC-38: before this commit the only way a test could close a field
-    // was to call targetDidBreakout directly - simulating the thing the engine is now supposed to
-    // know on its own. This test never touches breakout, reveal or level-up; tick() alone plays the
-    // session out. The elapsed time is pinned, not ranged: a range assertion recomputes the
-    // production formula and cannot fail (SessionHelperImplTest's "the starting difficulty..." is
-    // the cautionary precedent this repo already has for that mistake).
+    // tick() alone plays the session out - nothing here touches breakout, reveal or level-up. The elapsed
+    // time is pinned, not ranged: a range assertion recomputes the production formula and cannot fail.
     @Test
     fun `a full session runs to game over on ticks alone`() =
         runTest {
@@ -96,26 +92,12 @@ class GameSimulationTest {
 
             assertTrue(game.stateFlow.value.field.isClosed)
             assertEquals(0, game.stateFlow.value.field.lifeCount)
-            // Random(99) through SessionHelperImpl and Game's own draws, measured once and pinned:
-            // a change to either the difficulty curve or the clock arithmetic moves this number.
-            // MC-52 shortened and floored the lifetime/wave-gap curves, which is why this moved down
-            // from the pre-MC-52 30640. MC-60 threads operationDigit into getTargetValueByLevel,
-            // adding one Random draw per target - that reshuffles every later draw off the same
-            // seed, which is why this moved again from 12784. MC-73 assigns finishesAtMs directly
-            // instead of summing an independently-rolled appearance delay and lifetime, with a finish
-            // spacing floor derived from (INITIAL_LIFE_COUNT - 1) surviving one flight time - almost
-            // exactly double the old wave-gap-derived spacing, which is why this moved up from 12496
-            // to 24896 rather than down. A shorter fall and tighter spacing later took it to 15104.
+            // Measured once and pinned: any change to the difficulty curve or the clock arithmetic moves it.
             assertEquals(15104, elapsedMs)
         }
 
-    // The MC-27 bug class as a JVM assertion for the first time: a target's accumulated fall must
-    // survive a gap where tick() is simply never called (a paused/backgrounded composition), rather
-    // than the pre-MC-38 UI re-deriving position from a saved fraction on every resume. MC-72 makes
-    // this structural - a target's schedule never changes once set, so the same reference captured
-    // before the "pause" below is reused after it, and its position moves only because gameTimeMs
-    // does. 250ms steps divide the 1000ms lifetime evenly, so the tick that reaches position 1 (and
-    // therefore breakout) is exact.
+    // A target's fall must survive a gap where tick() is never called - a paused composition. 250ms steps
+    // divide the 1000ms lifetime evenly, so the tick that reaches position 1 is exact.
     @Test
     fun `pausing mid-fall and resuming keeps the accumulated fall`() =
         runTest {
@@ -143,12 +125,8 @@ class GameSimulationTest {
             assertEquals(2, game.stateFlow.value.field.lifeCount) // breakout on exactly this tick
         }
 
-    // MC-52 acceptance criterion, end to end through the real SessionHelperImpl rather than a fake:
-    // a session with no player input at all must outlast a single target's own fall. Pre-MC-52 this
-    // failed hard - the whole opening wave shared delay zero, so a device run with zero input closed
-    // the field in ~28s, faster than any one target's own lifetime. Ticking to exactly the first
-    // target's own lifetimeMs and finding the field still open proves the other three in that wave
-    // were staggered behind it, not stacked on top of it.
+    // A session with no player input must outlast a single target's own fall. Ticking to exactly the first
+    // target's lifetimeMs and finding the field open proves the wave is staggered, not stacked.
     @Test
     fun `a no-input session survives longer than its own first target's lifetime`() =
         runTest {
@@ -229,7 +207,7 @@ class GameSimulationTest {
             assertEquals(3, game.stateFlow.value.field.lifeCount)
         }
 
-    // MC-71: gameTimeMs moves by the exact same clamped step targets.advance() consumes, not the
+    // GameTimeMs moves by the exact same clamped step targets.advance() consumes, not the
     // raw elapsedMs passed in - proven over many small ticks and one oversized one in the same run,
     // so a mutant that clamped only one of the two would fail here.
     @Test
@@ -247,18 +225,12 @@ class GameSimulationTest {
             assertEquals((TICK_MS * 10 + MAX_TICK_MS).toLong(), game.stateFlow.value.field.gameTimeMs)
         }
 
-    // tick()'s own isClosed guard returns before step is even computed - this proves that early
-    // return covers the clock too, not just the targets. A single-target board would close with
-    // nothing left active either way (targets.none { it.isActive } alone already halts it), so this
-    // needs a fourth target still active and mid-fall at the moment the other three's simultaneous
-    // breakout empties lifeCount to zero - the case a guard that dropped isClosed and kept only the
-    // active-target check would still miss.
+    // Needs a fourth target still active and mid-fall when the other three's simultaneous breakout empties
+    // lifeCount - the case an active-target check alone would still miss.
     @Test
     fun `gameTimeMs does not advance once the field is closed`() =
         runTest {
-            // MC-73: built directly rather than through SimulationSessionHelper/createTargets(),
-            // since per-id delay staggering is no longer expressible through SessionHelper (spacing
-            // is uniform by construction).
+            // Applied identically to both games below, so the fast/slow comparison is unaffected by the fixture.
             val game = Game(SimulationSessionHelper(), backgroundScope, Random(7))
             game.createField(1)
             game.targetsRestored(
@@ -274,10 +246,7 @@ class GameSimulationTest {
                     .first { it.appearsAtMs > game.stateFlow.value.field.gameTimeMs }
                     .id
 
-            // 1000ms: the three undelayed targets break out together, closing the field. That same
-            // step's edge-triggered shortenAppearanceDelay (see tick()) would otherwise reveal the
-            // fourth target early since it is the only one left waiting - staying below that reveal
-            // threshold is not the point here, so the delay itself is not asserted, only isActive.
+            // 1000ms: the three undelayed targets break out together, closing the field.
             repeat(4) { game.tick(250) }
             assertTrue(game.stateFlow.value.field.isClosed)
             assertTrue(
@@ -297,8 +266,7 @@ class GameSimulationTest {
     @Test
     fun `ten seconds of ticks reveals exactly the targets whose delay has elapsed`() =
         runTest {
-            // MC-73: built directly rather than through SimulationSessionHelper/createTargets() -
-            // see the comment on the test above.
+            // Applied identically to both games below, so the fast/slow comparison is unaffected by the fixture.
             val delaysMs = listOf(1000L, 5000L, 9000L, 11000L)
             val game = Game(SimulationSessionHelper(), backgroundScope, Random(3))
             game.createField(1)
@@ -350,23 +318,15 @@ class GameSimulationTest {
             assertEquals(first.stateFlow.value.targets, second.stateFlow.value.targets)
         }
 
-    // The determinism trap named in the design doc: shortenAppearanceDelay must fire on the edge (a
-    // visible active target existed and then didn't), not on the level (no visible active target
-    // right now), or its draw count - and therefore the whole session's state - becomes a function
-    // of frame rate. Every target here starts with a non-zero delay, so nothing is ever visible
-    // before its own delay naturally elapses; a level-triggered shorten would fire on every one of
-    // the many ticks before that first reveal, and it would fire a different number of times at 8ms
-    // steps than at 16ms steps for the same elapsed time.
+    // shortenAppearanceDelay must fire on the edge, not on the level, or its draw count becomes a function
+    // of frame rate - it would fire a different number of times at 8ms steps than at 16ms.
     @Test
     fun `the same seed driven at two step sizes over the same elapsed time produces identical state`() =
         runTest {
             val totalElapsedMs = 8000
             val seed = 11L
 
-            // MC-73: built directly rather than through SimulationSessionHelper/createTargets() -
-            // see the comment on the tests above. Applied identically to both games below, so the
-            // fast/slow comparison this test exists for is unaffected by the fixture no longer
-            // coming from the session helper itself.
+            // Applied identically to both games below, so the fast/slow comparison is unaffected by the fixture.
             fun targetFixture() =
                 (0 until 8).map { index ->
                     scheduledTarget(

@@ -111,7 +111,7 @@ class GameViewModelPersistenceTest {
         Dispatchers.resetMain()
     }
 
-    // MC-72: a target's schedule (appearsAtMs/finishesAtMs) is fixed once created, so a tick that
+    // A target's schedule (appearsAtMs/finishesAtMs) is fixed once created, so a tick that
     // moves nothing but the clock produces no target-list change at all - not the "at most one
     // throttled write" the pre-MC-72 fallenMs/appearanceDelayMs counters needed, but exactly zero.
     @Test
@@ -192,7 +192,7 @@ class GameViewModelPersistenceTest {
             // below.
             val game =
                 Game(
-                    // MC-73: a huge finish spacing (rather than a per-id delay, no longer
+                    // A huge finish spacing (rather than a per-id delay, no longer
                     // expressible) pushes the second target's own appearsAtMs well past this
                     // test's window.
                     PersistenceFakeSessionHelper(
@@ -220,7 +220,7 @@ class GameViewModelPersistenceTest {
             assertEquals(1, repository.persistenceCallCount())
         }
 
-    // MC-72: isVisible is derived from the clock, not stored on Target, so crossing appearsAtMs
+    // IsVisible is derived from the clock, not stored on Target, so crossing appearsAtMs
     // changes nothing about the persisted target list - the opposite of the pre-MC-72 claim this
     // test's name used to make, and the direct kill for a mutant that reintroduced a stored flag.
     @Test

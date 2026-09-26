@@ -146,7 +146,7 @@ class MathArcadeDatabaseMigrationTest {
             assertTrue(restored.all { it.appearsAtMs == 0L })
         }
 
-    // MC-53: finishedAt did not exist before this version, so an install upgrading straight from
+    // FinishedAt did not exist before this version, so an install upgrading straight from
     // 1 to the current schema has nothing to recover it from - null, not a fabricated migration-time
     // stamp, is the only honest value. score and level (what MC-59 needs untouched) are asserted
     // alongside it to prove the new column's ALTER TABLE didn't disturb them.
@@ -172,7 +172,7 @@ class MathArcadeDatabaseMigrationTest {
             assertNull(restoredField.finishedAt)
         }
 
-    // MC-71: gameTimeMs did not exist before this version, so an install upgrading straight from 1
+    // GameTimeMs did not exist before this version, so an install upgrading straight from 1
     // has nothing to recover it from - 0 is the only honest default (see 4.sqm), the same reasoning
     // MC-53 already applied to finishedAt, just non-null here instead of left null. score and level
     // are asserted alongside it to prove the ALTER TABLE didn't disturb the columns already there.

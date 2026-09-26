@@ -2,7 +2,7 @@ package com.sdamashchuk.matharcade.core.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// MC-84: every value here was sampled from the reference field, not picked by eye. The bubble
+// Every value here was sampled from the reference field, not picked by eye. The bubble
 // layers were fitted numerically against it - mean absolute channel error 3.4% for the ready
 // state, 3.3% for the idle one. See .claude/specs/math-bubbles-ds.html for the derivation.
 

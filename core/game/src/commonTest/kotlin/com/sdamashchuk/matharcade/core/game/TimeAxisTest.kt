@@ -14,7 +14,7 @@ import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 // The closing property MC-74's design doc asks for directly: no axis operation may desynchronise
-// two targets, because none of them carries its own time any more (MC-72). Proven against a
+// two targets, because none of them carries its own time any more. Proven against a
 // generated board rather than a single fixture, and against the two operations composed together,
 // not just each in isolation.
 private fun generatedBoard() =

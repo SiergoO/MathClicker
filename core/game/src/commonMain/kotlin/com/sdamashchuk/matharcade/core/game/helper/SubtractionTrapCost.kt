@@ -2,7 +2,7 @@ package com.sdamashchuk.matharcade.core.game.helper
 
 import kotlin.random.Random
 
-// MC-80: subtraction's own axis - trap share, not division's four tap-cost buckets borrowed
+// Subtraction's own axis - trap share, not division's four tap-cost buckets borrowed
 // backwards (PreparationCost.kt's cost-as-value collapse made low levels the trap-heaviest and
 // piled traps onto the digit 1). Trap share rises with level per ASK-27 ("смягчить: уменьшить
 // долю ловушек на низких уровнях"): a gentle start teaches the mechanic, and traps become a bigger

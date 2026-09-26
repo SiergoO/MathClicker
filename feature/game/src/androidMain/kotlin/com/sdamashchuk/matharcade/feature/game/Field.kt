@@ -59,12 +59,12 @@ fun Field(
     onTick: (elapsedMs: Int) -> Unit,
     onPauseClicked: () -> Unit,
     targetZeroedSignal: TargetZeroedSignal?,
-    // MC-61: the readiness hint's on/off switch, not a property of the game itself. A constant
+    // The readiness hint's on/off switch, not a property of the game itself. A constant
     // today; once difficulty/mods exist, that's what supplies this value - TargetButton never sees
     // why a hint is off, and neither does this composable's own body beyond reading the flag.
     readinessHintsEnabled: Boolean = true,
 ) {
-    // MC-85: every one of these used to be a `gameState.value.field.X` read straight in this
+    // Every one of these used to be a `gameState.value.field.X` read straight in this
     // composable's body. GameViewModel.State is a fresh object on every tick because gameTimeMs
     // moved, so each of those reads dragged the whole HUD, the life stripes and the dock through
     // composition sixty times a second to render numbers that change once a second at most.

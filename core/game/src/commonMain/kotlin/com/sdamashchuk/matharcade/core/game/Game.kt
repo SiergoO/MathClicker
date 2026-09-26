@@ -37,41 +37,29 @@ import kotlinx.coroutines.sync.withLock
 import kotlin.random.Random
 import kotlin.time.Clock
 
-// A frame gap this large (a resumed app, a dropped composition) is treated as a single 250ms step
-// rather than replayed in full, so a stalled clock can't teleport every target straight to the
-// floor the moment it resumes. Read from Field's withFrameNanos loop, the sole driver of tick().
+// A resumed app or a dropped composition is clamped to one step rather than replayed in full,
+// so a stalled clock cannot teleport every target to the floor the moment it resumes.
 internal const val MAX_TICK_MS = 250
 
-// getNextSignAndDigit redraws rather than offers a press that cannot succeed against anything
-// visible (MC-50). Bounded rather than looped unconditionally: a board every candidate digit range
-// genuinely cannot touch (pathological, but not provably impossible) must still return in finite
-// time. 20 is generous against what that loop actually costs - each attempt is one Random draw and
-// a scan of the visible targets - and the fallback on exhaustion is simply the last draw made, dud
-// or not, which is exactly what every press already tolerated before this task.
+// Termination bound: a board no candidate digit can touch must still return in finite time.
 private const val MAX_OPERATION_DRAW_ATTEMPTS = 20
 
-// Ten of the nineteen are the engine's public contract - start/stop, the four session and restore
-// entry points, the two inputs, tick and grantLife - so the threshold is unreachable without
-// collapsing that contract, which is a bigger change than a counting rule should drive. Suppressed
-// here rather than in a baseline file so the next reader sees it, and so anything new still fails.
+// Ten of the nineteen are the engine's public contract, so the threshold is unreachable without
+// collapsing it. Suppressed here rather than in a baseline so anything new still fails.
 @Suppress("TooManyFunctions")
 class Game(
     private val sessionHelper: SessionHelper,
     private val scope: CoroutineScope,
     private val random: Random = Random.Default,
-    // Injected the same way random is: two engines seeded alike must reach identical state,
-    // finishedAt included, which reading Clock.System directly inside closeIfNecessary could not
-    // guarantee across two separate calls a real clock advances between.
+    // Injected, not read from Clock.System: two engines seeded alike must reach identical state,
+    // finishedAt included.
     private val clock: Clock = Clock.System,
 ) {
     private val _stateFlow: MutableStateFlow<GameState> = MutableStateFlow(GameState(Field(), listOf()))
     val stateFlow: StateFlow<GameState> = _stateFlow.asStateFlow()
 
-    // StateFlow conflates, so a UI collector provably drops intermediate events (two targets
-    // zeroed in the same frame would look identical to one). tryEmit is used at every call site
-    // below, never emit: emit suspends, and tick runs inside the mutex on the frame path where
-    // blocking on a slow subscriber is exactly what this buffer exists to avoid. DROP_OLDEST over
-    // SUSPEND is the same reasoning from the other side - a full buffer must never stall tick.
+    // tryEmit, never emit: emit suspends, and tick runs inside the mutex on the frame path.
+    // DROP_OLDEST for the same reason - a full buffer must never stall tick.
     private val _events =
         MutableSharedFlow<GameEvent>(
             replay = 0,
@@ -80,58 +68,26 @@ class Game(
         )
     val events: SharedFlow<GameEvent> = _events.asSharedFlow()
 
-    // Every read-then-write of _stateFlow - including the mutators that only touch one half of it -
-    // happens inside this lock, so a caller (Main) and the collector below (Default) can never
-    // interleave mid-transaction. Each locked function below assigns _stateFlow.value exactly once,
-    // with the untouched half copied through unchanged: that is what makes the published state
-    // indivisible rather than just the write to it serialized (MC-42; MC-32 only serialized writes).
-    // The lock itself is not reentrant: the locked functions call the private *Locked helpers
-    // directly rather than each other, so no coroutine ever tries to acquire it twice.
+    // Every read-then-write of _stateFlow happens under this lock, and each locked function assigns
+    // _stateFlow.value exactly once. Not reentrant: locked functions call the *Locked helpers, never each other.
     private val mutex = Mutex()
 
     private var collectorJob: Job? = null
 
-    // MC-79: recreateField's nextOperationSign/Digit is drawn with no board to validate against
-    // (MC-65 leaves it alone, see ensureOpeningOperationSucceeds), so the first press of a session
-    // promotes it to current via updateActionButtons unchecked. Set true on every createField() - a
-    // genuinely new session, Game being a DI singleton reused across many - and consumed by the next
-    // fireButtonClicked(), which is that session's first press by construction: nothing else sets it.
-    // Left false across a restore (fieldRestored/targetsRestored, no createField call): a session
-    // resumed after at least one real press no longer carries recreateField's blind draw. The one gap
-    // this does not close is a session restored after being killed before its own first press ever
-    // landed - narrow enough (an app kill in the handful of seconds before the first tap) that closing
-    // it would need persisting this flag, which is out of scope here.
+    // Set by createField, consumed by that session's first fireButtonClicked - which is what makes
+    // recreateField's unvalidated next draw safe to promote.
     private var pendingOpeningPromotionCheck = false
 
     fun start() {
         collectorJob?.cancel()
         collectorJob =
             scope.launch {
-                // Filtered to target changes only, same as the pre-MC-42 _targetsFlow.collect: a
-                // combined state also emits on field-only changes (gameColumnSizeMeasured, a
-                // non-scoring targetClicked, ...) that this collector's guard below has no reason
-                // to re-evaluate. Without this filter a field-only change would replay the same
-                // (unchanged) target list through activeTargetsAbsent(), which is at best a wasted
-                // lock acquisition.
                 stateFlow
                     .map { it.targets }
                     .distinctUntilChanged()
                     .collect { targets ->
-                        // start() registers this collector asynchronously on the injected scope, so its
-                        // first delivery races updateSession()'s own createField()/createTargets() calls:
-                        // gating on fieldFlow.value.id != 0 instead of targets.isNotEmpty() let that first,
-                        // still-empty delivery see a live field id and level up with no player input.
-                        // GameViewModel.updateSession() now recreates a restored empty target list itself
-                        // (targetsRestored(emptyList()) is otherwise a no-op MutableStateFlow never emits
-                        // a value equal to its current one), so nothing in production ever hands this
-                        // collector an empty list to recover from. Keep the cheap guard.
-                        //
-                        // The visibleTargetsAbsent() branch that used to sit here is gone: tick() now
-                        // runs every frame, and while no target is visible - true for the whole board at
-                        // the start of every level - distinctUntilChanged above would pass on every
-                        // single frame, replaying shortenAppearanceDelay() (and its Random draw) 60-120
-                        // times a second instead of once per game event. tick()'s own stillWaiting
-                        // computation does this correctly, fired on the edge instead of the level.
+                        // Do not restore the visibleTargetsAbsent branch that used to sit here: no target is visible at the
+                        // start of every level, so it replayed a Random draw every frame instead of once per event.
                         if (targets.isNotEmpty() && targets.none { it.isActive }) {
                             activeTargetsAbsent()
                         }
@@ -192,20 +148,8 @@ class Game(
             val updatedTargets =
                 pressOutcome.targets
                     .ensureAlive()
-            // Drawn against updatedTargets, not the pre-press board: this is the freshest state
-            // available before the draw is promoted to "current" by updateActionButtons below, so a
-            // target this same press just cleared or retired can't be the reason the next offer is a
-            // dud (MC-50). The board can still move again before the draw is actually used - tick()
-            // runs between now and the next press - but that gap is unavoidable without validating
-            // inside performOperation itself, which is deliberately out of scope: a press that turns
-            // out to fail must still cost what it costs.
             val (nextOperationSign, nextOperationDigit) =
                 getNextSignAndDigit(updatedTargets, current.field.level, current.field.gameTimeMs)
-            // MC-79: the very first press of a session promotes current.field.nextOperationSign/Digit -
-            // recreateField's blind draw, only ever checked at creation against the opening wave
-            // (MC-65) - straight to current below. Revalidated here, once, against updatedTargets: the
-            // same freshest-available board the line above already trusts for the new next draw, so a
-            // target this same press just cleared or retired can't rescue it either.
             val comboField =
                 current.field
                     .applyCombo(pressOutcome.scored)
@@ -217,8 +161,7 @@ class Game(
                             field
                         }
                     }
-            // In Long: totalScore is bounded by the board, but appliedMultiplier is not, so the
-            // product is the first place an uncapped streak can overflow.
+            // The product is where an unbounded multiplier would overflow Int.
             val gained =
                 (pressOutcome.totalScore.toLong() * comboField.appliedMultiplier)
                     .coerceAtMost(Int.MAX_VALUE.toLong())
@@ -231,17 +174,6 @@ class Game(
             _events.tryEmit(GameEvent.OperationResolved(gained, comboField.bonusMultiplier))
         }
 
-    // The engine's own clock: advances gameTimeMs by elapsedMs and resolves whatever that step
-    // causes against each target's fixed schedule - reveal, breakout, level-up - in this one locked
-    // step. Targets are never rewritten here (MC-72: their schedule is stable, only the clock they
-    // are read against moves); this is now the only way a target is revealed or breaks out, there
-    // is no equivalent UI-driven call left.
-    //
-    // clockScale is MC-74's freeze/slow seam: a coefficient on this call's own step, defaulted to
-    // 1.0 so every existing caller (there is no consumer of a non-default value yet) reproduces
-    // today's arithmetic exactly. It is a parameter, not state Game or Field carries between calls -
-    // Field is persisted, and a freeze that survives killing and relaunching the app is a bug, not a
-    // feature. A future caller drives it every frame, the same way the UI already drives elapsedMs.
     suspend fun tick(
         elapsedMs: Int,
         clockScale: Double = 1.0,
@@ -257,9 +189,7 @@ class Game(
         val (fieldAfterBreakout, targetsAfterBreakout) =
             resolveBreakouts(current.targets, brokenOutIds, advancedField)
 
-        // Fired on the edge - a visible active target existed before this step and does not
-        // after - never on the level, or the draw count this makes would depend on frame rate
-        // instead of game events (see shortenAppearanceDelay's own determinism guarantee).
+        // On the edge, never on the level: otherwise the draw count would follow frame rate, not game events.
         val stillWaiting =
             hadVisibleActiveTarget &&
                 targetsAfterBreakout.none { it.isActive && it.isVisible(advancedField.gameTimeMs) }
@@ -270,11 +200,7 @@ class Game(
                 targetsAfterBreakout
             }
 
-        // fieldAfterBreakout can already be closed here - the breakout that emptied the board
-        // is also the one that cost the last life. A closed field must not level up or get a
-        // fresh target set for a session that is already over (MC-59), so the board is instead
-        // published exactly as resolveBreakouts left it: the just-broken-out targets, inactive,
-        // not a recreated set.
+        // A closed field must not level up or get a fresh target set.
         val leveledUp = targetsAfterShorten.none { it.isActive } && !fieldAfterBreakout.isClosed
         _stateFlow.value =
             if (leveledUp) {
@@ -284,26 +210,19 @@ class Game(
                 GameState(fieldAfterBreakout, targetsAfterShorten)
             }
 
-        // lifeCount is decremented by exactly one per id, in this same order, inside
-        // resolveBreakouts - so the i-th id's own post-breakout count is derivable here without
-        // resolveBreakouts having to thread it back out as extra return state.
         brokenOutIds.forEachIndexed { index, id ->
             _events.tryEmit(GameEvent.TargetBrokeOut(id, current.field.lifeCount - (index + 1)))
         }
         if (leveledUp) {
             _events.tryEmit(GameEvent.LevelUp(_stateFlow.value.field.level))
         }
-        // current.field.isClosed already returned this call early above, so a closed field here
-        // is always a fresh transition, not a repeat of one already reported.
         if (_stateFlow.value.field.isClosed) {
             _events.tryEmit(GameEvent.GameOver)
         }
     }
 
-    // No caller today - MC-76 removed the every-N-levels trigger MC-54 wired through updateLevel,
-    // but kept the grant itself as the mechanism a future random event calls. Mutex-guarded like
-    // every other public entry point above; a call that would exceed the cap is a pure no-op and
-    // must not emit LifeGranted, or the feedback layer would tell a full-lives player they gained one.
+    // No caller yet, kept as the mechanism a future random event calls. A grant that would exceed the
+    // cap must not emit LifeGranted, or a full-lives player is told they gained one.
     suspend fun grantLife() =
         mutex.withLock {
             val current = _stateFlow.value.field
@@ -316,31 +235,18 @@ class Game(
 
     private suspend fun activeTargetsAbsent() =
         mutex.withLock {
-            // Re-check under the lock: the collector's own condition (targets.none { it.isActive })
-            // was evaluated outside it, and a concurrent createField()/createTargets() - a restart -
-            // can repopulate active targets in the window between that check and this coroutine
-            // actually acquiring the mutex. Without this, a stale trigger would level up a board
-            // that is no longer empty.
+            // Re-checked under the lock: a concurrent restart can repopulate active targets between the
+            // collector's own check and this coroutine acquiring the mutex.
             val current = _stateFlow.value
-            // A closed field must not level up here either (MC-59): tick() can close the field on
-            // a step that leaves other targets still active (not every breakout empties the board),
-            // and one of those can then reach zero through targetClicked - reaching this branch for
-            // a session that is already over. Leave the state exactly as it is; there is nothing to
-            // recreate for a dead session.
+            // A closed field must not level up: tick can close it on a step that leaves other targets active.
             if (current.targets.none { it.isActive } && !current.field.isClosed) {
-                // The level bump and the regenerated targets are published in the one assignment
-                // below, not two: a reader between separate writes here is exactly the torn state
-                // MC-42 exists to close (level+1 against the still-inactive target set).
                 val updatedField = current.field.updateLevel()
                 _stateFlow.value = GameState(updatedField, recreateTargets(updatedField))
                 _events.tryEmit(GameEvent.LevelUp(updatedField.level))
             }
         }
 
-    // Only ever called from inside a mutex.withLock block above - never acquires the lock itself,
-    // so createTargets() can call it without a non-reentrant Mutex deadlocking on its own coroutine.
-    // activeTargetsAbsent() no longer routes through here: it has to publish the bumped field and the
-    // regenerated targets in one assignment, which this cannot express.
+    // Called only from inside withLock, and never acquires the lock itself - the Mutex is not reentrant.
     private fun createTargetsLocked() {
         val field = _stateFlow.value.field
         val targets = recreateTargets(field)
@@ -348,22 +254,8 @@ class Game(
             _stateFlow.value.copy(field = ensureOpeningOperationSucceeds(field, targets), targets = targets)
     }
 
-    // MC-65: recreateField draws currentOperationSign/currentOperationDigit before a single target
-    // exists to validate against, so MC-50's guarantee never covered a session's opening operation.
-    // Validated here instead, once the targets recreateField had nothing to check against are actually
-    // known - and against the moment those targets first become visible (targets.minOf { appearsAtMs
-    // }), not against "now": recreateTargets's own opening offset guarantees appearsAtMs is never
-    // before gameTimeMs at creation (see getOpeningOffsetMsByLevel), so filtering on gameTimeMs here
-    // would find an empty board every time and validate nothing. A no-op when the draw already
-    // succeeds or there is nothing yet to fail against, so a healthy opening board costs no extra
-    // Random draw.
-    //
-    // MC-79 deliberately leaves nextOperationSign/Digit untouched here (option a, validating it against
-    // this same opening wave, was tried and measured: with real ticks between creation and the first
-    // press, 12.5% of seeded sessions still promoted a dud, because the opening wave is only the first
-    // target to appear and the board has usually moved on by press time). ensurePromotedOperationSucceeds
-    // below re-checks that pair against the board as it actually is at promotion, which is what closes
-    // the gap this comment used to just approximate.
+    // Validated against the moment the targets first become visible, not against now: nothing is visible
+    // at creation, so filtering on gameTimeMs would find an empty board and validate nothing.
     private fun ensureOpeningOperationSucceeds(
         field: Field,
         targets: List<Target>,
@@ -381,11 +273,6 @@ class Game(
         }
     }
 
-    // The body of the old targetDidBreakout, minus its "already inactive" guard: that guard is now
-    // structural, since tick only ever offers an id here once - the same locked step that finds
-    // hasBrokenOut() true is the one that deactivates it, leaving nothing for a repeat to find.
-    // isVisible no longer needs a matching changeVisibility() call: it is derived from the clock
-    // (MC-72), and every consumer already gates on isActive first, which this does set to false.
     private fun resolveBreakouts(
         targets: List<Target>,
         brokenOutIds: List<Int>,
@@ -414,9 +301,8 @@ class Game(
         )
     }
 
-    // Takes the field explicitly rather than reading _stateFlow.value.field, so activeTargetsAbsent
-    // can regenerate targets against the just-bumped level in the same assignment as the level bump
-    // itself, instead of a second read-then-write of _stateFlow.
+    // Takes the field explicitly so activeTargetsAbsent can regenerate against the just-bumped level in
+    // the same assignment as the bump.
     private fun recreateTargets(field: Field): List<Target> {
         val amount = sessionHelper.getTargetAmountByLevel(field.level)
         // Assigned once per field, not per target: both are deterministic (no Random draw), so
@@ -432,7 +318,7 @@ class Game(
             // after the first (the same discipline MC-72's version of this comment documented for
             // its own three draws).
             //
-            // MC-70: the armed sign picks which shaping the value gets - getTargetValueByLevel's
+            // The armed sign picks which shaping the value gets - getTargetValueByLevel's
             // residue is meaningless against subtraction, which is not modular (see
             // getSubtractionTargetValueByLevel). Both still draw from the same shared Random, just a
             // different number of times per call, so this branch can move the draw count from here on
@@ -461,7 +347,7 @@ class Game(
         }
     }
 
-    // Never offers a sign/digit that would fail against every visible target (MC-50): an empty or
+    // Never offers a sign/digit that would fail against every visible target: an empty or
     // fully-hidden board (no visible active target at all) has no dud to avoid, so the first draw is
     // taken unconditionally rather than looping. Otherwise redraws until one succeeds against at
     // least one visible active target, or MAX_OPERATION_DRAW_ATTEMPTS is spent.
@@ -474,7 +360,7 @@ class Game(
         return drawSignAndDigit(visibleActiveTargets, level)
     }
 
-    // MC-79: the promotion-time counterpart to ensureOpeningOperationSucceeds above - called once, by
+    // The promotion-time counterpart to ensureOpeningOperationSucceeds above - called once, by
     // fireButtonClicked, only for the press that consumes pendingOpeningPromotionCheck. Filters
     // updatedTargets the same way getNextSignAndDigit does, against the field's own (unadvanced -
     // fireButtonClicked never ticks the clock) gameTimeMs, so the check sees exactly the board the new
@@ -508,7 +394,7 @@ class Game(
             if (digit != null) return Pair(sign, digit)
         }
 
-        // Off the level's own digit curve, deliberately (MC-60): subtracting the smallest visible
+        // Off the level's own digit curve, deliberately: subtracting the smallest visible
         // value zeroes that target exactly, so a board no drawn digit satisfies still never hands
         // over a dead press.
         return Pair(OperationSign.SUBTRACTION, visibleActiveTargets.minOf { it.value })

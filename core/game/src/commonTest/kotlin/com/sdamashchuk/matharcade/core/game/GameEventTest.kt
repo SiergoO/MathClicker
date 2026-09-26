@@ -11,7 +11,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-// MC-51: events is a SharedFlow, not a diff of stateFlow, precisely because StateFlow conflates -
+// Events is a SharedFlow, not a diff of stateFlow, precisely because StateFlow conflates -
 // these tests exist to prove properties a state diff could never establish (two same-frame zeroes,
 // replay = 0, an overflowing buffer that still lets tick proceed).
 @OptIn(ExperimentalCoroutinesApi::class)

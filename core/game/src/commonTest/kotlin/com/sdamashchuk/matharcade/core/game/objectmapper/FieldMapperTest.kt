@@ -52,7 +52,7 @@ class FieldMapperTest {
         assertEquals(999, field.level)
     }
 
-    // MC-76: updateLevel no longer touches lifeCount at all - the every-N-levels grant MC-54 wired
+    // UpdateLevel no longer touches lifeCount at all - the every-N-levels grant MC-54 wired
     // through here is gone, levels 5 and 10 included, which used to qualify.
     @Test
     fun `updateLevel never changes lifeCount including on a former qualifying level`() {

@@ -11,7 +11,7 @@ private const val FLIGHT_FLOOR_MS = 3500
 
 // The base (un-spread) flight time a level's speed curve implies - floored so it, and everything
 // derived from it below, can never go empty or cross at any level in 1..999 (see FLIGHT_BASE_MS's own
-// comment). Top-level rather than a SessionHelperImpl member (MC-70): the class was already at
+// comment). Top-level rather than a SessionHelperImpl member: the class was already at
 // detekt's TooManyFunctions ceiling before getSubtractionTargetValueByLevel, and this reads none of
 // that class's state - not even its Random - so it moved out rather than raising the threshold.
 internal fun baseFlightMsByLevel(level: Int): Int =

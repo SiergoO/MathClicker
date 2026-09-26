@@ -16,7 +16,7 @@ private const val PROFILE_SAMPLE_ITERATIONS = 10_000
 private const val PROFILE_TOLERANCE_PP = 5
 private const val PROFILE_SEED = 4242L
 
-// MC-70: recreateTargets must pick the value generator by the armed sign, not always the
+// RecreateTargets must pick the value generator by the armed sign, not always the
 // division-shaped one - verified through Game.createTargets (not sessionHelper directly), since the
 // bug this task exists for was entirely in that dispatch, not in either generator on its own.
 @OptIn(ExperimentalCoroutinesApi::class)

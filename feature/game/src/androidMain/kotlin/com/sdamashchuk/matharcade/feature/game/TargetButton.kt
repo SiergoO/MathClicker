@@ -40,8 +40,7 @@ import com.sdamashchuk.matharcade.core.ui.theme.Ink
 import com.sdamashchuk.matharcade.feature.game.model.TargetScreenPosition
 import kotlin.math.abs
 
-// MC-54: telegraphs the final 15% of a fall (Target.isTelegraphingBreakout) so a breakout is never
-// a surprise. The cue is a size pulse plus a ring.
+// Telegraphs the final 15% of a fall so a breakout is never a surprise: a size pulse plus a ring.
 private const val TARGET_DIAMETER_FRACTION = 0.8
 private const val TELEGRAPH_PULSE_SCALE = 1.06f
 private const val TELEGRAPH_PULSE_MS = 300
@@ -50,19 +49,15 @@ private const val TELEGRAPH_RING_ALPHA = 0.85f
 
 private const val READINESS_TRANSITION_MS = 200
 
-// MC-81: depth cue for the fall. 0.72 is a hard floor, not a taste call - the target is
-// TARGET_DIAMETER_FRACTION (0.8) of a column, and a column is (screenWidthDp - 3) / 4; on a 411dp
-// phone that is 81.6dp. Android's minimum touch target is 48dp, i.e. 0.59 of that near size. 0.72
-// keeps margin above 0.59 for a shaky finger - do not lower it without redoing this math.
+// 0.72 is a hard floor, not a taste call: the target is 0.8 of a column, a column is about 81.6dp on a
+// 411dp phone, and 48dp of minimum touch target is 0.59 of that. Do not lower it without redoing this.
 private const val DEPTH_SCALE_AT_TOP = 0.72f
 private const val DEPTH_SCALE_AT_BOTTOM = 1f
 
 private const val LANE_CENTER_FRACTION = 0.5f
 
-// MC-84: the bubble, fitted numerically against the reference art rather than eyeballed - mean
-// absolute channel error 3.4% ready, 3.3% idle. Four layers: body, highlight glow, highlight core,
-// rim. The single most important finding is that the highlight is two layers and not one; with a
-// single blob the fit will not go below 10.7/255 however it is tuned.
+// Fitted numerically against the reference art, not eyeballed - mean absolute channel error 3.4%.
+// The highlight is two layers, not one: with a single blob the fit will not go below 10.7/255.
 private const val FILL_ALPHA_READY = 0.62f
 private const val FILL_ALPHA_IDLE = 0.28f
 private const val RIM_WIDTH_FRACTION_READY = 0.027f
@@ -90,8 +85,7 @@ private const val LIVELINESS_PROFITABLE_FLOOR = 0.62f
 private const val UNREACHABLE_CORE_ALPHA = 0.06f
 private const val UNREACHABLE_FILL_ALPHA = 0.16f
 
-// MC-82/83: squash-and-rebound on a hit. Three short steps land the whole gesture under 200ms so
-// rapid tapping never feels mushy waiting on the previous squash to finish.
+// Three short steps land the whole gesture under 200ms, so rapid tapping never waits on the previous one.
 private const val SQUASH_COMPRESS_SCALE = 0.93f
 private const val SQUASH_REBOUND_SCALE = 1.04f
 private const val SQUASH_COMPRESS_MS = 40
@@ -103,10 +97,8 @@ fun TargetButton(
     target: Target,
     gameColumnSize: Size,
     isReady: Boolean,
-    // MC-85: a provider, not a Long. Passing the clock by value would make this composable read a
-    // per-frame value during composition, and every target on the board would recompose 60 times a
-    // second. Read inside the layout and draw lambdas below, the same clock costs a relayout and a
-    // redraw and no recomposition at all.
+    // A provider, not a Long: passing the clock by value would read a per-frame value during composition
+    // and recompose every target 60 times a second. The lambdas below cost a relayout and a redraw instead.
     gameTimeMsProvider: () -> Long,
     onTargetClicked: (id: Int) -> Unit,
     onTargetPositioned: (id: Int, position: TargetScreenPosition) -> Unit,
@@ -139,11 +131,8 @@ fun TargetButton(
                 .offset {
                     val fallFraction = target.position(gameTimeMsProvider())
                     val yDp = fallFraction * columnHeight
-                    // Recorded from the layout lambda rather than a per-frame SideEffect. The
-                    // effect only ran after a recomposition, which this task's whole point is to
-                    // stop happening every frame - and it wrote to a snapshot map, which allocates
-                    // a record per write. This is the same number, taken where it is already being
-                    // computed, into a plain map.
+                    // Recorded from the layout lambda, not a SideEffect: the effect only ran after a recomposition, and it
+                    // wrote to a snapshot map, which allocates a record per write.
                     onTargetPositioned(
                         target.id,
                         TargetScreenPosition(xDp = columnCenterXDp, yDp = yDp + buttonDiameterDp / 2f),
@@ -176,10 +165,8 @@ fun TargetButton(
     }
 }
 
-// Derived from the engine clock instead of an InfiniteTransition. One transition plus one
-// animateFloat per target was running permanently whether or not that target was telegraphing,
-// each scheduling its own frame callback; the engine already advances a clock every frame, and a
-// triangle wave off it is the same 300ms linear reverse pulse for no objects at all.
+// Derived from the engine clock, not an InfiniteTransition: one transition per target ran permanently
+// whether or not it was telegraphing, each scheduling its own frame callback.
 internal fun telegraphPulse(
     gameTimeMs: Long,
     isTelegraphing: Boolean,

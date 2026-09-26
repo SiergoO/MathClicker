@@ -51,22 +51,17 @@ private const val SIMULATION_DIVISIONS = 3
 private const val SIMULATION_TAP_RATE_PER_SECOND = 8
 private const val SIMULATION_TAP_BUDGET_SECONDS = 3
 
-// MC-60: profile is measured against the level's own division digit range (getDivisionDigitByLevel),
+// Profile is measured against the level's own division digit range (getDivisionDigitByLevel),
 // not a fixed divisor - the spec's own "ready now at ÷5 but not ÷2" example is exactly why a single
 // divisor per level would misrepresent the real board.
 private const val PROFILE_SAMPLE_ITERATIONS = 10_000
 
-// Percentage points. n=10_000 keeps binomial sampling noise for any of these bucket sizes well under
-// 1pp on its own; the real source of slack is clamping - level 1's own division range starts at 2, so
-// a quarter of its draws (digit 2, only costs 0 or 1 exist) can't realize the "2-3 taps" bucket at all
-// and fall back into "1 tap" instead. Measured once against PROFILE_SEED: the largest observed gap
-// from the table was ~3pp (level 1's "1 tap"/"2-3 taps" pair, from that same clamp). 5 is generous
-// against that without being wide enough to pass mutation M1/M2/M5 (see the mutation ledger in
-// MC-60's spec).
+// Percentage points. Sampling noise at n=10_000 is under 1pp; the slack is clamping - at divisor 2 the
+// "2-3 taps" bucket has no reachable cost. Largest measured gap from the table was ~3pp.
 private const val PROFILE_TOLERANCE_PP = 5
 private const val PROFILE_SEED = 4242L
 
-// MC-80: subtraction's own axis is trap share, not division's four tap-cost buckets - n=10_000
+// Subtraction's own axis is trap share, not division's four tap-cost buckets - n=10_000
 // keeps binomial noise for a share this size well under 1pp, so this tolerance is mostly headroom
 // against the 15pp gaps between SubtractionTrapCost's own profile rows, not sampling slack.
 private const val SUBTRACTION_TRAP_SAMPLE_ITERATIONS = 10_000
@@ -87,10 +82,7 @@ private data class CostBuckets(
                 .map { it * 100 / (readyNow + oneTap + twoOrThreeTaps + fourPlusTaps) }
 }
 
-// Draws PROFILE_SAMPLE_ITERATIONS (divisor, value) pairs the way a real level-up does - a fresh
-// division digit per target, via the same getDivisionDigitByLevel a target's own currentOperationDigit
-// would come from - and buckets each by real taps-to-prepare (value % divisor, the same arithmetic
-// targetClicked's own decrementValue performs one tap at a time).
+// A fresh division digit per target, bucketed by real taps-to-prepare (value % divisor).
 private fun sampleCostBuckets(
     level: Int,
     seed: Long,
@@ -170,10 +162,8 @@ class SessionHelperImplTest {
 
     @Test
     fun `the narrow level-one ranges are produced in full - not merely stayed within`() {
-        // Asserting membership cannot catch a range that gets narrower. Where the range is small
-        // enough to be sampled exhaustively, assert the whole set instead. The wide ranges (flight
-        // time) cannot be pinned this way while the helper returns a random value with no way to ask
-        // it for the range it drew from; MC-6 should add that seam.
+        // Membership cannot catch a range that gets narrower, so small ranges are sampled exhaustively and
+        // asserted as whole sets. Flight time has no seam to ask for the range it drew from.
         val level = 0
 
         assertEquals((2..3).toSet(), sampled { helper.getDivisionDigitByLevel(level) })
@@ -308,11 +298,8 @@ class SessionHelperImplTest {
 
     @Test
     fun `no level from 1 to 999 produces an empty range for the flight curve`() {
-        // The class of failure LEVEL_MAX exists for: pre-MC-52, the lifetime curve's own min-max
-        // thresholds crossed past level 1334 and IntRange.random() threw. Flooring the base before
-        // dividing by the spread (mutation M5 undoes exactly this) makes the range structurally
-        // unable to go empty at any level - proven here by actually calling the curve at every level
-        // in range rather than only reasoning about the formula.
+        // Flooring the base before dividing by the spread is what makes the range structurally unable to go
+        // empty - proven by calling the curve at every level in range, not by reasoning about the formula.
         var previousFloor = Int.MAX_VALUE
         for (level in helper.levelRange) {
             val flightRange = expectedFlightRange(level)
@@ -395,14 +382,8 @@ class SessionHelperImplTest {
 
     @Test
     fun `a target at the failed growth ceiling is recoverable within its own fall - playability simulation`() {
-        // A player who reads the upcoming operation before firing never fires a division that will
-        // fail: they tap the remainder down to a multiple of the digit first (decrementValue, the
-        // same helper targetClicked uses), then fire (performOperation, the same call fireButtonClicked
-        // makes). SIMULATION_RUNS runs per level, SIMULATION_DIVISIONS such divisions with the real
-        // level-scaled digit range, closing whatever is left with plain taps at
-        // SIMULATION_TAP_RATE_PER_SECOND: level 1 closes within 12 taps every run (median 6); level 10
-        // within 12 (median 7); level 30 within 20 (median 10); level 50 within 22 (median 14) - all
-        // under three seconds of tapping, comfortably inside any level's fall.
+        // A player who reads the operation before firing taps the remainder to a multiple of the digit first,
+        // then fires. Measured: level 1 closes within 12 taps, level 50 within 22 - under three seconds.
         val tapBudget = SIMULATION_TAP_RATE_PER_SECOND * SIMULATION_TAP_BUDGET_SECONDS
         for (level in listOf(1, 10, 30, 50)) {
             val cap = helper.failedGrowthCap(level)
