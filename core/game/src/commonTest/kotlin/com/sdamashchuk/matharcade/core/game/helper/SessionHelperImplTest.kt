@@ -18,12 +18,14 @@ private const val SAMPLE_LEVEL = 50
 // Mirrors the constants in SessionHelperImpl (private there) so these tests fail when production
 // stops scaling, stops flooring, or reverses direction (MC-52/MC-73 mutations) rather than passing
 // by construction because both sides share one formula.
-private const val FLIGHT_BASE_MS = 9500
-private const val FLIGHT_STEP_MS = 110
+private const val FLIGHT_BASE_MS = 7600
+private const val FLIGHT_STEP_MS = 90
 private const val FLIGHT_FLOOR_MS = 3500
 private const val FLIGHT_SPEED_SPREAD = 0.2f
 private const val MIN_SPEED_MULTIPLIER = 1f - FLIGHT_SPEED_SPREAD
-private const val FINISH_SPACING_FRACTION = 0.7f
+private const val FINISH_SPACING_FRACTION = 0.38f
+private const val MIN_FINISH_SPACING_MS = 1800
+private const val MIN_TOTAL_LIFE_LOSS_MS = 3500
 
 private fun expectedBaseFlightMs(level: Int): Int =
     (FLIGHT_BASE_MS - level * FLIGHT_STEP_MS).coerceAtLeast(FLIGHT_FLOOR_MS)
@@ -34,14 +36,14 @@ private fun expectedFlightRange(level: Int): IntRange =
     IntRange(expectedBaseFlightMs(level), expectedMaxFlightMs(level))
 
 private fun expectedFinishSpacingMs(level: Int): Int =
-    (expectedBaseFlightMs(level) * FINISH_SPACING_FRACTION).roundToInt()
+    (expectedBaseFlightMs(level) * FINISH_SPACING_FRACTION).roundToInt().coerceAtLeast(MIN_FINISH_SPACING_MS)
 
 // Captured once from a real run against Random(PINNED_SEED) and hardcoded, the same way
 // failedGrowthCap's own pinned test works: proof the formula, not just its range, is unchanged.
 private const val PINNED_SEED = 2024L
-private const val PINNED_FLIGHT_LEVEL_1 = 10541
-private const val PINNED_FLIGHT_LEVEL_10 = 9430
-private const val PINNED_FLIGHT_LEVEL_30 = 6960
+private const val PINNED_FLIGHT_LEVEL_1 = 8431
+private const val PINNED_FLIGHT_LEVEL_10 = 7521
+private const val PINNED_FLIGHT_LEVEL_30 = 5501
 private const val PINNED_FLIGHT_LEVEL_55 = 3929
 
 private const val SIMULATION_RUNS = 2000
@@ -159,8 +161,8 @@ class SessionHelperImplTest {
         // properties, so none of them can notice a constant changing — a ten-fold rise in starting
         // target value would leave the suite green. This test is the only thing pinning the balance.
         assertEquals(1..9, helper.initialTargetValueRange)
-        assertEquals(9500..11875, helper.initialTargetFlightTimeMsRange)
-        assertEquals(6..10, helper.initialTargetAmountRange)
+        assertEquals(7600..9500, helper.initialTargetFlightTimeMsRange)
+        assertEquals(9..14, helper.initialTargetAmountRange)
         assertEquals(2..3, helper.initialDivisionValueRange)
         assertEquals(1..3, helper.initialSubtractionValueRange)
         assertEquals(1..999, helper.levelRange)
@@ -176,7 +178,7 @@ class SessionHelperImplTest {
 
         assertEquals((2..3).toSet(), sampled { helper.getDivisionDigitByLevel(level) })
         assertEquals((1..3).toSet(), sampled { helper.getSubtractionDigitByLevel(level) })
-        assertEquals((6..10).toSet(), sampled { helper.getTargetAmountByLevel(level) })
+        assertEquals((9..14).toSet(), sampled { helper.getTargetAmountByLevel(level) })
     }
 
     private fun sampled(draw: () -> Int): Set<Int> = buildSet { repeat(SAMPLE_ITERATIONS) { add(draw()) } }
@@ -278,21 +280,35 @@ class SessionHelperImplTest {
         }
     }
 
-    // The invariant this whole task exists to close: three breakouts (INITIAL_LIFE_COUNT - 1 gaps)
-    // must together span at least one flight time, at every level, not just the ones a device run
-    // happened to measure. Looped over the whole range the same way "no level from 1 to 999 produces
-    // an empty range" already does below, for the same reason - a spot check can't catch a curve that
-    // only crosses somewhere it wasn't asked about (the pre-MC-52 precedent this file was already
-    // written to guard against).
+    // The invariant MC-73 exists to close, restated by MC-94: three breakouts (INITIAL_LIFE_COUNT - 1
+    // gaps) must take real time. MC-73 measured that against the level's own flight time, which also
+    // pinned the board to ~1.4 targets on screen; what the player actually needs is a reaction window,
+    // which is wall-clock and independent of how long this level's fall happens to be. Looped over the
+    // whole range the same way "no level from 1 to 999 produces an empty range" already does below,
+    // for the same reason - a spot check can't catch a curve that only crosses somewhere it wasn't
+    // asked about (the pre-MC-52 precedent this file was already written to guard against).
     @Test
-    fun `INITIAL_LIFE_COUNT minus one times finish spacing is at least the max flight time - for every level`() {
+    fun `losing every life takes real time at every level - not milliseconds`() {
         for (level in helper.levelRange) {
-            val spacing = helper.getFinishSpacingMsByLevel(level)
-            val maxFlight = expectedMaxFlightMs(level)
-            val spanned = (INITIAL_LIFE_COUNT - 1) * spacing
+            val spanned = (INITIAL_LIFE_COUNT - 1) * helper.getFinishSpacingMsByLevel(level)
             assertTrue(
-                spanned >= maxFlight,
-                "level $level: (INITIAL_LIFE_COUNT - 1) * spacing = $spanned < max flight $maxFlight",
+                spanned >= MIN_TOTAL_LIFE_LOSS_MS,
+                "level $level: (INITIAL_LIFE_COUNT - 1) * spacing = $spanned < $MIN_TOTAL_LIFE_LOSS_MS",
+            )
+        }
+    }
+
+    // MC-94's own half of the change: the spacing had to come down for the board to hold more than
+    // one falling target at a time, and that is the number this pins. Flight time divided by spacing
+    // is how many targets are in the air at once.
+    @Test
+    fun `the early levels keep more than two targets in the air at once`() {
+        for (level in listOf(1, 5, 10, 20, 30)) {
+            val concurrent =
+                expectedBaseFlightMs(level).toFloat() / helper.getFinishSpacingMsByLevel(level)
+            assertTrue(
+                concurrent > 2f,
+                "level $level: only $concurrent targets in the air, expected more than two",
             )
         }
     }

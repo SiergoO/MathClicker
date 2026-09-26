@@ -105,9 +105,10 @@ class GameSimulationTest {
             // instead of summing an independently-rolled appearance delay and lifetime, with a finish
             // spacing floor derived from (INITIAL_LIFE_COUNT - 1) surviving one flight time - almost
             // exactly double the old wave-gap-derived spacing, which is why this moved up from 12496
-            // to 24896 rather than down: the fix is precisely "no-input sessions now last longer",
-            // and this pin is the end-to-end proof of it.
-            assertEquals(24896, elapsedMs)
+            // to 24896 rather than down. MC-94 then shortened the fall and cut the spacing to a third
+            // of it, so a no-input session now ends in 15104 - the faster early pace, measured
+            // end to end rather than asserted.
+            assertEquals(15104, elapsedMs)
         }
 
     // The MC-27 bug class as a JVM assertion for the first time: a target's accumulated fall must
@@ -171,12 +172,13 @@ class GameSimulationTest {
             assertFalse(game.stateFlow.value.field.isClosed)
         }
 
-    // MC-68's acceptance criterion, restated as MC-73's own closing proof: a no-input session's three
-    // life losses (INITIAL_LIFE_COUNT - 1 gaps) must be spread across at least one flight time, not
-    // clustered within a couple of milliseconds of each other - the measured device bug this whole
-    // epic exists to close.
+    // MC-68's acceptance criterion, restated as MC-73's closing proof and again by MC-94: a no-input
+    // session's three life losses must be spread out, not clustered within a couple of milliseconds of
+    // each other - the measured device bug this whole epic exists to close. MC-73 measured that span
+    // against the level's own flight time; MC-94 measures it against the level's own finish spacing,
+    // because the guarantee is now a reaction window rather than a ratio to how long a fall lasts.
     @Test
-    fun `a no-input session spreads its three life losses across at least one flight time - across several levels`() =
+    fun `a no-input session spreads its three life losses out - across several levels`() =
         runTest {
             for (level in listOf(1, 10, 30, 100, 999)) {
                 val seed = level.toLong()
@@ -202,15 +204,18 @@ class GameSimulationTest {
 
                 assertTrue(lifeLossTimes.size >= 2, "level $level: fewer than two life losses recorded")
                 val interval = lifeLossTimes.last() - lifeLossTimes.first()
-                // Against the level's own worst-case flight time, not a global floor: at level 1 the
-                // floor is under a third of the real flight, so a regression that halved the spacing
-                // would still clear it. getOpeningOffsetMsByLevel is that worst case by definition
-                // (see its own comment), and it is a different production quantity from the spacing
-                // under test - so this stays a cross-check rather than a restatement of the formula.
-                val maxFlightTimeMs = sessionHelper.getOpeningOffsetMsByLevel(level).toLong()
+                // One gap per loss actually recorded, at this level's own spacing - not a global
+                // floor, which at level 1 would sit well under the real spacing and let a regression
+                // that halved it still pass. Two losses landing on the same tick collapse a gap and
+                // fail this, which is exactly the clustering the epic exists to close.
+                //
+                // Less one tick: a breakout is detected on the first tick at or after its scheduled
+                // finish, so the recorded interval can sit up to one tick short of the scheduled one.
+                val expectedSpanMs =
+                    (lifeLossTimes.size - 1).toLong() * sessionHelper.getFinishSpacingMsByLevel(level) - TICK_MS
                 assertTrue(
-                    interval >= maxFlightTimeMs,
-                    "level $level: first-to-last life-loss interval ${interval}ms is under one flight time ${maxFlightTimeMs}ms",
+                    interval >= expectedSpanMs,
+                    "level $level: first-to-last life-loss interval ${interval}ms is under ${expectedSpanMs}ms",
                 )
             }
         }
