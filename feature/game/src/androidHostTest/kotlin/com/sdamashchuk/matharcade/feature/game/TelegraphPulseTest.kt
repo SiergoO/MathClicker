@@ -16,7 +16,7 @@ class TelegraphPulseTest {
     @Test
     fun `the pulse starts at rest and peaks half a period in`() {
         assertEquals(1f, telegraphPulse(gameTimeMs = 0L, isTelegraphing = true), FLOAT_DELTA)
-        assertEquals(1.15f, telegraphPulse(gameTimeMs = 300L, isTelegraphing = true), FLOAT_DELTA)
+        assertEquals(1.06f, telegraphPulse(gameTimeMs = 300L, isTelegraphing = true), FLOAT_DELTA)
         assertEquals(1f, telegraphPulse(gameTimeMs = 600L, isTelegraphing = true), FLOAT_DELTA)
     }
 
@@ -38,7 +38,7 @@ class TelegraphPulseTest {
     fun `the pulse never leaves its declared range`() {
         (0..2_000 step 7).forEach { time ->
             val pulse = telegraphPulse(time.toLong(), isTelegraphing = true)
-            assertTrue("pulse $pulse at $time", pulse in 1f..1.15f + FLOAT_DELTA)
+            assertTrue("pulse $pulse at $time", pulse in 1f..1.06f + FLOAT_DELTA)
         }
     }
 }

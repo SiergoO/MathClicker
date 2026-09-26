@@ -37,19 +37,22 @@ import com.sdamashchuk.matharcade.core.ui.theme.BubbleFillReady
 import com.sdamashchuk.matharcade.core.ui.theme.BubbleRimIdle
 import com.sdamashchuk.matharcade.core.ui.theme.BubbleRimReady
 import com.sdamashchuk.matharcade.core.ui.theme.Ink
-import com.sdamashchuk.matharcade.core.ui.theme.Warning
 import com.sdamashchuk.matharcade.feature.game.model.TargetScreenPosition
 import kotlin.math.abs
 
 // MC-54: telegraphs the final 15% of a fall (Target.isTelegraphingBreakout) so a breakout is never
-// a surprise. The cue is a size pulse plus a ring. MC-84 gave that ring a warm colour, which MC-54
-// had ruled out while readiness was carried by hue: under the water palette readiness is carried
-// by saturation (cyan against grey), so temperature is a free channel and the two cues cannot be
-// confused for one another.
+// a surprise. The cue is a size pulse plus a ring.
+//
+// MC-88 walked back MC-84's amber. Warm-against-cool was a free channel on paper, but on the board
+// a yellow ring reads as a different kind of object rather than as the same bubble in trouble, and
+// the 1.15 pulse was loud enough to pull the eye off every other target. The ring is now the
+// bubble's own light pushed to full brightness, and the pulse is small enough to notice without
+// being looked at.
 private const val TARGET_DIAMETER_FRACTION = 0.8
-private const val TELEGRAPH_PULSE_SCALE = 1.15f
+private const val TELEGRAPH_PULSE_SCALE = 1.06f
 private const val TELEGRAPH_PULSE_MS = 300
-private const val TELEGRAPH_RING_WIDTH_FRACTION = 0.045f
+private const val TELEGRAPH_RING_WIDTH_FRACTION = 0.03f
+private const val TELEGRAPH_RING_ALPHA = 0.85f
 
 private const val READINESS_TRANSITION_MS = 200
 
@@ -284,7 +287,12 @@ private fun Modifier.bubble(
         // a telegraph switching on has to re-draw but must never rebuild four shaders.
         if (target.isTelegraphingBreakout(gameTimeMsProvider())) {
             val ringWidth = size.minDimension * TELEGRAPH_RING_WIDTH_FRACTION
-            drawCircle(Warning, radius = radius - ringWidth / 2f, center = center, style = Stroke(ringWidth))
+            drawCircle(
+                BubbleRimReady.copy(alpha = TELEGRAPH_RING_ALPHA),
+                radius = radius - ringWidth / 2f,
+                center = center,
+                style = Stroke(ringWidth),
+            )
         }
     }
 }
