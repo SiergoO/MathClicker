@@ -40,6 +40,7 @@ import com.sdamashchuk.matharcade.core.model.INITIAL_LIFE_COUNT
 import com.sdamashchuk.matharcade.core.ui.theme.Red200
 import com.sdamashchuk.matharcade.core.ui.theme.Red500
 import com.sdamashchuk.matharcade.core.ui.theme.White
+import com.sdamashchuk.matharcade.feature.game.model.TargetZeroedSignal
 
 private const val HUD_HEIGHT_FRACTION = 0.05f
 
@@ -53,6 +54,7 @@ fun Field(
     onFireClicked: () -> Unit,
     onTick: (elapsedMs: Int) -> Unit,
     onPauseClicked: () -> Unit,
+    targetZeroedSignal: TargetZeroedSignal?,
     // MC-61: the readiness hint's on/off switch, not a property of the game itself. A constant
     // today; once difficulty/mods exist, that's what supplies this value - TargetButton never sees
     // why a hint is off, and neither does this composable's own body beyond reading the flag.
@@ -115,7 +117,7 @@ fun Field(
         }
     }
     Divider()
-    PlayArea(gameState, onTargetClicked, readinessHintsEnabled)
+    PlayArea(gameState, onTargetClicked, targetZeroedSignal, readinessHintsEnabled)
 
     Box(
         modifier =

@@ -10,8 +10,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -24,6 +28,9 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.sdamashchuk.matharcade.core.model.GAME_COLUMN_COUNT
+import com.sdamashchuk.matharcade.feature.game.model.TargetScreenPosition
+import com.sdamashchuk.matharcade.feature.game.model.TargetZeroedBurst
+import com.sdamashchuk.matharcade.feature.game.model.TargetZeroedSignal
 
 private const val PLAY_AREA_HEIGHT_FRACTION = 0.75f
 
@@ -37,11 +44,29 @@ private const val LANE_GUIDE_WIDTH_DP = 1
 fun PlayArea(
     gameState: State<GameViewModel.State>,
     onTargetClicked: (id: Int) -> Unit,
+    targetZeroedSignal: TargetZeroedSignal?,
     readinessHintsEnabled: Boolean,
 ) {
     var gameColumnSize by remember { mutableStateOf(Size(0, 0)) }
     val localDensity = LocalDensity.current
     val laneGuideColor = MaterialTheme.colors.onSurface.copy(alpha = LANE_GUIDE_ALPHA)
+
+    // Where a target last was, kept around after it leaves the composition: TargetButton reports
+    // its own position on every active frame (see SideEffect there), and a zeroed target's last
+    // report is exactly where its burst below needs to appear.
+    val targetPositions = remember { mutableStateMapOf<Int, TargetScreenPosition>() }
+    val bursts = remember { mutableStateListOf<TargetZeroedBurst>() }
+    LaunchedEffect(targetZeroedSignal) {
+        val signal = targetZeroedSignal ?: return@LaunchedEffect
+        val position = targetPositions.remove(signal.targetId) ?: return@LaunchedEffect
+        bursts.add(TargetZeroedBurst(signal.sequence, position))
+    }
+    // Bounds targetPositions to the current wave: a target that only ever breaks out (never
+    // zeroes) leaves its entry unconsumed above, so this is what keeps that map from growing for
+    // the rest of the session.
+    LaunchedEffect(gameState.value.targetList) {
+        targetPositions.keys.retainAll(gameState.value.targetList.mapTo(mutableSetOf()) { it.id })
+    }
 
     Box(
         modifier =
@@ -102,9 +127,17 @@ fun PlayArea(
                                 ),
                             gameTimeMs = gameState.value.field.gameTimeMs,
                             onTargetClicked = onTargetClicked,
+                            onTargetPositioned = { id, position -> targetPositions[id] = position },
                         )
                     }
                 }
+            }
+        }
+        // Drawn last, on top of the columns: a burst marks where a target was, not another lane
+        // occupant.
+        bursts.forEach { burst ->
+            key(burst.id) {
+                BurstRing(position = burst.position, onFinished = { bursts.remove(burst) })
             }
         }
     }

@@ -22,6 +22,7 @@ import androidx.lifecycle.Lifecycle
 import com.sdamashchuk.matharcade.core.ui.sound.model.SoundSample
 import com.sdamashchuk.matharcade.core.ui.theme.MathArcadeTheme
 import com.sdamashchuk.matharcade.feature.game.model.FeedbackEffect
+import com.sdamashchuk.matharcade.feature.game.model.TargetZeroedSignal
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
@@ -36,6 +37,7 @@ fun GameScreen(component: GameComponent) {
     val gameState = component.state.collectAsState()
     val hapticFeedback = LocalHapticFeedback.current
     var currentEffect by remember { mutableStateOf<FeedbackEffect?>(null) }
+    var targetZeroedSignal by remember { mutableStateOf<TargetZeroedSignal?>(null) }
     val shakeOffsetX = remember { Animatable(0f) }
 
     // Hoisted above Field on purpose: Field only composes while Playing (see shouldComposeField),
@@ -45,6 +47,7 @@ fun GameScreen(component: GameComponent) {
     LaunchedEffect(Unit) {
         val scope = this
         var bannerToken = 0
+        var zeroedSequence = 0
         component.feedback.receiveAsFlow().collect { effect ->
             repeat(effect.hapticRepeatCount) { repeatIndex ->
                 hapticFeedback.performHapticFeedback(effect.haptic)
@@ -53,6 +56,9 @@ fun GameScreen(component: GameComponent) {
             soundFor(effect)?.let { component.playSound(it) }
             if (effect is FeedbackEffect.TargetBrokeOut) {
                 scope.launch { shakeField(shakeOffsetX) }
+            }
+            if (effect is FeedbackEffect.TargetZeroed) {
+                targetZeroedSignal = TargetZeroedSignal(effect.targetId, ++zeroedSequence)
             }
             currentEffect = effect
             val myToken = ++bannerToken
@@ -102,6 +108,7 @@ fun GameScreen(component: GameComponent) {
                                 onFireClicked = { component.sendAction(GameViewModel.Action.FireButtonClicked) },
                                 onTick = { component.sendAction(GameViewModel.Action.Tick(it)) },
                                 onPauseClicked = { component.sendAction(GameViewModel.Action.PauseGame) },
+                                targetZeroedSignal = targetZeroedSignal,
                             )
                         }
                     }

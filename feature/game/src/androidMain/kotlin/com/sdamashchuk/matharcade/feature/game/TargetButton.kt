@@ -1,6 +1,8 @@
 package com.sdamashchuk.matharcade.feature.game
 
 import android.util.Size
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -17,7 +19,12 @@ import androidx.compose.material.Button
 import androidx.compose.material.ButtonDefaults
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
@@ -34,6 +41,7 @@ import com.sdamashchuk.matharcade.core.model.Target
 import com.sdamashchuk.matharcade.core.ui.theme.DarkGray
 import com.sdamashchuk.matharcade.core.ui.theme.Red200
 import com.sdamashchuk.matharcade.core.ui.theme.Red500
+import com.sdamashchuk.matharcade.feature.game.model.TargetScreenPosition
 
 // MC-54: telegraphs the final 15% of a fall (Target.isTelegraphingBreakout) so a breakout is never
 // a surprise. Deliberately not colour-coded - isProfitable already owns that channel below, and a
@@ -80,6 +88,14 @@ private const val HIGHLIGHT_CENTER_Y_FRACTION = -0.44f
 private const val HIGHLIGHT_RADIUS_FRACTION = 0.6f
 private const val HIGHLIGHT_ALPHA = 0.55f
 
+// MC-82: squash-and-rebound on a hit, not a slow ease - three short steps land the whole gesture
+// well under 200ms so rapid tapping never feels mushy waiting on the previous squash to finish.
+private const val SQUASH_COMPRESS_SCALE = 0.85f
+private const val SQUASH_REBOUND_SCALE = 1.1f
+private const val SQUASH_COMPRESS_MS = 40
+private const val SQUASH_REBOUND_MS = 60
+private const val SQUASH_SETTLE_MS = 60
+
 @Composable
 fun TargetButton(
     target: Target,
@@ -87,10 +103,20 @@ fun TargetButton(
     isReady: Boolean,
     gameTimeMs: Long,
     onTargetClicked: (id: Int) -> Unit,
+    onTargetPositioned: (id: Int, position: TargetScreenPosition) -> Unit,
 ) {
     val fallFraction = target.position(gameTimeMs)
     val targetButtonYOffset = fallFraction * gameColumnSize.height
     if (target.isActive && targetButtonYOffset.dp > 0.dp) {
+        val squashScale = remember(target.id) { Animatable(1f) }
+        var lastKnownValue by remember(target.id) { mutableIntStateOf(target.value) }
+        // Keyed on both id and value: a tap that doesn't change value (a no-op click) never
+        // relaunches this, and a fresh target reusing this slot never compares against a stale
+        // predecessor's value.
+        LaunchedEffect(target.id, target.value) {
+            if (shouldSquashTarget(target.value, lastKnownValue)) squashTarget(squashScale)
+            lastKnownValue = target.value
+        }
         val telegraphTransition = rememberInfiniteTransition(label = "breakoutTelegraph")
         val telegraphScale by
             telegraphTransition.animateFloat(
@@ -119,11 +145,25 @@ fun TargetButton(
         val convergenceOffsetXDp =
             laneOffsetX(laneIndexFraction, gameColumnSize.width, fallFraction) -
                 laneOffsetX(laneIndexFraction, gameColumnSize.width, fallFraction = 1f)
+        val buttonDiameterDp = (gameColumnSize.width * TARGET_DIAMETER_FRACTION).toFloat()
+        val columnCenterXDp = target.columnId * gameColumnSize.width + gameColumnSize.width * LANE_CENTER_FRACTION
+        // Reported every active frame, not just on click: the target leaves the composition the
+        // instant it zeroes (isActive flips false above), so a burst fired from that same event has
+        // nothing left to ask for its position - this is that position's only record.
+        SideEffect {
+            onTargetPositioned(
+                target.id,
+                TargetScreenPosition(
+                    xDp = columnCenterXDp + convergenceOffsetXDp,
+                    yDp = targetButtonYOffset + buttonDiameterDp / 2f,
+                ),
+            )
+        }
         Button(
             modifier =
                 Modifier
-                    .width((gameColumnSize.width * TARGET_DIAMETER_FRACTION).dp)
-                    .height((gameColumnSize.width * TARGET_DIAMETER_FRACTION).dp)
+                    .width(buttonDiameterDp.dp)
+                    .height(buttonDiameterDp.dp)
                     .offset {
                         // The lambda form, not offset(x.dp, y.dp): this moves the hit box itself,
                         // so a converging lane never lets the player tap where the paint isn't.
@@ -131,7 +171,7 @@ fun TargetButton(
                             x = convergenceOffsetXDp.dp.roundToPx(),
                             y = targetButtonYOffset.dp.roundToPx(),
                         )
-                    }.scale(telegraphScale * depthScale)
+                    }.scale(telegraphScale * depthScale * squashScale.value)
                     .clip(CircleShape)
                     .drawBehind { drawSphere(baseColor) },
             colors = ButtonDefaults.buttonColors(backgroundColor = Color.Transparent),
@@ -146,6 +186,19 @@ fun TargetButton(
             Text(text = target.value.toString(), fontSize = 20.sp, color = Color.White)
         }
     }
+}
+
+// A real hit only: a tap that misses (value unchanged) or a fresh target reusing this slot (value
+// reset upward by remember(target.id)) must never trigger the squash.
+internal fun shouldSquashTarget(
+    newValue: Int,
+    previousValue: Int,
+): Boolean = newValue < previousValue
+
+private suspend fun squashTarget(scale: Animatable<Float, AnimationVector1D>) {
+    scale.animateTo(SQUASH_COMPRESS_SCALE, tween(SQUASH_COMPRESS_MS))
+    scale.animateTo(SQUASH_REBOUND_SCALE, tween(SQUASH_REBOUND_MS))
+    scale.animateTo(1f, tween(SQUASH_SETTLE_MS))
 }
 
 private fun DrawScope.drawSphere(baseColor: Color) {
