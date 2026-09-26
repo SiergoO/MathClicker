@@ -91,7 +91,14 @@ private const val DIGIT_SIZE_FRACTION = 0.28f
 // A target that cannot be reduced by the armed operation is fully idle; one that can, but is not
 // yet a single press from zero, sits partway. One number drives every layer, so the three states
 // are one animatable value rather than three branches.
-private const val LIVELINESS_PROFITABLE_FLOOR = 0.45f
+//
+// MC-90: the floor was 0.45 and the two lower states were not told apart on a real board - the
+// owner had to read the number to know which was which. Raised so a reachable target is already
+// clearly blue, and an unreachable one loses its highlight core entirely, which is the cue that
+// separates them at a glance rather than on inspection.
+private const val LIVELINESS_PROFITABLE_FLOOR = 0.62f
+private const val UNREACHABLE_CORE_ALPHA = 0.06f
+private const val UNREACHABLE_FILL_ALPHA = 0.16f
 
 // MC-82/83: squash-and-rebound on a hit. Three short steps land the whole gesture under 200ms so
 // rapid tapping never feels mushy waiting on the previous squash to finish.
@@ -234,14 +241,24 @@ private fun Modifier.bubble(
             center.y + HIGHLIGHT_Y_FRACTION * radius,
         )
 
+    val isUnreachable = liveliness <= 0f
     val fill = lerp(BubbleFillIdle, BubbleFillReady, liveliness)
-    val fillAlpha = FILL_ALPHA_IDLE + (FILL_ALPHA_READY - FILL_ALPHA_IDLE) * liveliness
+    val fillAlpha =
+        if (isUnreachable) {
+            UNREACHABLE_FILL_ALPHA
+        } else {
+            FILL_ALPHA_IDLE + (FILL_ALPHA_READY - FILL_ALPHA_IDLE) * liveliness
+        }
     val rim = lerp(BubbleRimIdle, BubbleRimReady, liveliness)
     val rimWidth =
         size.minDimension *
             (RIM_WIDTH_FRACTION_IDLE + (RIM_WIDTH_FRACTION_READY - RIM_WIDTH_FRACTION_IDLE) * liveliness)
     val coreAlpha =
-        HIGHLIGHT_CORE_ALPHA_IDLE + (HIGHLIGHT_CORE_ALPHA_READY - HIGHLIGHT_CORE_ALPHA_IDLE) * liveliness
+        if (isUnreachable) {
+            UNREACHABLE_CORE_ALPHA
+        } else {
+            HIGHLIGHT_CORE_ALPHA_IDLE + (HIGHLIGHT_CORE_ALPHA_READY - HIGHLIGHT_CORE_ALPHA_IDLE) * liveliness
+        }
     val glowAlpha =
         HIGHLIGHT_GLOW_ALPHA_IDLE + (HIGHLIGHT_GLOW_ALPHA_READY - HIGHLIGHT_GLOW_ALPHA_IDLE) * liveliness
 
