@@ -10,13 +10,12 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.Button
-import androidx.compose.material.ButtonDefaults
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -25,14 +24,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -67,8 +67,7 @@ private const val READINESS_TRANSITION_MS = 200
 private const val DEPTH_SCALE_AT_TOP = 0.72f
 private const val DEPTH_SCALE_AT_BOTTOM = 1f
 
-// MC-81: a target sits at the midpoint of its column - the fractional column index its lane
-// convergence (see laneOffsetX) is computed from.
+// A target sits at the midpoint of its column.
 private const val LANE_CENTER_FRACTION = 0.5f
 
 // MC-81: sphere shading. One radial gradient whose centre is offset toward the light rather than
@@ -81,17 +80,22 @@ private const val GRADIENT_LIGHT_TINT_FRACTION = 0.5f
 private const val GRADIENT_MID_STOP = 0.55f
 private const val GRADIENT_DARK_SHADE_FRACTION = 0.55f
 
-// MC-81: specular highlight blob, layered on top of the base shading above rather than folded into
-// its gradient stops, so its position and falloff can be tuned independently.
-private const val HIGHLIGHT_CENTER_X_FRACTION = -0.36f
-private const val HIGHLIGHT_CENTER_Y_FRACTION = -0.44f
-private const val HIGHLIGHT_RADIUS_FRACTION = 0.6f
-private const val HIGHLIGHT_ALPHA = 0.55f
+// MC-83: the specular blob is a light source, not a sticker. Tightened and faded from MC-81's
+// 0.6/0.55 - at that strength it read as a white patch pasted on rather than as a sheen, which is
+// twice as obvious now that the Material elevation shadow no longer muddies the rest of the ball.
+private const val HIGHLIGHT_CENTER_X_FRACTION = -0.34f
+private const val HIGHLIGHT_CENTER_Y_FRACTION = -0.40f
+private const val HIGHLIGHT_RADIUS_FRACTION = 0.45f
+private const val HIGHLIGHT_ALPHA = 0.38f
+private const val HIGHLIGHT_MID_STOP = 0.5f
+private const val HIGHLIGHT_MID_ALPHA_FRACTION = 0.35f
 
 // MC-82: squash-and-rebound on a hit, not a slow ease - three short steps land the whole gesture
 // well under 200ms so rapid tapping never feels mushy waiting on the previous squash to finish.
-private const val SQUASH_COMPRESS_SCALE = 0.85f
-private const val SQUASH_REBOUND_SCALE = 1.1f
+// MC-83 pulled the extremes in from 0.85/1.10: at that amplitude a fast combo read as the ball
+// wobbling rather than as it being struck.
+private const val SQUASH_COMPRESS_SCALE = 0.93f
+private const val SQUASH_REBOUND_SCALE = 1.04f
 private const val SQUASH_COMPRESS_MS = 40
 private const val SQUASH_REBOUND_MS = 60
 private const val SQUASH_SETTLE_MS = 60
@@ -138,15 +142,9 @@ fun TargetButton(
         val baseColor =
             if (target.isProfitable) lerp(Red200, Red500, readinessFraction) else Color.LightGray
         val depthScale = DEPTH_SCALE_AT_TOP + (DEPTH_SCALE_AT_BOTTOM - DEPTH_SCALE_AT_TOP) * fallFraction
-        val laneIndexFraction = target.columnId + LANE_CENTER_FRACTION
-        // Delta from where Box(TopCenter) already centres the target within its own column - not
-        // an absolute position - because that placement is the fallFraction = 1 (full spacing)
-        // baseline this offset shifts away from.
-        val convergenceOffsetXDp =
-            laneOffsetX(laneIndexFraction, gameColumnSize.width, fallFraction) -
-                laneOffsetX(laneIndexFraction, gameColumnSize.width, fallFraction = 1f)
         val buttonDiameterDp = (gameColumnSize.width * TARGET_DIAMETER_FRACTION).toFloat()
         val columnCenterXDp = target.columnId * gameColumnSize.width + gameColumnSize.width * LANE_CENTER_FRACTION
+        val telegraphBorderColor = if (target.isTelegraphingBreakout(gameTimeMs)) DarkGray else null
         // Reported every active frame, not just on click: the target leaves the composition the
         // instant it zeroes (isActive flips false above), so a burst fired from that same event has
         // nothing left to ask for its position - this is that position's only record.
@@ -154,34 +152,29 @@ fun TargetButton(
             onTargetPositioned(
                 target.id,
                 TargetScreenPosition(
-                    xDp = columnCenterXDp + convergenceOffsetXDp,
+                    xDp = columnCenterXDp,
                     yDp = targetButtonYOffset + buttonDiameterDp / 2f,
                 ),
             )
         }
-        Button(
+        // MC-83: a plain Box, not a Material Button. Button drew an elevation shadow around a
+        // transparent background - a dark arc along the sphere's top edge and a smear under it -
+        // and a touch ripple over the top of the shading. Both fought the sphere the draw below
+        // paints, and neither belongs on an object that is meant to read as lit from one side.
+        Box(
             modifier =
                 Modifier
                     .width(buttonDiameterDp.dp)
                     .height(buttonDiameterDp.dp)
-                    .offset {
-                        // The lambda form, not offset(x.dp, y.dp): this moves the hit box itself,
-                        // so a converging lane never lets the player tap where the paint isn't.
-                        IntOffset(
-                            x = convergenceOffsetXDp.dp.roundToPx(),
-                            y = targetButtonYOffset.dp.roundToPx(),
-                        )
-                    }.scale(telegraphScale * depthScale * squashScale.value)
-                    .clip(CircleShape)
-                    .drawBehind { drawSphere(baseColor) },
-            colors = ButtonDefaults.buttonColors(backgroundColor = Color.Transparent),
-            border =
-                if (target.isTelegraphingBreakout(gameTimeMs)) {
-                    BorderStroke(TELEGRAPH_BORDER_WIDTH_DP.dp, DarkGray)
-                } else {
-                    null
-                },
-            onClick = { onTargetClicked.invoke(target.id) },
+                    .offset { IntOffset(x = 0, y = targetButtonYOffset.dp.roundToPx()) }
+                    .scale(telegraphScale * depthScale * squashScale.value)
+                    .drawBehind { drawSphere(baseColor, telegraphBorderColor) }
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = { onTargetClicked.invoke(target.id) },
+                    ),
+            contentAlignment = Alignment.Center,
         ) {
             Text(text = target.value.toString(), fontSize = 20.sp, color = Color.White)
         }
@@ -201,7 +194,10 @@ private suspend fun squashTarget(scale: Animatable<Float, AnimationVector1D>) {
     scale.animateTo(1f, tween(SQUASH_SETTLE_MS))
 }
 
-private fun DrawScope.drawSphere(baseColor: Color) {
+private fun DrawScope.drawSphere(
+    baseColor: Color,
+    borderColor: Color?,
+) {
     val radiusPx = size.minDimension / 2f
     val center = Offset(size.width / 2f, size.height / 2f)
     val lightCenter =
@@ -226,9 +222,23 @@ private fun DrawScope.drawSphere(baseColor: Color) {
         )
     val highlightBrush =
         Brush.radialGradient(
-            colors = listOf(Color.White.copy(alpha = HIGHLIGHT_ALPHA), Color.White.copy(alpha = 0f)),
+            0f to Color.White.copy(alpha = HIGHLIGHT_ALPHA),
+            HIGHLIGHT_MID_STOP to Color.White.copy(alpha = HIGHLIGHT_ALPHA * HIGHLIGHT_MID_ALPHA_FRACTION),
+            1f to Color.White.copy(alpha = 0f),
             center = highlightCenter,
             radius = radiusPx * HIGHLIGHT_RADIUS_FRACTION,
         )
     drawCircle(brush = highlightBrush, radius = radiusPx, center = center)
+
+    // Drawn here rather than as a Button border, because the Button is gone - the telegraph ring
+    // has to sit on the sphere's own edge, inside the same draw that owns it.
+    borderColor?.let {
+        val strokeWidthPx = TELEGRAPH_BORDER_WIDTH_DP.dp.toPx()
+        drawCircle(
+            color = it,
+            radius = radiusPx - strokeWidthPx / 2f,
+            center = center,
+            style = Stroke(width = strokeWidthPx),
+        )
+    }
 }

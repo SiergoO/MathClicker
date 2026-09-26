@@ -16,10 +16,13 @@ import androidx.compose.ui.unit.dp
 import com.sdamashchuk.matharcade.core.ui.theme.Red500
 import com.sdamashchuk.matharcade.feature.game.model.TargetScreenPosition
 
-private const val BURST_DIAMETER_DP = 96
-private const val BURST_DURATION_MS = 350
-private const val BURST_STROKE_WIDTH_DP = 4
-private const val BURST_MAX_ALPHA = 0.6f
+// MC-83: pulled well back from MC-82's 96dp / 4dp / 0.6 alpha. At that weight a zeroing threw a
+// saturated red hoop across two neighbouring lanes, which read as a second game object rather
+// than as the target's own departure.
+private const val BURST_DIAMETER_DP = 72
+private const val BURST_DURATION_MS = 260
+private const val BURST_STROKE_WIDTH_DP = 2
+private const val BURST_MAX_ALPHA = 0.28f
 
 // The zeroed target's own place on screen, not a generic one: position is a snapshot TargetButton
 // last reported (see TargetScreenPosition), taken because the target itself is already gone from
