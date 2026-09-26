@@ -86,6 +86,18 @@ class Game(
 
     private var collectorJob: Job? = null
 
+    // MC-79: recreateField's nextOperationSign/Digit is drawn with no board to validate against
+    // (MC-65 leaves it alone, see ensureOpeningOperationSucceeds), so the first press of a session
+    // promotes it to current via updateActionButtons unchecked. Set true on every createField() - a
+    // genuinely new session, Game being a DI singleton reused across many - and consumed by the next
+    // fireButtonClicked(), which is that session's first press by construction: nothing else sets it.
+    // Left false across a restore (fieldRestored/targetsRestored, no createField call): a session
+    // resumed after at least one real press no longer carries recreateField's blind draw. The one gap
+    // this does not close is a session restored after being killed before its own first press ever
+    // landed - narrow enough (an app kill in the handful of seconds before the first tap) that closing
+    // it would need persisting this flag, which is out of scope here.
+    private var pendingOpeningPromotionCheck = false
+
     fun start() {
         collectorJob?.cancel()
         collectorJob =
@@ -130,6 +142,7 @@ class Game(
     suspend fun createField(id: Int) =
         mutex.withLock {
             _stateFlow.value = _stateFlow.value.copy(field = recreateField(id))
+            pendingOpeningPromotionCheck = true
         }
 
     suspend fun createTargets() = mutex.withLock { createTargetsLocked() }
@@ -183,7 +196,22 @@ class Game(
             // out to fail must still cost what it costs.
             val (nextOperationSign, nextOperationDigit) =
                 getNextSignAndDigit(updatedTargets, current.field.level, current.field.gameTimeMs)
-            val streakedField = current.field.advanceStreak(pressOutcome.failed)
+            // MC-79: the very first press of a session promotes current.field.nextOperationSign/Digit -
+            // recreateField's blind draw, only ever checked at creation against the opening wave
+            // (MC-65) - straight to current below. Revalidated here, once, against updatedTargets: the
+            // same freshest-available board the line above already trusts for the new next draw, so a
+            // target this same press just cleared or retired can't rescue it either.
+            val streakedField =
+                current.field
+                    .advanceStreak(pressOutcome.failed)
+                    .let { field ->
+                        if (pendingOpeningPromotionCheck) {
+                            pendingOpeningPromotionCheck = false
+                            ensurePromotedOperationSucceeds(field, updatedTargets)
+                        } else {
+                            field
+                        }
+                    }
             // In Long: totalScore is bounded by the board, but appliedMultiplier is not, so the
             // product is the first place an uncapped streak can overflow.
             val gained =
@@ -324,6 +352,13 @@ class Game(
     // would find an empty board every time and validate nothing. A no-op when the draw already
     // succeeds or there is nothing yet to fail against, so a healthy opening board costs no extra
     // Random draw.
+    //
+    // MC-79 deliberately leaves nextOperationSign/Digit untouched here (option a, validating it against
+    // this same opening wave, was tried and measured: with real ticks between creation and the first
+    // press, 12.5% of seeded sessions still promoted a dud, because the opening wave is only the first
+    // target to appear and the board has usually moved on by press time). ensurePromotedOperationSucceeds
+    // below re-checks that pair against the board as it actually is at promotion, which is what closes
+    // the gap this comment used to just approximate.
     private fun ensureOpeningOperationSucceeds(
         field: Field,
         targets: List<Target>,
@@ -432,6 +467,26 @@ class Game(
     ): Pair<OperationSign, Int> {
         val visibleActiveTargets = targets.filter { it.isActive && it.isVisible(gameTimeMs) }
         return drawSignAndDigit(visibleActiveTargets, level)
+    }
+
+    // MC-79: the promotion-time counterpart to ensureOpeningOperationSucceeds above - called once, by
+    // fireButtonClicked, only for the press that consumes pendingOpeningPromotionCheck. Filters
+    // updatedTargets the same way getNextSignAndDigit does, against the field's own (unadvanced -
+    // fireButtonClicked never ticks the clock) gameTimeMs, so the check sees exactly the board the new
+    // next draw was just validated against, not the stale one recreateField drew against.
+    private fun ensurePromotedOperationSucceeds(
+        field: Field,
+        updatedTargets: List<Target>,
+    ): Field {
+        val visibleActiveTargets = updatedTargets.filter { it.isActive && it.isVisible(field.gameTimeMs) }
+        val alreadySucceeds =
+            visibleActiveTargets.any { it.succeedsAgainst(field.nextOperationSign, field.nextOperationDigit) }
+        return if (visibleActiveTargets.isEmpty() || alreadySucceeds) {
+            field
+        } else {
+            val (sign, digit) = drawSignAndDigit(visibleActiveTargets, field.level)
+            field.copy(nextOperationSign = sign, nextOperationDigit = digit)
+        }
     }
 
     // The redraw loop itself, shared with ensureOpeningOperationSucceeds above: the only thing that
