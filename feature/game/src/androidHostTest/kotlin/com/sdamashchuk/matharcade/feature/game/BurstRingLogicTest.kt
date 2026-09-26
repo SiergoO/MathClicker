@@ -6,7 +6,7 @@ import org.junit.Test
 class BurstRingLogicTest {
     @Test
     fun `burstAlpha is at its brightest at the start of the burst`() {
-        assertEquals(0.6f, burstAlpha(progress = 0f), 0f)
+        assertEquals(0.28f, burstAlpha(progress = 0f), 0f)
     }
 
     @Test
@@ -16,6 +16,6 @@ class BurstRingLogicTest {
 
     @Test
     fun `burstAlpha is halfway faded at the midpoint`() {
-        assertEquals(0.3f, burstAlpha(progress = 0.5f), 0.0001f)
+        assertEquals(0.14f, burstAlpha(progress = 0.5f), 0.0001f)
     }
 }
