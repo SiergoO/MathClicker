@@ -63,6 +63,7 @@ lint/tmp/
 # Local to this machine on purpose: the board is a live working surface, not a
 # record, and its churn was interleaving with the commits it exists to describe.
 .claude/
+.orchestra/
 queue.log
 
 # Kotlin build state (session locks and transformed metadata), regenerated on every build
