@@ -18,6 +18,9 @@ sqldelight = "2.4.0"
 kotlinxCoroutines = "1.11.0"
 koin = "4.2.2"
 junit = "4.13.2"
+roborazzi = "1.76.0"
+robolectric = "4.17"
+androidxComposeUiTest = "1.12.0"
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
@@ -32,12 +35,14 @@ compose-multiplatform = { id = "org.jetbrains.compose", version.ref = "composeMu
 detekt = { id = "dev.detekt", version.ref = "detekt" }
 spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
 sqldelight = { id = "app.cash.sqldelight", version.ref = "sqldelight" }
+roborazzi = { id = "io.github.takahirom.roborazzi", version.ref = "roborazzi" }
 
 [libraries]
 android-gradlePlugin = { module = "com.android.tools.build:gradle-api", version.ref = "agp" }
 kotlin-gradlePlugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
 detekt-gradlePlugin = { module = "dev.detekt:detekt-gradle-plugin", version.ref = "detekt" }
 spotless-gradlePlugin = { module = "com.diffplug.spotless:spotless-plugin-gradle", version.ref = "spotless" }
+roborazzi-gradlePlugin = { module = "io.github.takahirom.roborazzi:roborazzi-gradle-plugin", version.ref = "roborazzi" }
 androidx-lifecycle-runtime-ktx = { module = "androidx.lifecycle:lifecycle-runtime-ktx", version.ref = "androidxLifecycleRuntimeKtx" }
 androidx-constraintlayout-compose = { module = "androidx.constraintlayout:constraintlayout-compose", version.ref = "androidxConstraintlayoutCompose" }
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidxActivityCompose" }
@@ -64,3 +69,8 @@ koin-core = { module = "io.insert-koin:koin-core", version.ref = "koin" }
 koin-android = { module = "io.insert-koin:koin-android", version.ref = "koin" }
 koin-test = { module = "io.insert-koin:koin-test", version.ref = "koin" }
 junit = { module = "junit:junit", version.ref = "junit" }
+roborazzi = { module = "io.github.takahirom.roborazzi:roborazzi", version.ref = "roborazzi" }
+roborazzi-compose = { module = "io.github.takahirom.roborazzi:roborazzi-compose", version.ref = "roborazzi" }
+robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
+compose-ui-test-junit4 = { module = "org.jetbrains.compose.ui:ui-test-junit4", version.ref = "composeMultiplatform" }
+androidx-compose-ui-test-manifest = { module = "androidx.compose.ui:ui-test-manifest", version.ref = "androidxComposeUiTest" }

@@ -21,6 +21,7 @@ dependencies {
     compileOnly(libs.kotlin.gradlePlugin)
     compileOnly(libs.detekt.gradlePlugin)
     compileOnly(libs.spotless.gradlePlugin)
+    compileOnly(libs.roborazzi.gradlePlugin)
 }
 
 gradlePlugin {
@@ -48,6 +49,10 @@ gradlePlugin {
         register("kmpFeature") {
             id = "matharcade.kmp.feature"
             implementationClass = "com.sdamashchuk.matharcade.buildlogic.KmpFeatureConventionPlugin"
+        }
+        register("roborazzi") {
+            id = "matharcade.roborazzi"
+            implementationClass = "com.sdamashchuk.matharcade.buildlogic.RoborazziConventionPlugin"
         }
     }
 }

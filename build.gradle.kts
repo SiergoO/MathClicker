@@ -10,6 +10,7 @@ plugins {
     alias(libs.plugins.detekt) apply false
     alias(libs.plugins.spotless) apply false
     alias(libs.plugins.sqldelight) apply false
+    alias(libs.plugins.roborazzi) apply false
 }
 
 // build-logic is an included build, so `./gradlew check` does not reach it on its own - the gate

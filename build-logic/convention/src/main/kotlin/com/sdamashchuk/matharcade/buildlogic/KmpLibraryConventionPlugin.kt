@@ -31,7 +31,11 @@ class KmpLibraryConventionPlugin : Plugin<Project> {
                     namespace = namespaceFromPath
                     compileSdk = SdkVersions.COMPILE
                     minSdk = SdkVersions.MIN
-                    withHostTest {}
+                    // Without this, a host test that resolves an Android resource throws
+                    // ActivityNotFoundException instead of rendering it.
+                    withHostTest {
+                        isIncludeAndroidResources = true
+                    }
                     compilerOptions {
                         jvmTarget.set(JvmTarget.JVM_17)
                     }
