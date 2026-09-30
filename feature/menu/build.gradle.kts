@@ -1,5 +1,6 @@
 plugins {
     id("matharcade.kmp.feature")
+    id("matharcade.roborazzi")
 }
 
 kotlin {
@@ -19,6 +20,15 @@ kotlin {
             implementation(projects.core.ui)
             implementation(projects.core.component)
             implementation(libs.androidx.constraintlayout.compose)
+        }
+        androidHostTest.dependencies {
+            implementation(libs.junit)
+            implementation(libs.kotlinx.coroutines.test)
+            implementation(libs.roborazzi)
+            implementation(libs.roborazzi.compose)
+            implementation(libs.robolectric)
+            implementation(libs.compose.ui.test.junit4)
+            implementation(libs.androidx.compose.ui.test.manifest)
         }
     }
 }
