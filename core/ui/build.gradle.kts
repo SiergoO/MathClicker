@@ -1,5 +1,6 @@
 plugins {
     id("matharcade.kmp.library")
+    id("matharcade.roborazzi")
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.compose.multiplatform)
 }
@@ -37,6 +38,11 @@ kotlin {
         }
         androidHostTest.dependencies {
             implementation(libs.junit)
+            implementation(libs.roborazzi)
+            implementation(libs.roborazzi.compose)
+            implementation(libs.robolectric)
+            implementation(libs.compose.ui.test.junit4)
+            implementation(libs.androidx.compose.ui.test.manifest)
         }
     }
 }

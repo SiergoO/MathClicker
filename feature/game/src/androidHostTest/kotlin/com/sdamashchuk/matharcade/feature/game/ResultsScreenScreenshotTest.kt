@@ -79,4 +79,69 @@ class ResultsScreenScreenshotTest {
 
         composeTestRule.onRoot().captureRoboImage()
     }
+
+    @Test
+    fun `renders a first run with no best result yet`() {
+        val field = Field(id = 1, level = 1, score = 60, isClosed = true, finishedAt = NOW_EPOCH_MILLIS)
+
+        composeTestRule.setContent {
+            MathArcadeTheme {
+                ResultsScreen(
+                    field = field,
+                    recentResults = persistentListOf(field),
+                    bestResult = null,
+                    onRestartClicked = {},
+                    onBackToMainMenuClicked = {},
+                )
+            }
+        }
+
+        composeTestRule.onRoot().captureRoboImage()
+    }
+
+    @Test
+    fun `renders a run short of the best`() {
+        val bestResult =
+            Field(
+                id = 10,
+                level = 4,
+                score = 420,
+                isClosed = true,
+                finishedAt = NOW_EPOCH_MILLIS - HOUR_MILLIS,
+            )
+        val field = Field(id = 11, level = 3, score = 300, isClosed = true, finishedAt = NOW_EPOCH_MILLIS)
+
+        composeTestRule.setContent {
+            MathArcadeTheme {
+                ResultsScreen(
+                    field = field,
+                    recentResults = persistentListOf(field, bestResult),
+                    bestResult = bestResult,
+                    onRestartClicked = {},
+                    onBackToMainMenuClicked = {},
+                )
+            }
+        }
+
+        composeTestRule.onRoot().captureRoboImage()
+    }
+
+    @Test
+    fun `renders an empty history`() {
+        val field = Field(id = 1, level = 1, score = 60, isClosed = true, finishedAt = NOW_EPOCH_MILLIS)
+
+        composeTestRule.setContent {
+            MathArcadeTheme {
+                ResultsScreen(
+                    field = field,
+                    recentResults = persistentListOf(),
+                    bestResult = null,
+                    onRestartClicked = {},
+                    onBackToMainMenuClicked = {},
+                )
+            }
+        }
+
+        composeTestRule.onRoot().captureRoboImage()
+    }
 }
