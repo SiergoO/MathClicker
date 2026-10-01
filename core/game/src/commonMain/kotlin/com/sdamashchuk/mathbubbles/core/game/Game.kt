@@ -5,6 +5,7 @@ import com.sdamashchuk.mathbubbles.core.game.model.BoosterDropContext
 import com.sdamashchuk.mathbubbles.core.game.model.BoosterDropResult
 import com.sdamashchuk.mathbubbles.core.game.model.GameEvent
 import com.sdamashchuk.mathbubbles.core.game.model.GameState
+import com.sdamashchuk.mathbubbles.core.game.model.TimedBoosterEffect
 import com.sdamashchuk.mathbubbles.core.game.objectmapper.advanceClock
 import com.sdamashchuk.mathbubbles.core.game.objectmapper.applyCombo
 import com.sdamashchuk.mathbubbles.core.game.objectmapper.changeActiveness
@@ -12,14 +13,17 @@ import com.sdamashchuk.mathbubbles.core.game.objectmapper.closeIfNecessary
 import com.sdamashchuk.mathbubbles.core.game.objectmapper.decrementLifeCount
 import com.sdamashchuk.mathbubbles.core.game.objectmapper.decrementValue
 import com.sdamashchuk.mathbubbles.core.game.objectmapper.ensureAlive
+import com.sdamashchuk.mathbubbles.core.game.objectmapper.freeStashSlot
 import com.sdamashchuk.mathbubbles.core.game.objectmapper.grantLife
 import com.sdamashchuk.mathbubbles.core.game.objectmapper.resetStreak
+import com.sdamashchuk.mathbubbles.core.game.objectmapper.rewind
 import com.sdamashchuk.mathbubbles.core.game.objectmapper.shortenAppearanceDelay
 import com.sdamashchuk.mathbubbles.core.game.objectmapper.stashCurrentBooster
 import com.sdamashchuk.mathbubbles.core.game.objectmapper.updateActionButtons
 import com.sdamashchuk.mathbubbles.core.game.objectmapper.updateLevel
 import com.sdamashchuk.mathbubbles.core.game.objectmapper.updateScore
 import com.sdamashchuk.mathbubbles.core.game.scoring.performOperation
+import com.sdamashchuk.mathbubbles.core.model.Booster
 import com.sdamashchuk.mathbubbles.core.model.Field
 import com.sdamashchuk.mathbubbles.core.model.FieldAction
 import com.sdamashchuk.mathbubbles.core.model.OperationSign
@@ -50,8 +54,11 @@ private const val MAX_OPERATION_DRAW_ATTEMPTS = 20
 
 private const val BOOSTER_STASH_CAPACITY = 3
 
-// Ten of the nineteen are the engine's public contract, so the threshold is unreachable without
-// collapsing it. Suppressed here rather than in a baseline so anything new still fails.
+private const val FREEZE_DURATION_MS = 3_000
+private const val REWIND_DURATION_MS = 2_000
+
+// 13 of the 33 are Game's own public contract; splitting the file would only scatter private
+// helpers, not shrink it. Suppressed here, not in a baseline, so further growth still fails.
 @Suppress("TooManyFunctions")
 class Game(
     private val sessionHelper: SessionHelper,
@@ -92,6 +99,10 @@ class Game(
 
     private var hasDroppedBoosterThisSession = false
 
+    private var activeTimedEffect: TimedBoosterEffect? = null
+    private var icePickArmed = false
+    private var shieldActive = false
+
     fun start() {
         collectorJob?.cancel()
         collectorJob =
@@ -120,6 +131,9 @@ class Game(
             pendingOpeningPromotionCheck = true
             boosterDropCounter = 0
             hasDroppedBoosterThisSession = false
+            activeTimedEffect = null
+            icePickArmed = false
+            shieldActive = false
         }
 
     suspend fun createTargets() = mutex.withLock { createTargetsLocked() }
@@ -137,6 +151,22 @@ class Game(
     suspend fun targetClicked(id: Int) =
         mutex.withLock {
             val current = _stateFlow.value
+            if (icePickArmed) {
+                val target = current.targets.firstOrNull { it.id == id }
+                if (target == null || !target.isActive || !target.isVisible(current.field.gameTimeMs)) {
+                    return@withLock
+                }
+                icePickArmed = false
+                val awarded = if (target.isProfitable) target.value else 0
+                val updatedTargets =
+                    current.targets
+                        .decrementValue(id, target.value)
+                        .ensureAlive(id)
+                val updatedField = current.field.updateScore(awarded)
+                _stateFlow.value = GameState(updatedField, updatedTargets)
+                _events.tryEmit(GameEvent.TargetZeroed(id, awarded))
+                return@withLock
+            }
             val previousValue = current.targets.first { it.id == id }.value
             val updatedTargets =
                 current.targets
@@ -203,7 +233,7 @@ class Game(
     }
 
     private fun fireBoosterLocked(current: GameState) {
-        // TODO(MC-113): apply the booster's effect here instead of a no-op consume.
+        current.field.currentBooster?.let(::applyBoosterEffect)
         val drop = rollBoosterDrop(current.field, current.targets)
         val (nextOperationSign, nextOperationDigit) =
             getNextSignAndDigit(current.targets, current.field.level, current.field.gameTimeMs)
@@ -227,44 +257,107 @@ class Game(
             _stateFlow.value = GameState(promotedField, current.targets)
         }
 
+    suspend fun applyBoosterFromStash(slotIndex: Int) =
+        mutex.withLock {
+            val current = _stateFlow.value
+            val booster = current.field.boosterStash.getOrNull(slotIndex) ?: return@withLock
+            applyBoosterEffect(booster)
+            _stateFlow.value = current.copy(field = current.field.freeStashSlot(slotIndex))
+        }
+
+    suspend fun disarmIcePick() =
+        mutex.withLock {
+            if (!icePickArmed) return@withLock
+            val current = _stateFlow.value
+            if (current.field.boosterStash.size >= BOOSTER_STASH_CAPACITY) return@withLock
+            icePickArmed = false
+            _stateFlow.value = current.copy(field = current.field.stashCurrentBooster(Booster.ICE_PICK))
+        }
+
+    private fun applyBoosterEffect(booster: Booster) {
+        when (booster) {
+            Booster.FREEZE -> activeTimedEffect = TimedBoosterEffect(Booster.FREEZE, FREEZE_DURATION_MS)
+            Booster.REWIND -> activeTimedEffect = TimedBoosterEffect(Booster.REWIND, REWIND_DURATION_MS)
+            Booster.ICE_PICK -> icePickArmed = true
+            Booster.SHIELD -> shieldActive = true
+        }
+    }
+
     suspend fun tick(
         elapsedMs: Int,
         clockScale: Double = 1.0,
     ) = mutex.withLock {
         val current = _stateFlow.value
         if (current.field.isClosed || current.targets.none { it.isActive }) return@withLock
-        val step = scaleTickStep(elapsedMs, clockScale, MAX_TICK_MS)
         val hadVisibleActiveTarget = current.targets.any { it.isActive && it.isVisible(current.field.gameTimeMs) }
+        // Captured before advancing: the effect can expire inside advanceEffectField below, and
+        // shortenAppearanceDelay must stay off for the tick that ran under it either way.
+        val effectActiveBeforeTick = activeTimedEffect != null
 
-        val advancedField = current.field.advanceClock(step)
+        val advancedField = advanceEffectField(current, elapsedMs, clockScale)
         val brokenOutIds =
             current.targets.filter { it.isActive && it.hasBrokenOut(advancedField.gameTimeMs) }.map { it.id }
-        val (fieldAfterBreakout, targetsAfterBreakout) =
+        val (fieldAfterBreakout, targetsAfterBreakout, shieldConsumed) =
             resolveBreakouts(current.targets, brokenOutIds, advancedField)
 
-        // On the edge, never on the level: otherwise the draw count would follow frame rate, not game events.
+        val targetsAfterShorten =
+            shortenIfStillWaiting(targetsAfterBreakout, advancedField, hadVisibleActiveTarget, effectActiveBeforeTick)
+
+        val leveledUp = applyTickOutcome(fieldAfterBreakout, targetsAfterShorten)
+        emitTickEvents(current.field.lifeCount, brokenOutIds, shieldConsumed, leveledUp)
+    }
+
+    private fun advanceEffectField(
+        current: GameState,
+        elapsedMs: Int,
+        clockScale: Double,
+    ): Field =
+        when (activeTimedEffect?.booster) {
+            Booster.FREEZE -> advanceFrozenField(current, elapsedMs)
+            Booster.REWIND -> advanceRewindingField(current, elapsedMs)
+            else -> current.field.advanceClock(scaleTickStep(elapsedMs, clockScale, MAX_TICK_MS))
+        }
+
+    // On the edge, never on the level: otherwise the draw count would follow frame rate, not game events.
+    private fun shortenIfStillWaiting(
+        targets: List<Target>,
+        advancedField: Field,
+        hadVisibleActiveTarget: Boolean,
+        effectActiveBeforeTick: Boolean,
+    ): List<Target> {
         val stillWaiting =
             hadVisibleActiveTarget &&
-                targetsAfterBreakout.none { it.isActive && it.isVisible(advancedField.gameTimeMs) }
-        val targetsAfterShorten =
-            if (stillWaiting) {
-                targetsAfterBreakout.shortenAppearanceDelay(advancedField.gameTimeMs)
-            } else {
-                targetsAfterBreakout
-            }
+                !effectActiveBeforeTick &&
+                targets.none { it.isActive && it.isVisible(advancedField.gameTimeMs) }
+        return if (stillWaiting) targets.shortenAppearanceDelay(advancedField.gameTimeMs) else targets
+    }
 
-        // A closed field must not level up or get a fresh target set.
-        val leveledUp = targetsAfterShorten.none { it.isActive } && !fieldAfterBreakout.isClosed
+    // A closed field must not level up or get a fresh target set.
+    private fun applyTickOutcome(
+        field: Field,
+        targets: List<Target>,
+    ): Boolean {
+        val leveledUp = targets.none { it.isActive } && !field.isClosed
         _stateFlow.value =
             if (leveledUp) {
-                val leveledField = fieldAfterBreakout.updateLevel()
+                val leveledField = field.updateLevel()
                 GameState(leveledField, recreateTargets(leveledField))
             } else {
-                GameState(fieldAfterBreakout, targetsAfterShorten)
+                GameState(field, targets)
             }
+        return leveledUp
+    }
 
+    private fun emitTickEvents(
+        startingLives: Int,
+        brokenOutIds: List<Int>,
+        shieldConsumed: Boolean,
+        leveledUp: Boolean,
+    ) {
+        var livesLeft = startingLives
         brokenOutIds.forEachIndexed { index, id ->
-            _events.tryEmit(GameEvent.TargetBrokeOut(id, current.field.lifeCount - (index + 1)))
+            if (!(shieldConsumed && index == 0)) livesLeft -= 1
+            _events.tryEmit(GameEvent.TargetBrokeOut(id, livesLeft))
         }
         if (leveledUp) {
             _events.tryEmit(GameEvent.LevelUp(_stateFlow.value.field.level))
@@ -272,6 +365,37 @@ class Game(
         if (_stateFlow.value.field.isClosed) {
             _events.tryEmit(GameEvent.GameOver)
         }
+    }
+
+    private fun advanceFrozenField(
+        current: GameState,
+        elapsedMs: Int,
+    ): Field {
+        val effect = activeTimedEffect ?: return current.field
+        val step = scaleTickStep(elapsedMs, 1.0, MAX_TICK_MS)
+        val remaining = effect.remainingRealMs - step
+        activeTimedEffect = if (remaining > 0) effect.copy(remainingRealMs = remaining) else null
+        return current.field.advanceClock(0)
+    }
+
+    // Never wound past the newest visible bubble's appearsAtMs, or it would vanish off the top;
+    // reaching that clamp ends the effect early.
+    private fun advanceRewindingField(
+        current: GameState,
+        elapsedMs: Int,
+    ): Field {
+        val effect = activeTimedEffect ?: return current.field
+        val step = scaleTickStep(elapsedMs, 1.0, MAX_TICK_MS)
+        val topBoundaryMs =
+            current.targets
+                .filter { it.isActive && it.isVisible(current.field.gameTimeMs) }
+                .maxOfOrNull { it.appearsAtMs }
+        val maxRewindMs = topBoundaryMs?.let { (current.field.gameTimeMs - it).coerceAtLeast(0L) } ?: Long.MAX_VALUE
+        val actualStepMs = step.toLong().coerceAtMost(maxRewindMs)
+        val hitTopBoundary = actualStepMs < step
+        val remaining = effect.remainingRealMs - step
+        activeTimedEffect = if (hitTopBoundary || remaining <= 0) null else effect.copy(remainingRealMs = remaining)
+        return current.field.rewind(actualStepMs)
     }
 
     // No caller yet, kept as the mechanism a future random event calls. A grant that would exceed the
@@ -326,18 +450,22 @@ class Game(
         }
     }
 
+    // The Boolean says a shield absorbed one breakout, which the per-id livesLeft events must reflect.
     private fun resolveBreakouts(
         targets: List<Target>,
         brokenOutIds: List<Int>,
         field: Field,
-    ): Pair<Field, List<Target>> {
+    ): Triple<Field, List<Target>, Boolean> {
         val updatedTargets =
             brokenOutIds.fold(targets) { acc, id -> acc.changeActiveness(id, false) }
-        val fieldAfterLifeLoss = brokenOutIds.fold(field) { acc, _ -> acc.decrementLifeCount(1) }
+        val shieldConsumed = shieldActive && brokenOutIds.isNotEmpty()
+        if (shieldConsumed) shieldActive = false
+        val livesLost = brokenOutIds.size - (if (shieldConsumed) 1 else 0)
+        val fieldAfterLifeLoss = field.decrementLifeCount(livesLost)
         val updatedField =
             (if (brokenOutIds.isNotEmpty()) fieldAfterLifeLoss.resetStreak() else fieldAfterLifeLoss)
                 .closeIfNecessary(clock.now().toEpochMilliseconds())
-        return updatedField to updatedTargets
+        return Triple(updatedField, updatedTargets, shieldConsumed)
     }
 
     private fun recreateField(id: Int): Field {
@@ -433,7 +561,6 @@ class Game(
         }
     }
 
-    // TODO(MC-113): feed icePickArmed and shieldActive from the effect state.
     private fun rollBoosterDrop(
         field: Field,
         targets: List<Target>,
@@ -445,8 +572,8 @@ class Game(
                 anyVisibleBeyondTelegraph = visibleActiveTargets.any { it.isTelegraphingBreakout(field.gameTimeMs) },
                 noVisibleBubble = visibleActiveTargets.isEmpty(),
                 oneLifeLeft = field.lifeCount == 1,
-                icePickArmed = false,
-                shieldActive = false,
+                icePickArmed = icePickArmed,
+                shieldActive = shieldActive,
             )
         val result =
             boosterDropRule.roll(

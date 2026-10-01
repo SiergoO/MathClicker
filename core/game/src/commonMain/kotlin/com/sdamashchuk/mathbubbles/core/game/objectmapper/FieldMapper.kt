@@ -63,8 +63,6 @@ internal fun Field.updateActionButtons(
         nextBooster = nextBooster,
     )
 
-internal fun Field.stashCurrentBooster(booster: Booster): Field = copy(boosterStash = boosterStash + booster)
-
 /**
  * Replaces the multiplier with this press's own count, rather than accumulating across presses.
  */

@@ -1,5 +1,6 @@
 package com.sdamashchuk.mathbubbles.core.game.objectmapper
 
+import com.sdamashchuk.mathbubbles.core.model.Booster
 import com.sdamashchuk.mathbubbles.core.model.Field
 import com.sdamashchuk.mathbubbles.core.model.OperationSign
 import kotlin.test.Test
@@ -167,5 +168,12 @@ class FieldMapperTest {
         assertEquals(7, updated.currentOperationDigit)
         assertEquals(OperationSign.DIVISION, updated.nextOperationSign)
         assertEquals(4, updated.nextOperationDigit)
+    }
+
+    @Test
+    fun `freeStashSlot removes exactly the booster at that index`() {
+        val field = Field(boosterStash = listOf(Booster.FREEZE, Booster.SHIELD, Booster.ICE_PICK))
+
+        assertEquals(listOf(Booster.FREEZE, Booster.ICE_PICK), field.freeStashSlot(1).boosterStash)
     }
 }
