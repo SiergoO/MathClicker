@@ -13,13 +13,9 @@ kotlin {
     }
 
     sourceSets {
-        // MenuScreen builds its layout with androidx.constraintlayout.compose, which has no
-        // Compose Multiplatform equivalent today, so the feature lives in androidMain rather
-        // than behind an expect/actual with no honest iOS side.
         androidMain.dependencies {
             implementation(projects.core.ui)
             implementation(projects.core.component)
-            implementation(libs.androidx.constraintlayout.compose)
         }
         androidHostTest.dependencies {
             implementation(libs.junit)

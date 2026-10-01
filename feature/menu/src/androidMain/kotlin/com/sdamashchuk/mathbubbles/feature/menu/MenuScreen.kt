@@ -18,10 +18,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.constraintlayout.compose.ChainStyle
-import androidx.constraintlayout.compose.ConstraintLayout
+import com.sdamashchuk.mathbubbles.core.ui.component.GlassBackdrop
+import com.sdamashchuk.mathbubbles.core.ui.component.GlassButton
 import com.sdamashchuk.mathbubbles.core.ui.component.MathBubblesDialog
-import com.sdamashchuk.mathbubbles.core.ui.component.MenuButton
 import com.sdamashchuk.mathbubbles.core.ui.component.NavBar
 import com.sdamashchuk.mathbubbles.core.ui.component.ScreenWrapper
 import com.sdamashchuk.mathbubbles.core.ui.theme.Accent
@@ -29,7 +28,10 @@ import com.sdamashchuk.mathbubbles.core.ui.theme.Accent
 private val NAV_BAR_ICON_SIZE = 24.dp
 private val NAV_BAR_TOUCH_TARGET = 48.dp
 private val LOGO_HORIZONTAL_INSET = 40.dp
-private val MENU_BUTTON_GAP = 12.dp
+private val MENU_BUTTON_GAP = 20.dp
+private val MENU_BUTTON_BOTTOM_MARGIN = 28.dp
+private const val LOGO_AREA_WEIGHT = 2f
+private const val BUTTON_AREA_WEIGHT = 1f
 
 @Composable
 fun MenuScreen(component: MenuComponent) {
@@ -66,47 +68,32 @@ fun MenuScreen(component: MenuComponent) {
             )
         },
     ) {
-        ConstraintLayout(
-            modifier = Modifier.fillMaxWidth().weight(1f),
-        ) {
-            val (logoImage, menuButtons) = createRefs()
-
-            MenuLogo(
-                modifier =
-                    Modifier
-                        .constrainAs(logoImage) {
-                            top.linkTo(parent.top)
-                            bottom.linkTo(parent.bottom)
-                            start.linkTo(parent.start)
-                            end.linkTo(parent.end)
-                        }.padding(horizontal = LOGO_HORIZONTAL_INSET),
-            )
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.SpaceEvenly,
-                modifier =
-                    Modifier.constrainAs(menuButtons) {
-                        top.linkTo(logoImage.bottom)
-                        bottom.linkTo(parent.bottom)
-                        start.linkTo(parent.start)
-                        end.linkTo(parent.end)
-                    },
+        Column(modifier = Modifier.fillMaxWidth().weight(1f)) {
+            Box(
+                modifier = Modifier.fillMaxWidth().weight(LOGO_AREA_WEIGHT),
+                contentAlignment = Alignment.Center,
             ) {
-                // SpaceEvenly distributes the chain's own slack, which is zero here - the two
-                // buttons abutted into one notched shape on a device until this gap was explicit.
-                MenuButton(
-                    text = stringResource(id = R.string.menu_button_play),
-                    onClick = { component.sendAction(MenuViewModel.Action.ButtonPlayClicked) },
-                    horizontalPadding = 0.dp,
-                )
-                Spacer(modifier = Modifier.height(MENU_BUTTON_GAP))
-                MenuButton(
-                    text = stringResource(id = R.string.menu_button_settings),
-                    onClick = { component.sendAction(MenuViewModel.Action.ButtonSettingsClicked) },
-                    horizontalPadding = 0.dp,
-                )
+                MenuLogo(modifier = Modifier.padding(horizontal = LOGO_HORIZONTAL_INSET))
             }
-            createVerticalChain(logoImage, menuButtons, chainStyle = ChainStyle.Spread)
+            GlassBackdrop(
+                modifier = Modifier.fillMaxWidth().weight(BUTTON_AREA_WEIGHT),
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Bottom,
+                    modifier = Modifier.fillMaxSize().padding(bottom = MENU_BUTTON_BOTTOM_MARGIN),
+                ) {
+                    GlassButton(
+                        text = stringResource(id = R.string.menu_button_play),
+                        onClick = { component.sendAction(MenuViewModel.Action.ButtonPlayClicked) },
+                    )
+                    Spacer(modifier = Modifier.height(MENU_BUTTON_GAP))
+                    GlassButton(
+                        text = stringResource(id = R.string.menu_button_settings),
+                        onClick = { component.sendAction(MenuViewModel.Action.ButtonSettingsClicked) },
+                    )
+                }
+            }
         }
     }
 }
