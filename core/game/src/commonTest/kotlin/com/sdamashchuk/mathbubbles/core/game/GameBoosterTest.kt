@@ -1,6 +1,7 @@
 package com.sdamashchuk.mathbubbles.core.game
 
 import com.sdamashchuk.mathbubbles.core.game.helper.SessionHelperImpl
+import com.sdamashchuk.mathbubbles.core.game.model.IcePickSource
 import com.sdamashchuk.mathbubbles.core.model.Booster
 import com.sdamashchuk.mathbubbles.core.model.FieldAction
 import com.sdamashchuk.mathbubbles.core.model.OperationSign
@@ -250,6 +251,12 @@ class GameBoosterTest {
                 repeat(25) { fireIndex ->
                     repeat(1 + (fireIndex % 5)) { game.tick(250) }
                     game.fireButtonClicked()
+                    if (game.stateFlow.value.effects.icePickArmedFrom == IcePickSource.FireButton) {
+                        val armedAt = game.stateFlow.value.field.gameTimeMs
+                        game.stateFlow.value.targets
+                            .firstOrNull { it.isActive && it.isVisible(armedAt) }
+                            ?.let { game.targetClicked(it.id) }
+                    }
 
                     val field = game.stateFlow.value.field
                     val action = field.nextAction

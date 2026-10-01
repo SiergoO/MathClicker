@@ -11,4 +11,5 @@ import com.sdamashchuk.mathbubbles.core.model.Target
 data class GameState(
     val field: Field,
     val targets: List<Target>,
+    val effects: ActiveEffects = ActiveEffects(),
 )

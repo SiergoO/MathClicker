@@ -9,8 +9,16 @@
     <string name="ready_to_pay_overlay_hint">Touch screen to start</string>
     <string name="game_session_level">Level: %d</string>
     <string name="game_session_score">Score: %d</string>
-    <string name="game_session_combo">Combo\n x%d</string>
+    <string name="game_session_score_combo">x%1$d %2$d</string>
     <string name="game_level_intro">Level %d</string>
+
+    <string name="booster_freeze">Freeze</string>
+    <string name="booster_rewind">Rewind</string>
+    <string name="booster_ice_pick">Ice pick</string>
+    <string name="booster_shield">Shield</string>
+    <string name="booster_stash_slot">Stash slot %d</string>
+    <string name="booster_stash_slot_empty">Empty stash slot %d</string>
+    <string name="booster_ice_pick_armed">Ice pick armed, tap to disarm</string>
     <string name="game_feedback_award">+%d</string>
     <string name="game_feedback_streak">+%1$d x%2$d</string>
     <string name="game_feedback_miss">Miss</string>

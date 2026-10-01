@@ -5,6 +5,7 @@ import com.sdamashchuk.mathbubbles.core.model.Field
 
 internal fun Field.stashCurrentBooster(booster: Booster): Field = copy(boosterStash = boosterStash + booster)
 
-// index is validated by the caller (Game.applyBoosterFromStash never reaches here with one out of range).
-internal fun Field.freeStashSlot(index: Int): Field =
-    copy(boosterStash = boosterStash.toMutableList().apply { removeAt(index) })
+internal fun Field.freeStashSlot(index: Int): Field {
+    check(index in boosterStash.indices) { "freeStashSlot($index) on a stash of size ${boosterStash.size}" }
+    return copy(boosterStash = boosterStash.toMutableList().apply { removeAt(index) })
+}

@@ -7,6 +7,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import com.github.takahirom.roborazzi.captureRoboImage
+import com.sdamashchuk.mathbubbles.core.game.model.ActiveEffects
+import com.sdamashchuk.mathbubbles.core.game.model.IcePickSource
+import com.sdamashchuk.mathbubbles.core.model.Booster
 import com.sdamashchuk.mathbubbles.core.model.Field
 import com.sdamashchuk.mathbubbles.core.model.OperationSign
 import com.sdamashchuk.mathbubbles.core.model.Target
@@ -108,5 +111,95 @@ class FieldScreenshotTest {
         composeTestRule.mainClock.advanceTimeBy(ANIMATION_SETTLE_MS)
 
         composeTestRule.onRoot().captureRoboImage()
+    }
+
+    @Test
+    fun `renders a booster in the fire button`() {
+        renderFixedField(
+            FIXED_FIELD_STATE.copy(field = FIXED_FIELD_STATE.field.copy(currentBooster = Booster.FREEZE)),
+        )
+        composeTestRule.onRoot().captureRoboImage()
+    }
+
+    @Test
+    fun `renders a booster in the preview`() {
+        renderFixedField(
+            FIXED_FIELD_STATE.copy(field = FIXED_FIELD_STATE.field.copy(nextBooster = Booster.SHIELD)),
+        )
+        composeTestRule.onRoot().captureRoboImage()
+    }
+
+    @Test
+    fun `renders a full stash`() {
+        renderFixedField(
+            FIXED_FIELD_STATE.copy(
+                field =
+                    FIXED_FIELD_STATE.field.copy(
+                        boosterStash = listOf(Booster.FREEZE, Booster.REWIND, Booster.ICE_PICK),
+                    ),
+            ),
+        )
+        composeTestRule.onRoot().captureRoboImage()
+    }
+
+    @Test
+    fun `renders a frozen field`() {
+        renderFixedField(
+            FIXED_FIELD_STATE.copy(
+                effects =
+                    ActiveEffects(
+                        timedBooster = Booster.FREEZE,
+                        remainingRealMs = 1_500,
+                        remainingFraction = 0.5f,
+                    ),
+            ),
+        )
+        composeTestRule.onRoot().captureRoboImage()
+    }
+
+    @Test
+    fun `renders an ice pick armed in the fire button`() {
+        renderFixedField(
+            FIXED_FIELD_STATE.copy(
+                field = FIXED_FIELD_STATE.field.copy(currentBooster = Booster.ICE_PICK),
+                effects = ActiveEffects(icePickArmedFrom = IcePickSource.FireButton),
+            ),
+        )
+        composeTestRule.onRoot().captureRoboImage()
+    }
+
+    @Test
+    fun `renders an ice pick armed in a stash slot`() {
+        renderFixedField(
+            FIXED_FIELD_STATE.copy(
+                field =
+                    FIXED_FIELD_STATE.field.copy(
+                        boosterStash = listOf(Booster.FREEZE, Booster.ICE_PICK),
+                    ),
+                effects = ActiveEffects(icePickArmedFrom = IcePickSource.StashSlot(1)),
+            ),
+        )
+        composeTestRule.onRoot().captureRoboImage()
+    }
+
+    private fun renderFixedField(state: GameViewModel.State) {
+        composeTestRule.mainClock.autoAdvance = false
+        val gameState = mutableStateOf(state)
+
+        composeTestRule.setContent {
+            MathBubblesTheme {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    Field(
+                        gameState = gameState,
+                        onTargetClicked = {},
+                        onFireClicked = {},
+                        onTick = {},
+                        onPauseClicked = {},
+                        targetZeroedSignal = null,
+                    )
+                }
+            }
+        }
+        composeTestRule.mainClock.advanceTimeBy(ANIMATION_SETTLE_MS)
     }
 }

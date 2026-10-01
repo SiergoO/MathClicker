@@ -27,4 +27,20 @@ class FieldLogicTest {
         assertEquals(4, GAME_COLUMN_COUNT)
         assertEquals(100, calculateGameColumnWidth(400))
     }
+
+    @Test
+    fun `scoreLabel shows the plain score at a multiplier of 1`() {
+        assertEquals(
+            "plain",
+            scoreLabel(appliedMultiplier = 1, plainScore = "plain", comboScore = "x1 plain"),
+        )
+    }
+
+    @Test
+    fun `scoreLabel shows the combo prefix once the multiplier rises above 1`() {
+        assertEquals(
+            "x2 combo",
+            scoreLabel(appliedMultiplier = 2, plainScore = "plain", comboScore = "x2 combo"),
+        )
+    }
 }

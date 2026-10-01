@@ -1,6 +1,5 @@
 package com.sdamashchuk.mathbubbles.feature.game
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,12 +11,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.wrapContentSize
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.Button
-import androidx.compose.material.ButtonDefaults
 import androidx.compose.material.Divider
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
@@ -30,26 +26,21 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.intl.Locale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.toUpperCase
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.sdamashchuk.mathbubbles.core.game.model.IcePickSource
+import com.sdamashchuk.mathbubbles.core.model.Booster
 import com.sdamashchuk.mathbubbles.core.model.INITIAL_LIFE_COUNT
 import com.sdamashchuk.mathbubbles.core.ui.theme.Accent
 import com.sdamashchuk.mathbubbles.core.ui.theme.AccentDeep
-import com.sdamashchuk.mathbubbles.core.ui.theme.AccentSoft
-import com.sdamashchuk.mathbubbles.core.ui.theme.Ink
 import com.sdamashchuk.mathbubbles.feature.game.model.TargetZeroedSignal
+import kotlinx.collections.immutable.toImmutableList
 
 private const val HUD_HEIGHT_FRACTION = 0.05f
-
-// The next-operation button is a preview, not a control - dimmed so it reads as one.
-private const val NEXT_OPERATION_PREVIEW_ALPHA = 0.8f
+private val SHIELD_MARK_SIZE = 16.dp
 
 @Composable
 fun Field(
@@ -63,6 +54,9 @@ fun Field(
     // today; once difficulty/mods exist, that's what supplies this value - TargetButton never sees
     // why a hint is off, and neither does this composable's own body beyond reading the flag.
     readinessHintsEnabled: Boolean = true,
+    onStashBooster: () -> Unit = {},
+    onApplyBoosterFromStash: (slotIndex: Int) -> Unit = {},
+    onDisarmIcePick: () -> Unit = {},
 ) {
     // Every one of these used to be a `gameState.value.field.X` read straight in this
     // composable's body. GameViewModel.State is a fresh object on every tick because gameTimeMs
@@ -72,18 +66,18 @@ fun Field(
     val score by remember { derivedStateOf { gameState.value.field.score } }
     val lifeCount by remember { derivedStateOf { gameState.value.field.lifeCount } }
     val appliedMultiplier by remember { derivedStateOf { gameState.value.field.appliedMultiplier } }
-    val currentOperation by
-        remember {
-            derivedStateOf {
-                gameState.value.field.let { "${it.currentOperationSign.sign}${it.currentOperationDigit}" }
-            }
+    val currentAction by remember { derivedStateOf { gameState.value.field.currentAction } }
+    val nextAction by remember { derivedStateOf { gameState.value.field.nextAction } }
+    val boosterStash by remember {
+        derivedStateOf {
+            gameState.value.field.boosterStash
+                .toImmutableList()
         }
-    val nextOperation by
-        remember {
-            derivedStateOf {
-                gameState.value.field.let { "${it.nextOperationSign.sign}${it.nextOperationDigit}" }
-            }
-        }
+    }
+    val timedBooster by remember { derivedStateOf { gameState.value.effects.timedBooster } }
+    val shieldActive by remember { derivedStateOf { gameState.value.effects.shieldActive } }
+    val icePickArmedFrom by remember { derivedStateOf { gameState.value.effects.icePickArmedFrom } }
+    val countdownFraction = remember { { gameState.value.effects.remainingFraction } }
 
     LaunchedEffect(Unit) {
         var previousFrameNanos = withFrameNanos { it }
@@ -120,7 +114,11 @@ fun Field(
                     .align(Alignment.CenterVertically),
             textAlign = TextAlign.Center,
             text =
-                stringResource(id = R.string.game_session_score, score).toUpperCase(Locale.current),
+                scoreLabel(
+                    appliedMultiplier = appliedMultiplier,
+                    plainScore = stringResource(id = R.string.game_session_score, score),
+                    comboScore = stringResource(id = R.string.game_session_score_combo, appliedMultiplier, score),
+                ).toUpperCase(Locale.current),
             style = MaterialTheme.typography.body1,
         )
         // Fixed width, not weight(1f): Level and Score stay centred on each other regardless of
@@ -155,6 +153,13 @@ fun Field(
                 Spacer(modifier = Modifier.padding(bottom = 2.dp))
             }
         }
+        if (shieldActive) {
+            BoosterToken(
+                booster = Booster.SHIELD,
+                diameter = SHIELD_MARK_SIZE,
+                modifier = Modifier.align(Alignment.TopEnd).padding(top = 6.dp, end = 6.dp),
+            )
+        }
         Row(
             modifier =
                 Modifier
@@ -162,51 +167,42 @@ fun Field(
                     .fillMaxSize(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                modifier = Modifier.weight(1f),
-                textAlign = TextAlign.Center,
-                text =
-                    stringResource(id = R.string.game_session_combo, appliedMultiplier)
-                        .toUpperCase(Locale.current),
-                style = MaterialTheme.typography.h2,
-            )
-            Button(
-                onClick = onFireClicked,
-                modifier =
-                    Modifier
-                        .weight(1f)
-                        .wrapContentSize()
-                        .clip(CircleShape)
-                        .width(100.dp)
-                        .height(100.dp),
-            ) {
-                Text(
-                    text = currentOperation,
-                    fontSize = 36.sp,
-                    color = Ink,
+            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                BoosterStashRow(
+                    stash = boosterStash,
+                    armedSlotIndex = (icePickArmedFrom as? IcePickSource.StashSlot)?.index,
+                    onSlotClicked = { slotIndex ->
+                        if (icePickArmedFrom == IcePickSource.StashSlot(slotIndex)) {
+                            onDisarmIcePick()
+                        } else {
+                            onApplyBoosterFromStash(slotIndex)
+                        }
+                    },
                 )
             }
-            Button(
-                onClick = {},
-                colors = ButtonDefaults.buttonColors(backgroundColor = AccentSoft),
-                modifier =
-                    Modifier
-                        .weight(1f)
-                        .wrapContentSize()
-                        .clip(CircleShape)
-                        .width(48.dp)
-                        .height(48.dp)
-                        .alpha(NEXT_OPERATION_PREVIEW_ALPHA),
-            ) {
-                Text(
-                    text = nextOperation,
-                    fontSize = 12.sp,
-                    color = Ink,
+            Box(modifier = Modifier.width(FIRE_BUTTON_SIZE), contentAlignment = Alignment.Center) {
+                val icePickArmedInFireButton = icePickArmedFrom == IcePickSource.FireButton
+                FireButton(
+                    action = currentAction,
+                    countdownColor = timedBooster?.let { boosterStyleFor(it).circleColor },
+                    countdownFraction = countdownFraction,
+                    isIcePickArmedHere = icePickArmedInFireButton,
+                    onFireClicked = if (icePickArmedInFireButton) onDisarmIcePick else onFireClicked,
+                    onStashBooster = onStashBooster,
                 )
+            }
+            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                NextActionPreview(action = nextAction)
             }
         }
     }
 }
+
+internal fun scoreLabel(
+    appliedMultiplier: Int,
+    plainScore: String,
+    comboScore: String,
+): String = if (appliedMultiplier > 1) comboScore else plainScore
 
 // maxOf, not the bare cap: a lifeCount above INITIAL_LIFE_COUNT (a future random-event grant -
 // see LifeBonusTest) must still get a slot, or the extra life stays invisible.

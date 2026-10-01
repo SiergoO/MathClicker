@@ -3,6 +3,7 @@ package com.sdamashchuk.mathbubbles.feature.game
 import com.sdamashchuk.mathbubbles.core.component.ComponentViewModel
 import com.sdamashchuk.mathbubbles.core.database.repository.GameRepository
 import com.sdamashchuk.mathbubbles.core.game.Game
+import com.sdamashchuk.mathbubbles.core.game.model.ActiveEffects
 import com.sdamashchuk.mathbubbles.core.model.Field
 import com.sdamashchuk.mathbubbles.core.model.Target
 import com.sdamashchuk.mathbubbles.feature.game.model.FeedbackEffect
@@ -49,7 +50,7 @@ class GameViewModel(
         viewModelScope.launch {
             // One collector, not one per half: two read-modify-write copy() calls on _state could clobber each other.
             game.stateFlow.collect { gameState ->
-                val (field, targets) = gameState
+                val (field, targets, effects) = gameState
                 if (field.id == 0) return@collect
                 val previousField = state.value.field
                 val previousTargets = state.value.targetList
@@ -59,6 +60,7 @@ class GameViewModel(
                 _state.value =
                     state.value.copy(
                         field = field,
+                        effects = effects,
                         targetList = if (targets.isNotEmpty()) targets.toImmutableList() else previousTargets,
                         // Neither branch is a player action, so both bypass nextPhase. isClosed stays first: GameOver must
                         // always win over LevelIntro.
@@ -130,6 +132,18 @@ class GameViewModel(
 
                     is Action.FireButtonClicked -> {
                         game.fireButtonClicked()
+                    }
+
+                    Action.StashBooster -> {
+                        game.stashBooster()
+                    }
+
+                    is Action.ApplyBoosterFromStash -> {
+                        game.applyBoosterFromStash(action.slotIndex)
+                    }
+
+                    Action.DisarmIcePick -> {
+                        game.disarmIcePick()
                     }
 
                     is Action.Tick -> {
@@ -214,6 +228,14 @@ class GameViewModel(
 
         object FireButtonClicked : Action()
 
+        object StashBooster : Action()
+
+        data class ApplyBoosterFromStash(
+            val slotIndex: Int,
+        ) : Action()
+
+        object DisarmIcePick : Action()
+
         data class Tick(
             val elapsedMs: Int,
         ) : Action()
@@ -224,6 +246,7 @@ class GameViewModel(
     data class State(
         val targetList: ImmutableList<Target> = persistentListOf(),
         val field: Field = Field(),
+        val effects: ActiveEffects = ActiveEffects(),
         val phase: GamePhase = GamePhase.ReadyToPlay,
         val recentResults: ImmutableList<Field> = persistentListOf(),
         val bestResult: Field? = null,
@@ -312,6 +335,9 @@ internal fun nextPhase(
 
         is GameViewModel.Action.TargetClicked,
         GameViewModel.Action.FireButtonClicked,
+        GameViewModel.Action.StashBooster,
+        is GameViewModel.Action.ApplyBoosterFromStash,
+        GameViewModel.Action.DisarmIcePick,
         is GameViewModel.Action.Tick,
         GameViewModel.Action.PersistTargetsNow,
         -> {

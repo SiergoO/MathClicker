@@ -22,6 +22,5 @@ val gameModule =
         single { SessionHelperImpl() } bind SessionHelper::class
         // Game owns a flow collector that only runs once start() is called; a factory would hand
         // out un-started instances, so this must stay a single.
-        // TODO(MC-115): pass boostersEnabled = true once the booster UI lands.
-        single { Game(get(), CoroutineScope(Dispatchers.Default)).apply { start() } }
+        single { Game(get(), CoroutineScope(Dispatchers.Default), boostersEnabled = true).apply { start() } }
     }

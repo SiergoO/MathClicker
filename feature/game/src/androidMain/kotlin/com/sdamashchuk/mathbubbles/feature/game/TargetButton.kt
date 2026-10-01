@@ -37,6 +37,7 @@ import com.sdamashchuk.mathbubbles.core.ui.theme.BubbleFillReady
 import com.sdamashchuk.mathbubbles.core.ui.theme.BubbleRimIdle
 import com.sdamashchuk.mathbubbles.core.ui.theme.BubbleRimReady
 import com.sdamashchuk.mathbubbles.core.ui.theme.Ink
+import com.sdamashchuk.mathbubbles.core.ui.theme.Warning
 import com.sdamashchuk.mathbubbles.feature.game.model.TargetScreenPosition
 import kotlin.math.abs
 
@@ -77,6 +78,15 @@ private const val HIGHLIGHT_ECCENTRICITY = 1.2f
 
 private const val DIGIT_SIZE_FRACTION = 0.28f
 
+private const val CRACK_STROKE_WIDTH_FRACTION = 0.02f
+private const val CRACK_ALPHA = 0.8f
+private const val CRACK_BRANCH_1_X = 0.4f
+private const val CRACK_BRANCH_1_Y = 0.6f
+private const val CRACK_BRANCH_2_X = 0.5f
+private const val CRACK_BRANCH_2_Y = 0.3f
+private const val CRACK_BRANCH_3_X = 0.3f
+private const val CRACK_BRANCH_3_Y = 0.5f
+
 // A target that cannot be reduced by the armed operation is fully idle; one that can, but is not
 // yet a single press from zero, sits partway. One number drives every layer, so the three states
 // are one animatable value rather than three branches. An unreachable target additionally loses its
@@ -102,6 +112,7 @@ fun TargetButton(
     gameTimeMsProvider: () -> Long,
     onTargetClicked: (id: Int) -> Unit,
     onTargetPositioned: (id: Int, position: TargetScreenPosition) -> Unit,
+    icePickArmed: Boolean = false,
 ) {
     val squashScale = remember(target.id) { Animatable(1f) }
     var lastKnownValue by remember(target.id) { mutableIntStateOf(target.value) }
@@ -149,7 +160,7 @@ fun TargetButton(
                             squashScale.value
                     scaleX = combined
                     scaleY = combined
-                }.bubble(liveliness, target, gameTimeMsProvider)
+                }.bubble(liveliness, target, gameTimeMsProvider, icePickArmed)
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
@@ -209,6 +220,7 @@ private fun Modifier.bubble(
     liveliness: Float,
     target: Target,
     gameTimeMsProvider: () -> Long,
+    icePickArmed: Boolean,
 ) = drawWithCache {
     val radius = size.minDimension / 2f
     val center = Offset(size.width / 2f, size.height / 2f)
@@ -277,6 +289,28 @@ private fun Modifier.bubble(
             drawCircle(coreBrush, radius = radius * HIGHLIGHT_CORE_RADIUS_FRACTION, center = highlightCenter)
         }
         drawCircle(rim, radius = radius - rimWidth / 2f, center = center, style = Stroke(rimWidth))
+        if (icePickArmed) {
+            val crackWidth = size.minDimension * CRACK_STROKE_WIDTH_FRACTION
+            val crackColor = Warning.copy(alpha = CRACK_ALPHA)
+            drawLine(
+                crackColor,
+                Offset(center.x - radius * CRACK_BRANCH_1_X, center.y - radius * CRACK_BRANCH_1_Y),
+                center,
+                crackWidth,
+            )
+            drawLine(
+                crackColor,
+                center,
+                Offset(center.x + radius * CRACK_BRANCH_2_X, center.y + radius * CRACK_BRANCH_2_Y),
+                crackWidth,
+            )
+            drawLine(
+                crackColor,
+                center,
+                Offset(center.x - radius * CRACK_BRANCH_3_X, center.y + radius * CRACK_BRANCH_3_Y),
+                crackWidth,
+            )
+        }
         // Read here, not in the cache block above: the ring's colour and width are constant, so
         // a telegraph switching on has to re-draw but must never rebuild four shaders.
         if (target.isTelegraphingBreakout(gameTimeMsProvider())) {

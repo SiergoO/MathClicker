@@ -1,6 +1,7 @@
 package com.sdamashchuk.mathbubbles.core.game
 
 import com.sdamashchuk.mathbubbles.core.game.model.GameEvent
+import com.sdamashchuk.mathbubbles.core.game.model.IcePickSource
 import com.sdamashchuk.mathbubbles.core.model.Booster
 import com.sdamashchuk.mathbubbles.core.model.FieldAction
 import com.sdamashchuk.mathbubbles.core.model.OperationSign
@@ -11,7 +12,6 @@ import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -155,47 +155,7 @@ class GameBoosterUsageTest {
         }
 
     @Test
-    fun `firing an operation does not disarm an already-armed ice pick`() =
-        runTest {
-            val game =
-                Game(
-                    FakeSessionHelper(targetAmount = 1, targetValue = 1000),
-                    backgroundScope,
-                    Random(1),
-                    boostersEnabled = true,
-                )
-            game.createField(1)
-            game.targetsRestored(listOf(scheduledTarget(id = 1, value = 1000)))
-            game.fieldRestored(
-                game.stateFlow.value.field.copy(
-                    currentBooster = Booster.ICE_PICK,
-                    nextOperationSign = OperationSign.SUBTRACTION,
-                    nextOperationDigit = 5,
-                ),
-            )
-
-            game.fireButtonClicked() // arms the pick, promotes the pre-set operation into current
-            assertIs<FieldAction.Operation>(game.stateFlow.value.field.currentAction)
-
-            game.fireButtonClicked() // fires that operation while the pick stays armed
-            assertEquals(
-                995,
-                game.stateFlow.value.targets
-                    .single()
-                    .value,
-            )
-
-            game.targetClicked(1) // still armed: destroys outright instead of -1
-            assertEquals(
-                0,
-                game.stateFlow.value.targets
-                    .single()
-                    .value,
-            )
-        }
-
-    @Test
-    fun `disarmIcePick clears the armed flag and returns the pick to the first free stash slot`() =
+    fun `ice pick armed from the fire button holds the centre until the destroying tap then promotes once`() =
         runTest {
             val game =
                 Game(
@@ -209,14 +169,111 @@ class GameBoosterUsageTest {
             game.fieldRestored(
                 game.stateFlow.value.field.copy(
                     currentBooster = Booster.ICE_PICK,
-                    boosterStash = listOf(Booster.SHIELD),
+                    nextOperationSign = OperationSign.SUBTRACTION,
+                    nextOperationDigit = 5,
                 ),
+            )
+
+            game.fireButtonClicked() // arms the pick without promoting
+            assertEquals(Booster.ICE_PICK, game.stateFlow.value.field.currentBooster)
+
+            game.fireButtonClicked() // re-arming while already armed: still just the pick, still not promoted
+            assertEquals(Booster.ICE_PICK, game.stateFlow.value.field.currentBooster, "still holding the centre")
+
+            game.targetClicked(1) // the destroying tap
+
+            // A second promotion would have discarded the pre-arm next (5) into history instead of
+            // landing it in current, and a second drop roll would have left the counter at 2, not 1.
+            assertEquals(
+                FieldAction.Operation(OperationSign.SUBTRACTION, 5),
+                game.stateFlow.value.field.currentAction,
+                "the destroying tap should promote exactly once",
+            )
+            assertEquals(1, game.stateFlow.value.field.boosterDropCounter, "exactly one drop roll should have run")
+        }
+
+    @Test
+    fun `ice pick armed from a stash slot empties that slot on the destroying tap`() =
+        runTest {
+            val game =
+                Game(
+                    FakeSessionHelper(targetAmount = 1, targetValue = 7),
+                    backgroundScope,
+                    Random(1),
+                    boostersEnabled = true,
+                )
+            game.createField(1)
+            game.targetsRestored(listOf(scheduledTarget(id = 1, value = 7)))
+            game.fieldRestored(
+                game.stateFlow.value.field
+                    .copy(boosterStash = listOf(Booster.FREEZE, Booster.ICE_PICK)),
+            )
+
+            game.applyBoosterFromStash(1) // arms the pick in slot 1, does not free it
+            assertEquals(listOf(Booster.FREEZE, Booster.ICE_PICK), game.stateFlow.value.field.boosterStash)
+
+            game.targetClicked(1) // the destroying tap
+
+            assertEquals(listOf(Booster.FREEZE), game.stateFlow.value.field.boosterStash)
+        }
+
+    @Test
+    fun `firing an operation still works while the ice pick is armed in a stash slot`() =
+        runTest {
+            val game =
+                Game(
+                    FakeSessionHelper(targetAmount = 1, targetValue = 7),
+                    backgroundScope,
+                    Random(1),
+                    boostersEnabled = true,
+                )
+            game.createField(1)
+            game.targetsRestored(listOf(scheduledTarget(id = 1, value = 7)))
+            game.fieldRestored(
+                game.stateFlow.value.field.copy(
+                    boosterStash = listOf(Booster.ICE_PICK),
+                    currentOperationSign = OperationSign.SUBTRACTION,
+                    currentOperationDigit = 2,
+                ),
+            )
+
+            game.applyBoosterFromStash(0) // arms the pick, the centre is untouched
+            game.fireButtonClicked() // fires the centre operation normally
+
+            assertEquals(
+                5,
+                game.stateFlow.value.targets
+                    .single()
+                    .value,
+            )
+            assertEquals(
+                listOf(Booster.ICE_PICK),
+                game.stateFlow.value.field.boosterStash,
+                "the armed pick should stay put",
+            )
+        }
+
+    @Test
+    fun `tapping the fire button again disarms a pick armed there without moving it`() =
+        runTest {
+            val game =
+                Game(
+                    FakeSessionHelper(targetAmount = 1, targetValue = 7),
+                    backgroundScope,
+                    Random(1),
+                    boostersEnabled = true,
+                )
+            game.createField(1)
+            game.targetsRestored(listOf(scheduledTarget(id = 1, value = 7)))
+            game.fieldRestored(
+                game.stateFlow.value.field
+                    .copy(currentBooster = Booster.ICE_PICK),
             )
             game.fireButtonClicked() // arms it
 
             game.disarmIcePick()
 
-            assertEquals(listOf(Booster.SHIELD, Booster.ICE_PICK), game.stateFlow.value.field.boosterStash)
+            assertEquals(Booster.ICE_PICK, game.stateFlow.value.field.currentBooster, "the pick should stay put")
             game.targetClicked(1) // disarmed: an ordinary decrement, not an outright destroy
             assertEquals(
                 6,
@@ -224,6 +281,59 @@ class GameBoosterUsageTest {
                     .single()
                     .value,
             )
+        }
+
+    @Test
+    fun `tapping the stash slot again disarms a pick armed there without moving it`() =
+        runTest {
+            val game =
+                Game(
+                    FakeSessionHelper(targetAmount = 1, targetValue = 7),
+                    backgroundScope,
+                    Random(1),
+                    boostersEnabled = true,
+                )
+            game.createField(1)
+            game.targetsRestored(listOf(scheduledTarget(id = 1, value = 7)))
+            game.fieldRestored(
+                game.stateFlow.value.field
+                    .copy(boosterStash = listOf(Booster.ICE_PICK)),
+            )
+            game.applyBoosterFromStash(0) // arms it
+
+            game.disarmIcePick()
+
+            assertEquals(listOf(Booster.ICE_PICK), game.stateFlow.value.field.boosterStash, "the pick should stay put")
+            game.targetClicked(1) // disarmed: an ordinary decrement, not an outright destroy
+            assertEquals(
+                6,
+                game.stateFlow.value.targets
+                    .single()
+                    .value,
+            )
+        }
+
+    @Test
+    fun `stashBooster refuses to swipe away a pick armed in the fire button`() =
+        runTest {
+            val game =
+                Game(
+                    FakeSessionHelper(targetAmount = 1, targetValue = 7),
+                    backgroundScope,
+                    Random(1),
+                    boostersEnabled = true,
+                )
+            game.createField(1)
+            game.fieldRestored(
+                game.stateFlow.value.field
+                    .copy(currentBooster = Booster.ICE_PICK),
+            )
+            game.fireButtonClicked() // arms it
+            val before = game.stateFlow.value.field
+
+            game.stashBooster()
+
+            assertEquals(before, game.stateFlow.value.field)
         }
 
     @Test
@@ -239,7 +349,7 @@ class GameBoosterUsageTest {
         }
 
     @Test
-    fun `disarmIcePick is refused when the stash is full and leaves the pick armed`() =
+    fun `disarmIcePick succeeds even when the stash is full since it never touches the stash`() =
         runTest {
             val game =
                 Game(
@@ -260,9 +370,9 @@ class GameBoosterUsageTest {
             game.disarmIcePick()
 
             assertEquals(fullStash, game.stateFlow.value.field.boosterStash)
-            game.targetClicked(1) // still armed: destroys outright instead of -1
+            game.targetClicked(1) // disarmed: an ordinary decrement, not an outright destroy
             assertEquals(
-                0,
+                6,
                 game.stateFlow.value.targets
                     .single()
                     .value,
@@ -473,5 +583,76 @@ class GameBoosterUsageTest {
             game.applyBoosterFromStash(1)
 
             assertEquals(before, game.stateFlow.value.field)
+        }
+
+    @Test
+    fun `freeing an earlier slot while the ice pick is armed later does not crash the destroying tap`() =
+        runTest {
+            val game =
+                Game(
+                    FakeSessionHelper(targetAmount = 1, targetValue = 7),
+                    backgroundScope,
+                    Random(1),
+                    boostersEnabled = true,
+                )
+            game.createField(1)
+            game.targetsRestored(listOf(scheduledTarget(id = 1, value = 7)))
+            game.fieldRestored(
+                game.stateFlow.value.field
+                    .copy(boosterStash = listOf(Booster.FREEZE, Booster.ICE_PICK)),
+            )
+            game.applyBoosterFromStash(1) // arms the pick at slot 1
+            game.applyBoosterFromStash(0) // frees FREEZE at slot 0, shifting the pick down to slot 0
+
+            game.targetClicked(1) // must free the pick, not crash on a stale index
+
+            assertEquals(emptyList(), game.stateFlow.value.field.boosterStash)
+        }
+
+    @Test
+    fun `freeing an earlier slot while the ice pick is armed later re-targets the pick instead of the wrong booster`() =
+        runTest {
+            val game =
+                Game(
+                    FakeSessionHelper(targetAmount = 1, targetValue = 7),
+                    backgroundScope,
+                    Random(1),
+                    boostersEnabled = true,
+                )
+            game.createField(1)
+            game.targetsRestored(listOf(scheduledTarget(id = 1, value = 7)))
+            game.fieldRestored(
+                game.stateFlow.value.field
+                    .copy(boosterStash = listOf(Booster.FREEZE, Booster.ICE_PICK, Booster.SHIELD)),
+            )
+            game.applyBoosterFromStash(1) // arms the pick at slot 1
+            game.applyBoosterFromStash(0) // frees FREEZE at slot 0, shifting the pick down to slot 0
+            assertEquals(IcePickSource.StashSlot(0), game.stateFlow.value.effects.icePickArmedFrom)
+
+            game.targetClicked(1) // the destroying tap
+
+            assertEquals(listOf(Booster.SHIELD), game.stateFlow.value.field.boosterStash)
+        }
+
+    @Test
+    fun `freeing a later slot while the ice pick is armed leaves its own slot index unchanged`() =
+        runTest {
+            val game =
+                Game(
+                    FakeSessionHelper(targetAmount = 1, targetValue = 7),
+                    backgroundScope,
+                    Random(1),
+                    boostersEnabled = true,
+                )
+            game.createField(1)
+            game.fieldRestored(
+                game.stateFlow.value.field
+                    .copy(boosterStash = listOf(Booster.ICE_PICK, Booster.FREEZE, Booster.SHIELD)),
+            )
+            game.applyBoosterFromStash(0) // arms the pick at slot 0
+            game.applyBoosterFromStash(2) // frees SHIELD at slot 2, after the armed slot
+
+            assertEquals(IcePickSource.StashSlot(0), game.stateFlow.value.effects.icePickArmedFrom)
+            assertEquals(listOf(Booster.ICE_PICK, Booster.FREEZE), game.stateFlow.value.field.boosterStash)
         }
 }

@@ -31,7 +31,9 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import com.sdamashchuk.mathbubbles.core.model.Booster
 import com.sdamashchuk.mathbubbles.core.model.GAME_COLUMN_COUNT
+import com.sdamashchuk.mathbubbles.core.ui.theme.AccentSoft
 import com.sdamashchuk.mathbubbles.core.ui.theme.WaterDeep
 import com.sdamashchuk.mathbubbles.core.ui.theme.WaterMote
 import com.sdamashchuk.mathbubbles.core.ui.theme.WaterSurface
@@ -73,10 +75,12 @@ fun PlayArea(
                 gameState.value.targetList.filter { it.isActive && it.isVisible(gameTimeMs) }
             }
         }
+    val isFrozen by remember { derivedStateOf { gameState.value.effects.timedBooster == Booster.FREEZE } }
+    val icePickArmed by remember { derivedStateOf { gameState.value.effects.icePickArmed } }
 
     val depthFactor = waterDepthFactor(level)
-    val surface = sink(WaterSurface, depthFactor)
-    val deep = sink(WaterDeep, depthFactor)
+    val surface = tintIfFrozen(sink(WaterSurface, depthFactor), isFrozen)
+    val deep = tintIfFrozen(sink(WaterDeep, depthFactor), isFrozen)
 
     // A plain map, not mutableStateMapOf. Nothing composable reads it - the burst below reads it
     // from a coroutine - so snapshot machinery bought nothing and cost a state record per write,
@@ -162,6 +166,7 @@ fun PlayArea(
                                 gameTimeMsProvider = gameTimeMsProvider,
                                 onTargetClicked = onTargetClicked,
                                 onTargetPositioned = { id, position -> targetPositions[id] = position },
+                                icePickArmed = icePickArmed,
                             )
                         }
                     }
@@ -177,6 +182,23 @@ fun PlayArea(
         }
     }
 }
+
+private const val FROZEN_TINT_FRACTION = 0.25f
+
+private fun tintIfFrozen(
+    color: Color,
+    isFrozen: Boolean,
+): Color =
+    if (isFrozen) {
+        Color(
+            red = color.red + (AccentSoft.red - color.red) * FROZEN_TINT_FRACTION,
+            green = color.green + (AccentSoft.green - color.green) * FROZEN_TINT_FRACTION,
+            blue = color.blue + (AccentSoft.blue - color.blue) * FROZEN_TINT_FRACTION,
+            alpha = color.alpha,
+        )
+    } else {
+        color
+    }
 
 // An even split. The subtraction this used to carry reserved width for 1dp lane separators; MC-81
 // moved those into an overlay and MC-84 removed them, so reserving for them left the row 3dp short

@@ -1,10 +1,12 @@
 package com.sdamashchuk.mathbubbles.core.game
 
 import com.sdamashchuk.mathbubbles.core.game.helper.SessionHelper
+import com.sdamashchuk.mathbubbles.core.game.model.ActiveEffects
 import com.sdamashchuk.mathbubbles.core.game.model.BoosterDropContext
 import com.sdamashchuk.mathbubbles.core.game.model.BoosterDropResult
 import com.sdamashchuk.mathbubbles.core.game.model.GameEvent
 import com.sdamashchuk.mathbubbles.core.game.model.GameState
+import com.sdamashchuk.mathbubbles.core.game.model.IcePickSource
 import com.sdamashchuk.mathbubbles.core.game.model.TimedBoosterEffect
 import com.sdamashchuk.mathbubbles.core.game.objectmapper.advanceClock
 import com.sdamashchuk.mathbubbles.core.game.objectmapper.applyCombo
@@ -23,6 +25,7 @@ import com.sdamashchuk.mathbubbles.core.game.objectmapper.updateActionButtons
 import com.sdamashchuk.mathbubbles.core.game.objectmapper.updateLevel
 import com.sdamashchuk.mathbubbles.core.game.objectmapper.updateScore
 import com.sdamashchuk.mathbubbles.core.game.scoring.performOperation
+import com.sdamashchuk.mathbubbles.core.model.BOOSTER_STASH_CAPACITY
 import com.sdamashchuk.mathbubbles.core.model.Booster
 import com.sdamashchuk.mathbubbles.core.model.Field
 import com.sdamashchuk.mathbubbles.core.model.FieldAction
@@ -51,8 +54,6 @@ internal const val MAX_TICK_MS = 250
 
 // Termination bound: a board no candidate digit can touch must still return in finite time.
 private const val MAX_OPERATION_DRAW_ATTEMPTS = 20
-
-private const val BOOSTER_STASH_CAPACITY = 3
 
 private const val FREEZE_DURATION_MS = 3_000
 private const val REWIND_DURATION_MS = 2_000
@@ -95,7 +96,7 @@ class Game(
     private var pendingOpeningPromotionCheck = false
 
     private var activeTimedEffect: TimedBoosterEffect? = null
-    private var icePickArmed = false
+    private var icePickArmedFrom: IcePickSource? = null
     private var shieldActive = false
 
     fun start() {
@@ -122,21 +123,21 @@ class Game(
 
     suspend fun createField(id: Int) =
         mutex.withLock {
-            _stateFlow.value = _stateFlow.value.copy(field = recreateField(id))
             pendingOpeningPromotionCheck = true
             activeTimedEffect = null
-            icePickArmed = false
+            icePickArmedFrom = null
             shieldActive = false
+            _stateFlow.value = _stateFlow.value.copy(field = recreateField(id), effects = currentEffects())
         }
 
     suspend fun createTargets() = mutex.withLock { createTargetsLocked() }
 
     suspend fun fieldRestored(field: Field) =
         mutex.withLock {
-            _stateFlow.value = _stateFlow.value.copy(field = field)
             activeTimedEffect = null
-            icePickArmed = false
+            icePickArmedFrom = null
             shieldActive = false
+            _stateFlow.value = _stateFlow.value.copy(field = field, effects = currentEffects())
         }
 
     suspend fun targetsRestored(targets: List<Target>) =
@@ -147,19 +148,25 @@ class Game(
     suspend fun targetClicked(id: Int) =
         mutex.withLock {
             val current = _stateFlow.value
-            if (icePickArmed) {
+            val armedFrom = icePickArmedFrom
+            if (armedFrom != null) {
                 val target = current.targets.firstOrNull { it.id == id }
                 if (target == null || !target.isActive || !target.isVisible(current.field.gameTimeMs)) {
                     return@withLock
                 }
-                icePickArmed = false
+                icePickArmedFrom = null
                 val awarded = if (target.isProfitable) target.value else 0
                 val updatedTargets =
                     current.targets
                         .decrementValue(id, target.value)
                         .ensureAlive(id)
-                val updatedField = current.field.updateScore(awarded)
-                _stateFlow.value = GameState(updatedField, updatedTargets)
+                val scoredField = current.field.updateScore(awarded)
+                val updatedField =
+                    when (armedFrom) {
+                        IcePickSource.FireButton -> promoteAfterIcePick(current, scoredField, updatedTargets)
+                        is IcePickSource.StashSlot -> scoredField.freeStashSlot(armedFrom.index)
+                    }
+                _stateFlow.value = GameState(updatedField, updatedTargets, currentEffects())
                 _events.tryEmit(GameEvent.TargetZeroed(id, awarded))
                 return@withLock
             }
@@ -171,7 +178,7 @@ class Game(
             val updatedTarget = updatedTargets.first { it.id == id }
             val awarded = if (updatedTarget.isProfitable) 1 else 0
             val updatedField = if (updatedTarget.isProfitable) current.field.updateScore(1) else current.field
-            _stateFlow.value = GameState(updatedField, updatedTargets)
+            _stateFlow.value = GameState(updatedField, updatedTargets, currentEffects())
             if (previousValue > 0 && updatedTarget.value == 0) {
                 _events.tryEmit(GameEvent.TargetZeroed(id, awarded))
             }
@@ -223,18 +230,35 @@ class Game(
             comboField
                 .updateActionButtons(nextOperationSign, nextOperationDigit, drop.booster, drop.counter)
                 .updateScore(gained)
-        _stateFlow.value = GameState(updatedField, updatedTargets)
+        _stateFlow.value = GameState(updatedField, updatedTargets, currentEffects())
         _events.tryEmit(GameEvent.OperationResolved(gained, comboField.bonusMultiplier))
     }
 
     private fun fireBoosterLocked(current: GameState) {
-        current.field.currentBooster?.let(::applyBoosterEffect)
+        val booster = current.field.currentBooster ?: return
+        if (booster == Booster.ICE_PICK) {
+            icePickArmedFrom = IcePickSource.FireButton
+            _stateFlow.value = current.copy(effects = currentEffects())
+            return
+        }
+        applyBoosterEffect(booster)
         val drop = rollBoosterDrop(current.field, current.targets)
         val (nextOperationSign, nextOperationDigit) =
             getNextSignAndDigit(current.targets, current.field.level, current.field.gameTimeMs)
         val updatedField =
             current.field.updateActionButtons(nextOperationSign, nextOperationDigit, drop.booster, drop.counter)
-        _stateFlow.value = GameState(updatedField, current.targets)
+        _stateFlow.value = GameState(updatedField, current.targets, currentEffects())
+    }
+
+    private fun promoteAfterIcePick(
+        current: GameState,
+        scoredField: Field,
+        updatedTargets: List<Target>,
+    ): Field {
+        val drop = rollBoosterDrop(current.field, updatedTargets)
+        val (nextOperationSign, nextOperationDigit) =
+            getNextSignAndDigit(updatedTargets, current.field.level, current.field.gameTimeMs)
+        return scoredField.updateActionButtons(nextOperationSign, nextOperationDigit, drop.booster, drop.counter)
     }
 
     // A swipe on an operation or into a full stash is a UI slip, so it is ignored rather than reported.
@@ -242,6 +266,7 @@ class Game(
         mutex.withLock {
             val current = _stateFlow.value
             val booster = current.field.currentBooster ?: return@withLock
+            if (booster == Booster.ICE_PICK && icePickArmedFrom == IcePickSource.FireButton) return@withLock
             if (current.field.boosterStash.size >= BOOSTER_STASH_CAPACITY) return@withLock
             val stashedField = current.field.stashCurrentBooster(booster)
             val drop = rollBoosterDrop(stashedField, current.targets)
@@ -249,31 +274,64 @@ class Game(
                 getNextSignAndDigit(current.targets, stashedField.level, stashedField.gameTimeMs)
             val promotedField =
                 stashedField.updateActionButtons(nextOperationSign, nextOperationDigit, drop.booster, drop.counter)
-            _stateFlow.value = GameState(promotedField, current.targets)
+            _stateFlow.value = GameState(promotedField, current.targets, currentEffects())
         }
 
     suspend fun applyBoosterFromStash(slotIndex: Int) =
         mutex.withLock {
             val current = _stateFlow.value
             val booster = current.field.boosterStash.getOrNull(slotIndex) ?: return@withLock
+            if (booster == Booster.ICE_PICK) {
+                icePickArmedFrom = IcePickSource.StashSlot(slotIndex)
+                _stateFlow.value = current.copy(effects = currentEffects())
+                return@withLock
+            }
             applyBoosterEffect(booster)
-            _stateFlow.value = current.copy(field = current.field.freeStashSlot(slotIndex))
+            shiftArmedSlotAfterRemoving(slotIndex)
+            _stateFlow.value =
+                current.copy(field = current.field.freeStashSlot(slotIndex), effects = currentEffects())
         }
+
+    // The stash shifts left on removal, so the armed slot index must follow it.
+    private fun shiftArmedSlotAfterRemoving(removedIndex: Int) {
+        val armedFrom = icePickArmedFrom as? IcePickSource.StashSlot ?: return
+        icePickArmedFrom =
+            when {
+                removedIndex == armedFrom.index -> null
+                removedIndex < armedFrom.index -> IcePickSource.StashSlot(armedFrom.index - 1)
+                else -> armedFrom
+            }
+    }
 
     suspend fun disarmIcePick() =
         mutex.withLock {
-            if (!icePickArmed) return@withLock
-            val current = _stateFlow.value
-            if (current.field.boosterStash.size >= BOOSTER_STASH_CAPACITY) return@withLock
-            icePickArmed = false
-            _stateFlow.value = current.copy(field = current.field.stashCurrentBooster(Booster.ICE_PICK))
+            if (icePickArmedFrom == null) return@withLock
+            icePickArmedFrom = null
+            _stateFlow.value = _stateFlow.value.copy(effects = currentEffects())
         }
+
+    private fun currentEffects(): ActiveEffects {
+        val timed = activeTimedEffect
+        val totalMs =
+            when (timed?.booster) {
+                Booster.FREEZE -> FREEZE_DURATION_MS
+                Booster.REWIND -> REWIND_DURATION_MS
+                else -> 0
+            }
+        return ActiveEffects(
+            timedBooster = timed?.booster,
+            remainingRealMs = timed?.remainingRealMs ?: 0,
+            remainingFraction = if (timed != null && totalMs > 0) timed.remainingRealMs / totalMs.toFloat() else 0f,
+            icePickArmedFrom = icePickArmedFrom,
+            shieldActive = shieldActive,
+        )
+    }
 
     private fun applyBoosterEffect(booster: Booster) {
         when (booster) {
             Booster.FREEZE -> activeTimedEffect = TimedBoosterEffect(Booster.FREEZE, FREEZE_DURATION_MS)
             Booster.REWIND -> activeTimedEffect = TimedBoosterEffect(Booster.REWIND, REWIND_DURATION_MS)
-            Booster.ICE_PICK -> icePickArmed = true
+            Booster.ICE_PICK -> error("ice pick must not reach applyBoosterEffect")
             Booster.SHIELD -> shieldActive = true
         }
     }
@@ -336,9 +394,9 @@ class Game(
         _stateFlow.value =
             if (leveledUp) {
                 val leveledField = field.updateLevel()
-                GameState(leveledField, recreateTargets(leveledField))
+                GameState(leveledField, recreateTargets(leveledField), currentEffects())
             } else {
-                GameState(field, targets)
+                GameState(field, targets, currentEffects())
             }
         return leveledUp
     }
@@ -413,7 +471,7 @@ class Game(
             // A closed field must not level up: tick can close it on a step that leaves other targets active.
             if (current.targets.none { it.isActive } && !current.field.isClosed) {
                 val updatedField = current.field.updateLevel()
-                _stateFlow.value = GameState(updatedField, recreateTargets(updatedField))
+                _stateFlow.value = GameState(updatedField, recreateTargets(updatedField), currentEffects())
                 _events.tryEmit(GameEvent.LevelUp(updatedField.level))
             }
         }
@@ -567,7 +625,7 @@ class Game(
                 anyVisibleBeyondTelegraph = visibleActiveTargets.any { it.isTelegraphingBreakout(field.gameTimeMs) },
                 noVisibleBubble = visibleActiveTargets.isEmpty(),
                 oneLifeLeft = field.lifeCount == 1,
-                icePickArmed = icePickArmed,
+                icePickArmed = icePickArmedFrom != null,
                 shieldActive = shieldActive,
             )
         return boosterDropRule.roll(

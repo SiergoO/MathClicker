@@ -19,6 +19,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.lifecycle.Lifecycle
+import com.sdamashchuk.mathbubbles.core.model.BOOSTER_STASH_CAPACITY
+import com.sdamashchuk.mathbubbles.core.model.FieldAction
 import com.sdamashchuk.mathbubbles.core.ui.sound.model.SoundSample
 import com.sdamashchuk.mathbubbles.core.ui.theme.MathBubblesTheme
 import com.sdamashchuk.mathbubbles.feature.game.model.FeedbackEffect
@@ -96,10 +98,27 @@ fun GameScreen(component: GameComponent) {
                                     component.playSound(SoundSample.Tap)
                                     component.sendAction(GameViewModel.Action.TargetClicked(id))
                                 },
-                                onFireClicked = { component.sendAction(GameViewModel.Action.FireButtonClicked) },
+                                onFireClicked = {
+                                    if (gameState.value.field.currentAction is FieldAction.BoosterAction) {
+                                        component.playSound(SoundSample.OperationSuccess)
+                                    }
+                                    component.sendAction(GameViewModel.Action.FireButtonClicked)
+                                },
                                 onTick = { component.sendAction(GameViewModel.Action.Tick(it)) },
                                 onPauseClicked = { component.sendAction(GameViewModel.Action.PauseGame) },
                                 targetZeroedSignal = targetZeroedSignal,
+                                onStashBooster = {
+                                    playTapUnlessStashFull(component, gameState.value)
+                                    component.sendAction(GameViewModel.Action.StashBooster)
+                                },
+                                onApplyBoosterFromStash = { slotIndex ->
+                                    component.playSound(SoundSample.OperationSuccess)
+                                    component.sendAction(GameViewModel.Action.ApplyBoosterFromStash(slotIndex))
+                                },
+                                onDisarmIcePick = {
+                                    component.playSound(SoundSample.Tap)
+                                    component.sendAction(GameViewModel.Action.DisarmIcePick)
+                                },
                             )
                         }
                     }
@@ -154,6 +173,15 @@ fun GameScreen(component: GameComponent) {
 // Field owns the frame loop that drives the engine clock (withFrameNanos -> onTick), so composing
 // it only for Playing is what makes pausing stop that clock structurally rather than via a flag.
 internal fun shouldComposeField(phase: GamePhase) = phase == GamePhase.Playing
+
+private fun playTapUnlessStashFull(
+    component: GameComponent,
+    gameState: GameViewModel.State,
+) {
+    if (gameState.field.boosterStash.size < BOOSTER_STASH_CAPACITY) {
+        component.playSound(SoundSample.Tap)
+    }
+}
 
 // Launched fire-and-forget on TargetBrokeOut so it never blocks the collector loop above from
 // processing the next event; three steps read as a rattle rather than one big nudge.
