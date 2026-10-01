@@ -10,11 +10,12 @@ import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.sdamashchuk.mathbubbles.core.ui.theme.Accent
 import com.sdamashchuk.mathbubbles.core.ui.theme.Shapes
 
-private const val GUTTER_DP = 24
+private val DefaultGutter = 24.dp
 private const val HEIGHT_DP = 60
 
 @Composable
@@ -22,6 +23,7 @@ fun MenuButton(
     modifier: Modifier = Modifier,
     text: String,
     onClick: () -> Unit,
+    horizontalPadding: Dp = DefaultGutter,
 ) {
     Button(
         onClick = onClick,
@@ -29,7 +31,7 @@ fun MenuButton(
         modifier =
             modifier
                 .fillMaxWidth()
-                .padding(horizontal = GUTTER_DP.dp)
+                .padding(horizontal = horizontalPadding)
                 .height(HEIGHT_DP.dp)
                 .clip(Shapes.large),
     ) {
