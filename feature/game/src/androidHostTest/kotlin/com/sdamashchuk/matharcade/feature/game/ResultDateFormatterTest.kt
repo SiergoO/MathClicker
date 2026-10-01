@@ -1,13 +1,22 @@
 package com.sdamashchuk.matharcade.feature.game
 
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Test
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.TimeZone
 
 class ResultDateFormatterTest {
+    private val defaultTimeZone: TimeZone = TimeZone.getDefault()
+
+    @After
+    fun restoreTimeZone() {
+        TimeZone.setDefault(defaultTimeZone)
+    }
+
     // M4: a null date treated as zero rather than unknown. Epoch zero itself is exercised
     // separately below so a regression to "null coerced to 0L" can't pass by coincidence.
     @Test
@@ -36,6 +45,16 @@ class ResultDateFormatterTest {
         // carried by the absent setTimeZone call, not proven here.
         val instant = 1_790_208_000_000L
         assertEquals(expected(instant), formatResultDate(instant, noDateText = "—"))
+    }
+
+    @Test
+    fun `formatResultDate follows a change of the default time zone`() {
+        val instant = 1_790_208_000_000L
+        TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
+        val inUtc = formatResultDate(instant, noDateText = "—")
+        TimeZone.setDefault(TimeZone.getTimeZone("Asia/Tokyo"))
+        val inTokyo = formatResultDate(instant, noDateText = "—")
+        assertNotEquals(inUtc, inTokyo)
     }
 
     private fun expected(epochMillis: Long): String =
