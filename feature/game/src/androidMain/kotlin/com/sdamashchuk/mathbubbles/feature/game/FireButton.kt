@@ -19,7 +19,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -46,6 +45,7 @@ fun FireButton(
     onStashBooster: () -> Unit,
     isIcePickArmedHere: Boolean = false,
     modifier: Modifier = Modifier,
+    countdownAlpha: () -> Float = { 1f },
 ) {
     val density = LocalDensity.current
     val scope = rememberCoroutineScope()
@@ -53,7 +53,6 @@ fun FireButton(
     val thresholdPx = with(density) { -SWIPE_STASH_THRESHOLD.toPx() }
     val flingThresholdPxPerS = with(density) { FLING_VELOCITY_THRESHOLD_DP_PER_S.dp.toPx() }
     val isBooster = action is FieldAction.BoosterAction
-    val pulseScale = rememberPulseScale(enabled = isIcePickArmedHere)
     val armedLabel = stringResource(id = R.string.booster_ice_pick_armed)
 
     // A promotion can detach the drag mid-animation, so the offset is reset here, not in the drag.
@@ -73,10 +72,7 @@ fun FireButton(
             modifier
                 .size(FIRE_BUTTON_SIZE)
                 .offset { IntOffset(dragOffsetPx.value.roundToInt(), 0) }
-                .graphicsLayer {
-                    scaleX = pulseScale.value
-                    scaleY = pulseScale.value
-                }.draggable(
+                .draggable(
                     orientation = Orientation.Horizontal,
                     state = draggableState,
                     enabled = isBooster && !isIcePickArmedHere,
@@ -111,7 +107,7 @@ fun FireButton(
             }
         }
         if (countdownColor != null) {
-            CountdownRing(color = countdownColor, fraction = countdownFraction)
+            CountdownRing(color = countdownColor, fraction = countdownFraction, alpha = countdownAlpha)
         }
     }
 }

@@ -46,7 +46,10 @@ class GameBoosterUsageTest {
             assertFalse(target.isActive)
             assertEquals(0, target.value)
             assertEquals(7, game.stateFlow.value.field.score)
-            assertEquals(GameEvent.TargetZeroed(1, 7), events.filterIsInstance<GameEvent.TargetZeroed>().single())
+            assertEquals(
+                GameEvent.TargetZeroed(1, 7, viaIcePick = true),
+                events.filterIsInstance<GameEvent.TargetZeroed>().single(),
+            )
         }
 
     @Test
@@ -74,7 +77,10 @@ class GameBoosterUsageTest {
             testScheduler.runCurrent()
 
             assertEquals(10, game.stateFlow.value.field.score)
-            assertEquals(GameEvent.TargetZeroed(1, 0), events.filterIsInstance<GameEvent.TargetZeroed>().single())
+            assertEquals(
+                GameEvent.TargetZeroed(1, 0, viaIcePick = true),
+                events.filterIsInstance<GameEvent.TargetZeroed>().single(),
+            )
         }
 
     @Test
@@ -151,7 +157,10 @@ class GameBoosterUsageTest {
             game.targetClicked(1) // still armed: this tap is the one that lands
             testScheduler.runCurrent()
 
-            assertEquals(GameEvent.TargetZeroed(1, 9), events.filterIsInstance<GameEvent.TargetZeroed>().single())
+            assertEquals(
+                GameEvent.TargetZeroed(1, 9, viaIcePick = true),
+                events.filterIsInstance<GameEvent.TargetZeroed>().single(),
+            )
         }
 
     @Test
@@ -423,114 +432,6 @@ class GameBoosterUsageTest {
                     .first { it.id == 2 }
                     .value,
                 "ice pick survived createField",
-            )
-        }
-
-    @Test
-    fun `shield absorbs the next breakout's life loss and is consumed by it`() =
-        runTest {
-            val game =
-                Game(
-                    FakeSessionHelper(targetAmount = 1, targetValue = 5),
-                    backgroundScope,
-                    Random(1),
-                    boostersEnabled = true,
-                )
-            game.createField(1)
-            // id 2 outlives the test so the board never levels up into a fresh target reusing id 1.
-            game.targetsRestored(
-                listOf(
-                    scheduledTarget(id = 1, value = 5, lifetimeMs = 100),
-                    scheduledTarget(id = 2, columnId = 1, value = 5, lifetimeMs = 1_000_000),
-                ),
-            )
-            game.fieldRestored(
-                game.stateFlow.value.field
-                    .copy(currentBooster = Booster.SHIELD),
-            )
-            val startingLives = game.stateFlow.value.field.lifeCount
-
-            game.fireButtonClicked() // raises the shield
-            repeat(5) { game.tick(50) } // clears the 100ms lifetime
-
-            assertEquals(startingLives, game.stateFlow.value.field.lifeCount)
-            assertFalse(
-                game.stateFlow.value.targets
-                    .first { it.id == 1 }
-                    .isActive,
-            )
-        }
-
-    @Test
-    fun `a second breakout after the shield is spent costs a life normally`() =
-        runTest {
-            val game =
-                Game(
-                    FakeSessionHelper(targetAmount = 2, targetValue = 5),
-                    backgroundScope,
-                    Random(1),
-                    boostersEnabled = true,
-                )
-            game.createField(1)
-            // id 3 outlives the test; otherwise a level-up could reuse id 2 and run the loop below past
-            // the breakout it stops at.
-            game.targetsRestored(
-                listOf(
-                    scheduledTarget(id = 1, value = 5, lifetimeMs = 100),
-                    scheduledTarget(id = 2, columnId = 1, value = 5, lifetimeMs = 10_000),
-                    scheduledTarget(id = 3, columnId = 2, value = 5, lifetimeMs = 1_000_000),
-                ),
-            )
-            game.fieldRestored(
-                game.stateFlow.value.field
-                    .copy(currentBooster = Booster.SHIELD),
-            )
-            val startingLives = game.stateFlow.value.field.lifeCount
-
-            game.fireButtonClicked() // raises the shield
-            repeat(3) { game.tick(50) } // id 1 breaks out, the shield absorbs it
-            assertEquals(startingLives, game.stateFlow.value.field.lifeCount)
-
-            while (game.stateFlow.value.targets
-                    .first { it.id == 2 }
-                    .isActive
-            ) {
-                game.tick(250)
-            }
-            assertEquals(startingLives - 1, game.stateFlow.value.field.lifeCount)
-        }
-
-    @Test
-    fun `applying shield again while one is already active still protects only one breakout`() =
-        runTest {
-            val game =
-                Game(
-                    FakeSessionHelper(targetAmount = 2, targetValue = 5),
-                    backgroundScope,
-                    Random(1),
-                    boostersEnabled = true,
-                )
-            game.createField(1)
-            game.targetsRestored(
-                listOf(
-                    scheduledTarget(id = 1, value = 5, lifetimeMs = 100),
-                    scheduledTarget(id = 2, columnId = 1, value = 5, lifetimeMs = 150),
-                ),
-            )
-            game.fieldRestored(
-                game.stateFlow.value.field
-                    .copy(currentBooster = Booster.SHIELD, nextBooster = Booster.SHIELD),
-            )
-            val startingLives = game.stateFlow.value.field.lifeCount
-
-            game.fireButtonClicked() // raises the shield
-            game.fireButtonClicked() // applies a second shield - still just one flag
-
-            repeat(4) { game.tick(50) } // both targets have broken out by 200ms
-            assertEquals(
-                startingLives - 1,
-                game.stateFlow.value.field.lifeCount,
-                "shield protected more than one breakout",
             )
         }
 

@@ -27,6 +27,7 @@ import com.sdamashchuk.mathbubbles.core.game.objectmapper.updateScore
 import com.sdamashchuk.mathbubbles.core.game.scoring.performOperation
 import com.sdamashchuk.mathbubbles.core.model.BOOSTER_STASH_CAPACITY
 import com.sdamashchuk.mathbubbles.core.model.Booster
+import com.sdamashchuk.mathbubbles.core.model.EFFECT_RAMP_MS
 import com.sdamashchuk.mathbubbles.core.model.Field
 import com.sdamashchuk.mathbubbles.core.model.FieldAction
 import com.sdamashchuk.mathbubbles.core.model.OperationSign
@@ -45,6 +46,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlin.math.abs
 import kotlin.random.Random
 import kotlin.time.Clock
 
@@ -57,6 +59,12 @@ private const val MAX_OPERATION_DRAW_ATTEMPTS = 20
 
 private const val FREEZE_DURATION_MS = 3_000
 private const val REWIND_DURATION_MS = 2_000
+
+// The clock multiplier both effects ease toward and away from: 1 is untouched, and each effect's
+// own floor is how far below (or, for Rewind, past zero into negative) it eases on the way in.
+private const val NEUTRAL_RATE = 1.0
+private const val FREEZE_RATE_FLOOR = 0.0
+private const val REWIND_RATE_FLOOR = -1.0
 
 // 13 of the 33 are Game's own public contract; splitting the file would only scatter private
 // helpers, not shrink it. Suppressed here, not in a baseline, so further growth still fails.
@@ -99,6 +107,10 @@ class Game(
     private var icePickArmedFrom: IcePickSource? = null
     private var shieldActive = false
 
+    // Its own envelope, not derived from the shared rate: the rate passes through 0 on every
+    // Rewind ramp, which would otherwise read as a flash of Freeze.
+    private var freezeTintEnvelope = 0.0
+
     fun start() {
         collectorJob?.cancel()
         collectorJob =
@@ -127,6 +139,7 @@ class Game(
             activeTimedEffect = null
             icePickArmedFrom = null
             shieldActive = false
+            freezeTintEnvelope = 0.0
             _stateFlow.value = _stateFlow.value.copy(field = recreateField(id), effects = currentEffects())
         }
 
@@ -137,6 +150,7 @@ class Game(
             activeTimedEffect = null
             icePickArmedFrom = null
             shieldActive = false
+            freezeTintEnvelope = 0.0
             _stateFlow.value = _stateFlow.value.copy(field = field, effects = currentEffects())
         }
 
@@ -167,7 +181,7 @@ class Game(
                         is IcePickSource.StashSlot -> scoredField.freeStashSlot(armedFrom.index)
                     }
                 _stateFlow.value = GameState(updatedField, updatedTargets, currentEffects())
-                _events.tryEmit(GameEvent.TargetZeroed(id, awarded))
+                _events.tryEmit(GameEvent.TargetZeroed(id, awarded, viaIcePick = true))
                 return@withLock
             }
             val previousValue = current.targets.first { it.id == id }.value
@@ -322,15 +336,38 @@ class Game(
             timedBooster = timed?.booster,
             remainingRealMs = timed?.remainingRealMs ?: 0,
             remainingFraction = if (timed != null && totalMs > 0) timed.remainingRealMs / totalMs.toFloat() else 0f,
+            intensity = timed?.let { effectIntensity(it.booster, it.rate) } ?: 0f,
+            freezeTintIntensity = freezeTintEnvelope.toFloat(),
             icePickArmedFrom = icePickArmedFrom,
             shieldActive = shieldActive,
         )
     }
 
-    private fun applyBoosterEffect(booster: Booster) {
+    // Rewind's floor sits on the other side of 0 from Freeze's, letting a crossover between them
+    // pass through 0 instead of jumping.
+    private fun rateFloor(booster: Booster): Double =
         when (booster) {
-            Booster.FREEZE -> activeTimedEffect = TimedBoosterEffect(Booster.FREEZE, FREEZE_DURATION_MS)
-            Booster.REWIND -> activeTimedEffect = TimedBoosterEffect(Booster.REWIND, REWIND_DURATION_MS)
+            Booster.FREEZE -> FREEZE_RATE_FLOOR
+            Booster.REWIND -> REWIND_RATE_FLOOR
+            Booster.ICE_PICK, Booster.SHIELD -> NEUTRAL_RATE
+        }
+
+    // Symmetric around the floor, not just toward neutral: a crossover can carry a rate past the
+    // floor from the far side, which must not pop straight to full intensity.
+    private fun effectIntensity(
+        booster: Booster,
+        rate: Double,
+    ): Float {
+        val floor = rateFloor(booster)
+        if (floor == NEUTRAL_RATE) return 0f
+        return (1.0 - abs(rate - floor) / abs(NEUTRAL_RATE - floor)).toFloat().coerceIn(0f, 1f)
+    }
+
+    private fun applyBoosterEffect(booster: Booster) {
+        val carriedRate = activeTimedEffect?.rate ?: NEUTRAL_RATE
+        when (booster) {
+            Booster.FREEZE -> activeTimedEffect = TimedBoosterEffect(Booster.FREEZE, FREEZE_DURATION_MS, carriedRate)
+            Booster.REWIND -> activeTimedEffect = TimedBoosterEffect(Booster.REWIND, REWIND_DURATION_MS, carriedRate)
             Booster.ICE_PICK -> error("ice pick must not reach applyBoosterEffect")
             Booster.SHIELD -> shieldActive = true
         }
@@ -346,6 +383,11 @@ class Game(
         // Captured before advancing: the effect can expire inside advanceEffectField below, and
         // shortenAppearanceDelay must stay off for the tick that ran under it either way.
         val effectActiveBeforeTick = activeTimedEffect != null
+        advanceFreezeTintEnvelope(
+            elapsedMs,
+            freezeActive =
+                activeTimedEffect?.let { it.booster == Booster.FREEZE && it.remainingRealMs > EFFECT_RAMP_MS } == true,
+        )
 
         val advancedField = advanceEffectField(current, elapsedMs, clockScale)
         val brokenOutIds =
@@ -365,10 +407,10 @@ class Game(
         elapsedMs: Int,
         clockScale: Double,
     ): Field =
-        when (activeTimedEffect?.booster) {
-            Booster.FREEZE -> advanceFrozenField(current, elapsedMs)
-            Booster.REWIND -> advanceRewindingField(current, elapsedMs)
-            else -> current.field.advanceClock(scaleTickStep(elapsedMs, clockScale, MAX_TICK_MS))
+        if (activeTimedEffect != null) {
+            advanceTimedEffectField(current, elapsedMs)
+        } else {
+            current.field.advanceClock(scaleTickStep(elapsedMs, clockScale, MAX_TICK_MS))
         }
 
     // On the edge, never on the level: otherwise the draw count would follow frame rate, not game events.
@@ -409,8 +451,9 @@ class Game(
     ) {
         var livesLeft = startingLives
         brokenOutIds.forEachIndexed { index, id ->
-            if (!(shieldConsumed && index == 0)) livesLeft -= 1
-            _events.tryEmit(GameEvent.TargetBrokeOut(id, livesLeft))
+            val absorbedThisOne = shieldConsumed && index == 0
+            if (!absorbedThisOne) livesLeft -= 1
+            _events.tryEmit(GameEvent.TargetBrokeOut(id, livesLeft, shieldAbsorbed = absorbedThisOne))
         }
         if (leveledUp) {
             _events.tryEmit(GameEvent.LevelUp(_stateFlow.value.field.level))
@@ -420,35 +463,99 @@ class Game(
         }
     }
 
-    private fun advanceFrozenField(
+    // Split at the point remaining budget enters its own ramp-out window, so a tick spanning both
+    // segments integrates each at its own target.
+    private fun advanceTimedEffectField(
         current: GameState,
         elapsedMs: Int,
     ): Field {
         val effect = activeTimedEffect ?: return current.field
-        val step = scaleTickStep(elapsedMs, 1.0, MAX_TICK_MS)
-        val remaining = effect.remainingRealMs - step
-        activeTimedEffect = if (remaining > 0) effect.copy(remainingRealMs = remaining) else null
-        return current.field.advanceClock(0)
+        val clampedElapsedMs = scaleTickStep(elapsedMs, 1.0, MAX_TICK_MS)
+        val speed = rampSpeedPerMs(effect.booster)
+        val holdSegmentMs = (effect.remainingRealMs - EFFECT_RAMP_MS).coerceIn(0, clampedElapsedMs)
+        val rampOutSegmentMs = clampedElapsedMs - holdSegmentMs
+
+        val (rateAfterHold, holdStepMs) =
+            advanceRateSegment(
+                effect.rate,
+                rateFloor(effect.booster),
+                speed,
+                holdSegmentMs,
+            )
+        val (newRate, rampOutStepMs) = advanceRateSegment(rateAfterHold, NEUTRAL_RATE, speed, rampOutSegmentMs)
+        val rawStepMs = holdStepMs + rampOutStepMs
+
+        val (actualStepMs, hitRewindBoundary) =
+            if (rawStepMs < 0.0) {
+                clampRewindStep(current, rawStepMs)
+            } else {
+                rawStepMs.toInt() to false
+            }
+
+        val startingRampOutEarly =
+            hitRewindBoundary && effect.booster == Booster.REWIND && effect.remainingRealMs > EFFECT_RAMP_MS
+        val remaining = if (startingRampOutEarly) EFFECT_RAMP_MS else effect.remainingRealMs - clampedElapsedMs
+        activeTimedEffect = if (remaining > 0) effect.copy(remainingRealMs = remaining, rate = newRate) else null
+
+        return if (actualStepMs >= 0) {
+            current.field.advanceClock(actualStepMs)
+        } else {
+            current.field.rewind((-actualStepMs).toLong())
+        }
     }
 
-    // Never wound past the newest visible bubble's appearsAtMs, or it would vanish off the top;
-    // reaching that clamp ends the effect early.
-    private fun advanceRewindingField(
+    // Split at the moment the rate reaches [target] mid-segment, or a short segment inside a long
+    // tick either over- or undershoots the average.
+    private fun advanceRateSegment(
+        rate: Double,
+        target: Double,
+        speedPerMs: Double,
+        durationMs: Int,
+    ): Pair<Double, Double> {
+        val delta = target - rate
+        return if (durationMs <= 0 || speedPerMs <= 0.0 || delta == 0.0) {
+            rate to rate * durationMs.coerceAtLeast(0)
+        } else {
+            val msToTarget = (abs(delta) / speedPerMs).coerceAtMost(durationMs.toDouble())
+            val rateAtTarget = rate + (if (delta > 0) speedPerMs else -speedPerMs) * msToTarget
+            val rampStepMs = (rate + rateAtTarget) / 2.0 * msToTarget
+            val holdMs = durationMs - msToTarget
+            rateAtTarget to rampStepMs + rateAtTarget * holdMs
+        }
+    }
+
+    // Never wound past the newest visible bubble's appearsAtMs; hitting that clamp starts the
+    // effect's ramp-out instead of holding the clock at a standstill.
+    private fun clampRewindStep(
         current: GameState,
-        elapsedMs: Int,
-    ): Field {
-        val effect = activeTimedEffect ?: return current.field
-        val step = scaleTickStep(elapsedMs, 1.0, MAX_TICK_MS)
+        rawStepMs: Double,
+    ): Pair<Int, Boolean> {
         val topBoundaryMs =
             current.targets
                 .filter { it.isActive && it.isVisible(current.field.gameTimeMs) }
                 .maxOfOrNull { it.appearsAtMs }
         val maxRewindMs = topBoundaryMs?.let { (current.field.gameTimeMs - it).coerceAtLeast(0L) } ?: Long.MAX_VALUE
-        val actualStepMs = step.toLong().coerceAtMost(maxRewindMs)
-        val hitTopBoundary = actualStepMs < step
-        val remaining = effect.remainingRealMs - step
-        activeTimedEffect = if (hitTopBoundary || remaining <= 0) null else effect.copy(remainingRealMs = remaining)
-        return current.field.rewind(actualStepMs)
+        val desiredStepMs = (-rawStepMs).toInt()
+        val actualStepMs = desiredStepMs.toLong().coerceAtMost(maxRewindMs).toInt()
+        return -actualStepMs to (actualStepMs < desiredStepMs)
+    }
+
+    private fun rampSpeedPerMs(booster: Booster): Double = (NEUTRAL_RATE - rateFloor(booster)) / EFFECT_RAMP_MS
+
+    private fun advanceFreezeTintEnvelope(
+        elapsedMs: Int,
+        freezeActive: Boolean,
+    ) {
+        val target = if (freezeActive) NEUTRAL_RATE else 0.0
+        val clampedElapsedMs = scaleTickStep(elapsedMs, 1.0, MAX_TICK_MS)
+        val (newTint, _) =
+            advanceRateSegment(
+                freezeTintEnvelope,
+                target,
+                NEUTRAL_RATE / EFFECT_RAMP_MS,
+                clampedElapsedMs,
+            )
+        freezeTintEnvelope = newTint
     }
 
     // No caller yet, kept as the mechanism a future random event calls. A grant that would exceed the

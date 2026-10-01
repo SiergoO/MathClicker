@@ -10,6 +10,7 @@ import com.github.takahirom.roborazzi.captureRoboImage
 import com.sdamashchuk.mathbubbles.core.game.model.ActiveEffects
 import com.sdamashchuk.mathbubbles.core.game.model.IcePickSource
 import com.sdamashchuk.mathbubbles.core.model.Booster
+import com.sdamashchuk.mathbubbles.core.model.EFFECT_RAMP_MS
 import com.sdamashchuk.mathbubbles.core.model.Field
 import com.sdamashchuk.mathbubbles.core.model.OperationSign
 import com.sdamashchuk.mathbubbles.core.model.Target
@@ -150,9 +151,77 @@ class FieldScreenshotTest {
                         timedBooster = Booster.FREEZE,
                         remainingRealMs = 1_500,
                         remainingFraction = 0.5f,
+                        intensity = 1f,
+                        freezeTintIntensity = 1f,
                     ),
             ),
         )
+        composeTestRule.onRoot().captureRoboImage()
+    }
+
+    @Test
+    fun `renders a freeze mid ramp-in half-tinted`() {
+        renderFixedField(
+            FIXED_FIELD_STATE.copy(
+                effects =
+                    ActiveEffects(
+                        timedBooster = Booster.FREEZE,
+                        remainingRealMs = 2_900,
+                        remainingFraction = 0.97f,
+                        intensity = 0.5f,
+                        freezeTintIntensity = 0.5f,
+                    ),
+            ),
+        )
+        composeTestRule.onRoot().captureRoboImage()
+    }
+
+    @Test
+    fun `renders a shield mark mid fade-in on activation`() {
+        composeTestRule.mainClock.autoAdvance = false
+        val gameState = mutableStateOf(FIXED_FIELD_STATE.copy(effects = ActiveEffects(shieldActive = false)))
+
+        composeTestRule.setContent {
+            MathBubblesTheme {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    Field(
+                        gameState = gameState,
+                        onTargetClicked = {},
+                        onFireClicked = {},
+                        onTick = {},
+                        targetZeroedSignal = null,
+                    )
+                }
+            }
+        }
+        composeTestRule.mainClock.advanceTimeBy(ANIMATION_SETTLE_MS)
+        gameState.value = gameState.value.copy(effects = ActiveEffects(shieldActive = true))
+        composeTestRule.mainClock.advanceTimeBy(EFFECT_RAMP_MS / 2L)
+
+        composeTestRule.onRoot().captureRoboImage()
+    }
+
+    @Test
+    fun `renders a shield mid crack on absorbing a breakout`() {
+        composeTestRule.mainClock.autoAdvance = false
+        val gameState = mutableStateOf(FIXED_FIELD_STATE)
+
+        composeTestRule.setContent {
+            MathBubblesTheme {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    Field(
+                        gameState = gameState,
+                        onTargetClicked = {},
+                        onFireClicked = {},
+                        onTick = {},
+                        targetZeroedSignal = null,
+                        shieldCracking = true,
+                    )
+                }
+            }
+        }
+        composeTestRule.mainClock.advanceTimeBy(CUE_MS / 4L)
+
         composeTestRule.onRoot().captureRoboImage()
     }
 
@@ -181,7 +250,10 @@ class FieldScreenshotTest {
         composeTestRule.onRoot().captureRoboImage()
     }
 
-    private fun renderFixedField(state: GameViewModel.State) {
+    private fun renderFixedField(
+        state: GameViewModel.State,
+        settleMs: Long = ANIMATION_SETTLE_MS,
+    ) {
         composeTestRule.mainClock.autoAdvance = false
         val gameState = mutableStateOf(state)
 
@@ -198,6 +270,6 @@ class FieldScreenshotTest {
                 }
             }
         }
-        composeTestRule.mainClock.advanceTimeBy(ANIMATION_SETTLE_MS)
+        composeTestRule.mainClock.advanceTimeBy(settleMs)
     }
 }

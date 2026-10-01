@@ -18,6 +18,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.lifecycle.Lifecycle
 import com.sdamashchuk.mathbubbles.core.model.BOOSTER_STASH_CAPACITY
@@ -25,6 +26,7 @@ import com.sdamashchuk.mathbubbles.core.model.FieldAction
 import com.sdamashchuk.mathbubbles.core.ui.sound.model.SoundSample
 import com.sdamashchuk.mathbubbles.core.ui.theme.MathBubblesTheme
 import com.sdamashchuk.mathbubbles.feature.game.model.FeedbackEffect
+import com.sdamashchuk.mathbubbles.feature.game.model.ShieldCrackCue
 import com.sdamashchuk.mathbubbles.feature.game.model.TargetZeroedSignal
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -39,6 +41,8 @@ fun GameScreen(component: GameComponent) {
     val gameState = component.state.collectAsState()
     val hapticFeedback = LocalHapticFeedback.current
     var targetZeroedSignal by remember { mutableStateOf<TargetZeroedSignal?>(null) }
+    val shieldCrackCue = remember { ShieldCrackCue() }
+    val shieldCracking by shieldCrackCue.isCracking
     val shakeOffsetX = remember { Animatable(0f) }
 
     // See Field's own derivedStateOf comment: reading these fields straight off gameState.value
@@ -52,21 +56,13 @@ fun GameScreen(component: GameComponent) {
     // produced the event, so a collector living inside Field would race its own unmount and drop
     // the feedback for exactly the events this task cares most about.
     LaunchedEffect(Unit) {
-        val scope = this
-        var zeroedSequence = 0
-        component.feedback.receiveAsFlow().collect { effect ->
-            repeat(effect.hapticRepeatCount) { repeatIndex ->
-                hapticFeedback.performHapticFeedback(effect.haptic)
-                if (repeatIndex < effect.hapticRepeatCount - 1) delay(HAPTIC_REPEAT_GAP_MS)
-            }
-            soundFor(effect)?.let { component.playSound(it) }
-            if (effect is FeedbackEffect.TargetBrokeOut) {
-                scope.launch { shakeField(shakeOffsetX) }
-            }
-            if (effect is FeedbackEffect.TargetZeroed) {
-                targetZeroedSignal = TargetZeroedSignal(effect.targetId, ++zeroedSequence)
-            }
-        }
+        collectFeedback(
+            component = component,
+            hapticFeedback = hapticFeedback,
+            onShake = { launch { shakeField(shakeOffsetX) } },
+            onTargetZeroed = { targetZeroedSignal = it },
+            onShieldAbsorbed = { shieldCrackCue.absorb() },
+        )
     }
 
     MathBubblesTheme {
@@ -119,6 +115,8 @@ fun GameScreen(component: GameComponent) {
                                     },
                                     onTick = { component.sendAction(GameViewModel.Action.Tick(it)) },
                                     targetZeroedSignal = targetZeroedSignal,
+                                    shieldCracking = shieldCracking,
+                                    onShieldCrackFinished = { shieldCrackCue.finish() },
                                     onStashBooster = {
                                         playTapUnlessStashFull(component, gameState.value)
                                         component.sendAction(GameViewModel.Action.StashBooster)
@@ -193,6 +191,28 @@ private fun playTapUnlessStashFull(
 ) {
     if (gameState.field.boosterStash.size < BOOSTER_STASH_CAPACITY) {
         component.playSound(SoundSample.Tap)
+    }
+}
+
+private suspend fun collectFeedback(
+    component: GameComponent,
+    hapticFeedback: HapticFeedback,
+    onShake: () -> Unit,
+    onTargetZeroed: (TargetZeroedSignal) -> Unit,
+    onShieldAbsorbed: () -> Unit,
+) {
+    var zeroedSequence = 0
+    component.feedback.receiveAsFlow().collect { effect ->
+        if (effect is FeedbackEffect.TargetBrokeOut && effect.shieldAbsorbed) onShieldAbsorbed()
+        repeat(effect.hapticRepeatCount) { repeatIndex ->
+            hapticFeedback.performHapticFeedback(effect.haptic)
+            if (repeatIndex < effect.hapticRepeatCount - 1) delay(HAPTIC_REPEAT_GAP_MS)
+        }
+        soundFor(effect)?.let { component.playSound(it) }
+        if (effect is FeedbackEffect.TargetBrokeOut) onShake()
+        if (effect is FeedbackEffect.TargetZeroed) {
+            onTargetZeroed(TargetZeroedSignal(effect.targetId, ++zeroedSequence, effect.viaIcePick))
+        }
     }
 }
 

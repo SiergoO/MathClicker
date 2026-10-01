@@ -15,6 +15,7 @@ sealed interface FeedbackEffect {
     data class TargetZeroed(
         val targetId: Int,
         val awarded: Int,
+        val viaIcePick: Boolean = false,
     ) : FeedbackEffect {
         override val haptic = HapticFeedbackType.LongPress
         override val hapticRepeatCount = 1
@@ -41,6 +42,7 @@ sealed interface FeedbackEffect {
     // costs the player something irreversible, and the repeat is what makes it read that way.
     data class TargetBrokeOut(
         val livesLeft: Int,
+        val shieldAbsorbed: Boolean = false,
     ) : FeedbackEffect {
         override val haptic = HapticFeedbackType.Reject
         override val hapticRepeatCount = 2

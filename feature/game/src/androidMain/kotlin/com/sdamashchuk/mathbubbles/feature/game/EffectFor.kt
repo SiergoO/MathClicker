@@ -7,9 +7,9 @@ import com.sdamashchuk.mathbubbles.feature.game.model.FeedbackEffect
 // carry no feedback (the failure mode MC-58's M3 mutant exists to catch).
 internal fun effectFor(event: GameEvent): FeedbackEffect =
     when (event) {
-        is GameEvent.TargetZeroed -> FeedbackEffect.TargetZeroed(event.id, event.awarded)
+        is GameEvent.TargetZeroed -> FeedbackEffect.TargetZeroed(event.id, event.awarded, event.viaIcePick)
         is GameEvent.OperationResolved -> FeedbackEffect.OperationResolved(event.gained, event.streak)
-        is GameEvent.TargetBrokeOut -> FeedbackEffect.TargetBrokeOut(event.livesLeft)
+        is GameEvent.TargetBrokeOut -> FeedbackEffect.TargetBrokeOut(event.livesLeft, event.shieldAbsorbed)
         is GameEvent.LevelUp -> FeedbackEffect.LevelUp
         is GameEvent.LifeGranted -> FeedbackEffect.LifeGranted(event.livesLeft)
         GameEvent.GameOver -> FeedbackEffect.GameOver

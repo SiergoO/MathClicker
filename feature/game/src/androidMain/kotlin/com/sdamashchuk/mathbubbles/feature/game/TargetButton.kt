@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.sdamashchuk.mathbubbles.core.model.EFFECT_RAMP_MS
 import com.sdamashchuk.mathbubbles.core.model.Target
 import com.sdamashchuk.mathbubbles.core.ui.theme.BubbleFillIdle
 import com.sdamashchuk.mathbubbles.core.ui.theme.BubbleFillReady
@@ -38,7 +39,9 @@ import com.sdamashchuk.mathbubbles.core.ui.theme.Ink
 import com.sdamashchuk.mathbubbles.feature.game.model.BubbleHighlight
 import com.sdamashchuk.mathbubbles.feature.game.model.BubbleStyle
 import com.sdamashchuk.mathbubbles.feature.game.model.TargetScreenPosition
+import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.sin
 
 // Telegraphs the final 15% of a fall so a breakout is never a surprise: a size pulse plus a ring.
 private const val TARGET_DIAMETER_FRACTION = 0.8
@@ -69,14 +72,10 @@ private const val HIGHLIGHT_GLOW_ALPHA_IDLE = 0.14f
 
 private const val DIGIT_SIZE_FRACTION = 0.28f
 
-private const val CRACK_STROKE_WIDTH_FRACTION = 0.02f
-private const val CRACK_ALPHA = 0.8f
-private const val CRACK_BRANCH_1_X = 0.4f
-private const val CRACK_BRANCH_1_Y = 0.6f
-private const val CRACK_BRANCH_2_X = 0.5f
-private const val CRACK_BRANCH_2_Y = 0.3f
-private const val CRACK_BRANCH_3_X = 0.3f
-private const val CRACK_BRANCH_3_Y = 0.5f
+// The ice pick's targeting cue: every visible bubble sways out of sync with its neighbours rather
+// than carrying a static mark, so the player reads "something is armed" without a crack to parse.
+private const val SWAY_PERIOD_MS = 2_000
+private const val SWAY_AMPLITUDE_DP = 5f
 
 // A target that cannot be reduced by the armed operation is fully idle; one that can, but is not
 // yet a single press from zero, sits partway. One number drives every layer, so the three states
@@ -104,6 +103,9 @@ fun TargetButton(
     onTargetClicked: (id: Int) -> Unit,
     onTargetPositioned: (id: Int, position: TargetScreenPosition) -> Unit,
     icePickArmed: Boolean = false,
+    // Frame time, not gameTimeMsProvider: the sway must keep moving while Freeze or Rewind
+    // holds the game clock still or running backward.
+    realTimeMsProvider: () -> Long = gameTimeMsProvider,
 ) {
     val squashScale = remember(target.id) { Animatable(1f) }
     var lastKnownValue by remember(target.id) { mutableIntStateOf(target.value) }
@@ -120,6 +122,15 @@ fun TargetButton(
             animationSpec = tween(READINESS_TRANSITION_MS),
             label = "readinessFraction",
         )
+    // The ice pick's own onset: every bubble's sway grows in as it arms and shrinks out as it
+    // disarms, on the same span every other booster cue ramps over.
+    val swayEnvelope by
+        animateFloatAsState(
+            targetValue = if (icePickArmed) 1f else 0f,
+            animationSpec = tween(EFFECT_RAMP_MS),
+            label = "icePickSwayEnvelope",
+        )
+    val swayPhase = remember(target.id) { swayPhase(target.id) }
     val liveliness = liveliness(target.isProfitable, readinessFraction)
     val buttonDiameterDp = (gameColumnSize.width * TARGET_DIAMETER_FRACTION).toFloat()
     val bubbleStyle = targetBubbleStyle(buttonDiameterDp.dp, liveliness)
@@ -152,8 +163,12 @@ fun TargetButton(
                             squashScale.value
                     scaleX = combined
                     scaleY = combined
+                    if (swayEnvelope > 0f) {
+                        val offset = swayOffsetPx(realTimeMsProvider(), swayPhase, SWAY_AMPLITUDE_DP.dp.toPx())
+                        translationX = offset * swayEnvelope
+                    }
                 }.bubbleSurface(bubbleStyle)
-                .icePickAndTelegraph(target, gameTimeMsProvider, icePickArmed)
+                .telegraphRing(target, gameTimeMsProvider)
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
@@ -237,37 +252,14 @@ private fun targetBubbleStyle(
     )
 }
 
-private fun Modifier.icePickAndTelegraph(
+private fun Modifier.telegraphRing(
     target: Target,
     gameTimeMsProvider: () -> Long,
-    icePickArmed: Boolean,
 ) = drawWithCache {
     val radius = size.minDimension / 2f
     val center = Offset(size.width / 2f, size.height / 2f)
 
     onDrawBehind {
-        if (icePickArmed) {
-            val crackWidth = size.minDimension * CRACK_STROKE_WIDTH_FRACTION
-            val crackColor = Ink.copy(alpha = CRACK_ALPHA)
-            drawLine(
-                crackColor,
-                Offset(center.x - radius * CRACK_BRANCH_1_X, center.y - radius * CRACK_BRANCH_1_Y),
-                center,
-                crackWidth,
-            )
-            drawLine(
-                crackColor,
-                center,
-                Offset(center.x + radius * CRACK_BRANCH_2_X, center.y + radius * CRACK_BRANCH_2_Y),
-                crackWidth,
-            )
-            drawLine(
-                crackColor,
-                center,
-                Offset(center.x - radius * CRACK_BRANCH_3_X, center.y + radius * CRACK_BRANCH_3_Y),
-                crackWidth,
-            )
-        }
         if (target.isTelegraphingBreakout(gameTimeMsProvider())) {
             val ringWidth = size.minDimension * TELEGRAPH_RING_WIDTH_FRACTION
             drawCircle(
@@ -278,4 +270,23 @@ private fun Modifier.icePickAndTelegraph(
             )
         }
     }
+}
+
+// A large odd multiplier spreads consecutive ids across the full phase range before the modulo,
+// rather than clustering nearby ids near 0 - the usual trick behind a cheap integer hash.
+private const val PHASE_HASH_MULTIPLIER = 2_654_435_761L
+private const val PHASE_HASH_MODULUS = 1_000L
+
+// A cheap stand-in for per-bubble randomness: deterministic in id, so two bubbles never happen to
+// share a phase, without pulling a Random instance into a composable.
+internal fun swayPhase(id: Int): Float =
+    (id * PHASE_HASH_MULTIPLIER % PHASE_HASH_MODULUS).toFloat() / PHASE_HASH_MODULUS * (2f * PI.toFloat())
+
+internal fun swayOffsetPx(
+    timeMs: Long,
+    phase: Float,
+    amplitudePx: Float,
+): Float {
+    val cyclePosition = (timeMs % SWAY_PERIOD_MS).toFloat() / SWAY_PERIOD_MS
+    return sin(2f * PI.toFloat() * cyclePosition + phase) * amplitudePx
 }

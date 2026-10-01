@@ -7,4 +7,5 @@ package com.sdamashchuk.mathbubbles.feature.game.model
 data class TargetZeroedSignal(
     val targetId: Int,
     val sequence: Int,
+    val viaIcePick: Boolean = false,
 )

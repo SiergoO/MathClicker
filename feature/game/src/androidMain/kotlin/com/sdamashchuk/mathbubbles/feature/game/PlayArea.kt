@@ -31,15 +31,16 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import com.sdamashchuk.mathbubbles.core.model.Booster
 import com.sdamashchuk.mathbubbles.core.model.GAME_COLUMN_COUNT
 import com.sdamashchuk.mathbubbles.core.ui.theme.AccentSoft
 import com.sdamashchuk.mathbubbles.core.ui.theme.WaterDeep
 import com.sdamashchuk.mathbubbles.core.ui.theme.WaterMote
 import com.sdamashchuk.mathbubbles.core.ui.theme.WaterSurface
+import com.sdamashchuk.mathbubbles.feature.game.model.BurstPhase
 import com.sdamashchuk.mathbubbles.feature.game.model.TargetScreenPosition
 import com.sdamashchuk.mathbubbles.feature.game.model.TargetZeroedBurst
 import com.sdamashchuk.mathbubbles.feature.game.model.TargetZeroedSignal
+import com.sdamashchuk.mathbubbles.feature.game.model.initialBurstPhase
 import androidx.compose.ui.geometry.Size as GeometrySize
 
 private const val PLAY_AREA_HEIGHT_FRACTION = 0.75f
@@ -53,6 +54,7 @@ fun PlayArea(
     onTargetClicked: (id: Int) -> Unit,
     targetZeroedSignal: TargetZeroedSignal?,
     readinessHintsEnabled: Boolean,
+    realTimeMsProvider: () -> Long = { 0L },
 ) {
     var gameColumnSize by remember { mutableStateOf(Size(0, 0)) }
     val localDensity = LocalDensity.current
@@ -62,6 +64,10 @@ fun PlayArea(
     // a single `gameState.value` read anywhere in this composable's body would have put the entire
     // board back through composition sixty times a second.
     val gameTimeMsProvider = remember { { gameState.value.field.gameTimeMs } }
+
+    // Freeze's own envelope, not gated on timedBooster == FREEZE: a crossover into Rewind must
+    // still ease this back to 0 instead of popping it the instant the booster swaps.
+    val freezeIntensityProvider = remember { { gameState.value.effects.freezeTintIntensity } }
 
     // Each of these recomputes per tick and is cheap, but only notifies a reader when its own value
     // actually changes - which is what keeps this composable out of the per-frame path.
@@ -75,12 +81,11 @@ fun PlayArea(
                 gameState.value.targetList.filter { it.isActive && it.isVisible(gameTimeMs) }
             }
         }
-    val isFrozen by remember { derivedStateOf { gameState.value.effects.timedBooster == Booster.FREEZE } }
     val icePickArmed by remember { derivedStateOf { gameState.value.effects.icePickArmed } }
 
     val depthFactor = waterDepthFactor(level)
-    val surface = tintIfFrozen(sink(WaterSurface, depthFactor), isFrozen)
-    val deep = tintIfFrozen(sink(WaterDeep, depthFactor), isFrozen)
+    val surface = sink(WaterSurface, depthFactor)
+    val deep = sink(WaterDeep, depthFactor)
 
     // A plain map, not mutableStateMapOf. Nothing composable reads it - the burst below reads it
     // from a coroutine - so snapshot machinery bought nothing and cost a state record per write,
@@ -90,7 +95,7 @@ fun PlayArea(
     LaunchedEffect(targetZeroedSignal) {
         val signal = targetZeroedSignal ?: return@LaunchedEffect
         val position = targetPositions.remove(signal.targetId) ?: return@LaunchedEffect
-        bursts.add(TargetZeroedBurst(signal.sequence, position))
+        bursts.add(TargetZeroedBurst(signal.sequence, position, signal.viaIcePick))
     }
     LaunchedEffect(visibleTargets) {
         targetPositions.keys.retainAll(visibleTargets.mapTo(mutableSetOf()) { it.id })
@@ -117,6 +122,12 @@ fun PlayArea(
                             dstOffset = IntOffset.Zero,
                             dstSize = fieldSize,
                         )
+                        // A flat overlay, not a re-rasterised strip: rebuilding the gradient bitmap
+                        // at this rate would reintroduce the cost the comment above moved out.
+                        val freezeIntensity = freezeIntensityProvider()
+                        if (freezeIntensity > 0f) {
+                            drawRect(AccentSoft.copy(alpha = FROZEN_TINT_ALPHA * freezeIntensity))
+                        }
                         drawAmbientBubbles(gameTimeMsProvider())
                     }
                 },
@@ -164,6 +175,7 @@ fun PlayArea(
                                         hintsEnabled = readinessHintsEnabled,
                                     ),
                                 gameTimeMsProvider = gameTimeMsProvider,
+                                realTimeMsProvider = realTimeMsProvider,
                                 onTargetClicked = onTargetClicked,
                                 onTargetPositioned = { id, position -> targetPositions[id] = position },
                                 icePickArmed = icePickArmed,
@@ -177,28 +189,22 @@ fun PlayArea(
         // occupant.
         bursts.forEach { burst ->
             key(burst.id) {
-                BurstRing(position = burst.position, onFinished = { bursts.remove(burst) })
+                var phase by remember(burst.id) { mutableStateOf(initialBurstPhase(burst.viaIcePick)) }
+                when (phase) {
+                    BurstPhase.Shatter -> {
+                        IcePickShatter(position = burst.position, onFinished = { phase = BurstPhase.Burst })
+                    }
+
+                    BurstPhase.Burst -> {
+                        BurstRing(position = burst.position, onFinished = { bursts.remove(burst) })
+                    }
+                }
             }
         }
     }
 }
 
-private const val FROZEN_TINT_FRACTION = 0.25f
-
-private fun tintIfFrozen(
-    color: Color,
-    isFrozen: Boolean,
-): Color =
-    if (isFrozen) {
-        Color(
-            red = color.red + (AccentSoft.red - color.red) * FROZEN_TINT_FRACTION,
-            green = color.green + (AccentSoft.green - color.green) * FROZEN_TINT_FRACTION,
-            blue = color.blue + (AccentSoft.blue - color.blue) * FROZEN_TINT_FRACTION,
-            alpha = color.alpha,
-        )
-    } else {
-        color
-    }
+private const val FROZEN_TINT_ALPHA = 0.55f
 
 // An even split. The subtraction this used to carry reserved width for 1dp lane separators; MC-81
 // moved those into an overlay and MC-84 removed them, so reserving for them left the row 3dp short

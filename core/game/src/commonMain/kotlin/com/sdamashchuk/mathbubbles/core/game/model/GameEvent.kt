@@ -4,6 +4,7 @@ sealed interface GameEvent {
     data class TargetZeroed(
         val id: Int,
         val awarded: Int,
+        val viaIcePick: Boolean = false,
     ) : GameEvent
 
     data class OperationResolved(
@@ -14,6 +15,7 @@ sealed interface GameEvent {
     data class TargetBrokeOut(
         val id: Int,
         val livesLeft: Int,
+        val shieldAbsorbed: Boolean = false,
     ) : GameEvent
 
     data class LevelUp(

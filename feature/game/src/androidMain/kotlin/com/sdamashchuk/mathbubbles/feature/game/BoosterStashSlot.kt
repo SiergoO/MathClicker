@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -32,7 +31,6 @@ fun BoosterStashSlot(
             booster?.let { stringResource(id = R.string.booster_stash_slot, slotIndex + 1) }
                 ?: stringResource(id = R.string.booster_stash_slot_empty, slotIndex + 1)
         }
-    val pulseScale = rememberPulseScale(enabled = isArmed)
     Box(
         modifier =
             modifier
@@ -42,15 +40,7 @@ fun BoosterStashSlot(
         contentAlignment = Alignment.Center,
     ) {
         if (booster != null) {
-            BoosterToken(
-                booster = booster,
-                diameter = STASH_SLOT_VISUAL_SIZE,
-                modifier =
-                    Modifier.graphicsLayer {
-                        scaleX = pulseScale.value
-                        scaleY = pulseScale.value
-                    },
-            )
+            BoosterToken(booster = booster, diameter = STASH_SLOT_VISUAL_SIZE)
         }
     }
 }

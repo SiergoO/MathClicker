@@ -5,4 +5,5 @@ package com.sdamashchuk.mathbubbles.feature.game.model
 data class TargetZeroedBurst(
     val id: Int,
     val position: TargetScreenPosition,
+    val viaIcePick: Boolean = false,
 )

@@ -31,8 +31,10 @@ class GameBoosterEffectTest {
 
             game.fireButtonClicked() // applies the freeze
 
-            repeat(11) { game.tick(250) } // 2750ms - still inside the 3s window
-            assertEquals(0L, game.stateFlow.value.field.gameTimeMs)
+            // 2750ms, inside the 3s window: 100ms of drift comes from easing down to a stop
+            // over EFFECT_RAMP_MS rather than snapping to it.
+            repeat(11) { game.tick(250) }
+            assertEquals(100L, game.stateFlow.value.field.gameTimeMs)
 
             repeat(2) { game.tick(250) } // crosses the 3000ms mark
             assertTrue(game.stateFlow.value.field.gameTimeMs > 0, "the clock never resumed")
@@ -59,11 +61,13 @@ class GameBoosterEffectTest {
 
             game.fireButtonClicked() // applies the rewind
 
+            // 3400, not 3000: the ramp spends EFFECT_RAMP_MS easing the rate in and out of -1
+            // rather than holding it for the whole budget, so the clock travels less far back.
             repeat(8) { game.tick(250) } // exactly the 2000ms budget
-            assertEquals(3000L, game.stateFlow.value.field.gameTimeMs)
+            assertEquals(3400L, game.stateFlow.value.field.gameTimeMs)
 
             game.tick(250)
-            assertEquals(3250L, game.stateFlow.value.field.gameTimeMs, "the clock never resumed forward")
+            assertEquals(3650L, game.stateFlow.value.field.gameTimeMs, "the clock never resumed forward")
         }
 
     @Test
@@ -94,8 +98,10 @@ class GameBoosterEffectTest {
                 "the bubble was pushed back past its own appearance",
             )
 
-            repeat(2) { game.tick(250) } // the budget was far from spent, so the clock should move forward again
-            assertEquals(500L, game.stateFlow.value.field.gameTimeMs, "the effect did not end at the clamp")
+            // 300, not 500: hitting the clamp reserves a fresh, full ramp-out window instead of
+            // folding it into whatever budget was already spent.
+            repeat(2) { game.tick(250) }
+            assertEquals(300L, game.stateFlow.value.field.gameTimeMs, "the effect did not end at the clamp")
         }
 
     @Test
@@ -111,7 +117,9 @@ class GameBoosterEffectTest {
             game.createField(1)
             val targets =
                 listOf(
-                    scheduledTarget(id = 1, value = 5, lifetimeMs = 100),
+                    // 1000ms, not 100: clear of the frozen clock's own 100ms ramp-in drift, so
+                    // that drift can never coincide with this target's own finish.
+                    scheduledTarget(id = 1, value = 5, lifetimeMs = 1_000),
                     scheduledTarget(id = 2, columnId = 1, value = 5, appearanceDelayMs = 100_000, lifetimeMs = 200_000),
                 )
             game.targetsRestored(targets)
@@ -127,7 +135,8 @@ class GameBoosterEffectTest {
             game.fireButtonClicked() // applies the freeze
             repeat(11) { game.tick(250) } // 2750ms, inside the budget - would break id 1 out if not frozen
 
-            assertEquals(0L, game.stateFlow.value.field.gameTimeMs, "freeze let the clock move")
+            // 100ms of ramp-in drift, same as GameBoosterEffectTest's own freeze test above.
+            assertEquals(100L, game.stateFlow.value.field.gameTimeMs, "freeze let the clock move")
             assertEquals(
                 appearsAtMsBefore,
                 game.stateFlow.value.targets
@@ -163,8 +172,10 @@ class GameBoosterEffectTest {
             repeat(10) { game.tick(250) } // 2500ms of its 3000ms budget spent
             game.fireButtonClicked() // second freeze restarts the timer
 
+            // 100ms, all from the first application's ramp-in: the restart carries the rate
+            // (already at the floor) across instead of ramping down from 1 again.
             repeat(10) { game.tick(250) } // would have unfrozen under the first timer alone
-            assertEquals(0L, game.stateFlow.value.field.gameTimeMs, "the restarted freeze ended early")
+            assertEquals(100L, game.stateFlow.value.field.gameTimeMs, "the restarted freeze ended early")
         }
 
     @Test
@@ -191,12 +202,16 @@ class GameBoosterEffectTest {
 
             game.fireButtonClicked() // freeze
             game.tick(250)
-            assertEquals(5000L, game.stateFlow.value.field.gameTimeMs, "freeze did not hold the clock")
+            // 5100, not 5000: this single tick is inside freeze's own ramp-in, so the clock still
+            // creeps forward a little rather than stopping outright.
+            assertEquals(5100L, game.stateFlow.value.field.gameTimeMs, "freeze did not hold the clock")
 
             game.fireButtonClicked() // rewind cancels the freeze
             game.tick(250)
+            // 4900: the rewind carries freeze's own rate (already down at 0, not back up at 1) into
+            // its own ramp, which is what makes this crossover pass through 0 instead of jumping.
             assertEquals(
-                4750L,
+                4900L,
                 game.stateFlow.value.field.gameTimeMs,
                 "rewind did not take over from the cancelled freeze",
             )
@@ -222,7 +237,7 @@ class GameBoosterEffectTest {
             game.fireButtonClicked()
             repeat(11) { game.tick(250) } // 2750ms, still inside the budget
             repeat(5) { game.grantLife() } // unrelated activity between ticks
-            assertEquals(0L, game.stateFlow.value.field.gameTimeMs)
+            assertEquals(100L, game.stateFlow.value.field.gameTimeMs)
 
             repeat(2) { game.tick(250) } // crosses the 3000ms mark exactly as if nothing happened in between
             assertTrue(game.stateFlow.value.field.gameTimeMs > 0)
@@ -320,9 +335,11 @@ class GameBoosterEffectTest {
                 brokeOutAtRealMs
                     .sortedBy { it.first }
                     .map { it.second }
+            // ~6600, not ~7000: the ramp spends part of the budget easing in and out of full
+            // speed rather than holding it throughout, so the clock travels less far backward.
             assertTrue(
-                firstMs in 7000 - stepMs..7000 + stepMs,
-                "expected the rewind to delay the first breakout to ~7000ms, got ${firstMs}ms",
+                firstMs in 6600 - stepMs..6600 + stepMs,
+                "expected the rewind to delay the first breakout to ~6600ms, got ${firstMs}ms",
             )
             assertTrue(
                 secondMs - firstMs in 1800 - stepMs..1800 + stepMs,
