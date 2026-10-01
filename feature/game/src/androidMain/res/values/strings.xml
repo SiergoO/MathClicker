@@ -4,11 +4,10 @@
     <string name="resume">Resume</string>
     <string name="restart">Restart</string>
     <string name="main_menu">Main Menu</string>
-    <string name="game_over">Game\nOver</string>
+    <string name="game_over">Game Over</string>
 
     <string name="ready_to_pay_overlay_hint">Touch screen to start</string>
     <string name="game_session_level">Level: %d</string>
-    <string name="game_session_score">Score: %d</string>
     <string name="game_session_score_combo">x%1$d %2$d</string>
     <string name="game_level_intro">Level %d</string>
 
@@ -31,4 +30,5 @@
     <string name="results_header_level">Level</string>
     <string name="results_header_score">Score</string>
     <string name="results_no_date">—</string>
+    <string name="results_content_description">Results</string>
 </resources>

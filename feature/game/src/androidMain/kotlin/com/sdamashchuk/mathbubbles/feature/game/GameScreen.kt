@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,6 +40,12 @@ fun GameScreen(component: GameComponent) {
     val hapticFeedback = LocalHapticFeedback.current
     var targetZeroedSignal by remember { mutableStateOf<TargetZeroedSignal?>(null) }
     val shakeOffsetX = remember { Animatable(0f) }
+
+    // See Field's own derivedStateOf comment: reading these fields straight off gameState.value
+    // would drag the HUD through composition on every tick, not just the second it changes.
+    val level by remember { derivedStateOf { gameState.value.field.level } }
+    val score by remember { derivedStateOf { gameState.value.field.score } }
+    val appliedMultiplier by remember { derivedStateOf { gameState.value.field.appliedMultiplier } }
 
     // Hoisted above Field on purpose: Field only composes while Playing (see shouldComposeField),
     // but a breakout or a level-up can flip the phase away from Playing in the very same tick that
@@ -89,37 +96,43 @@ fun GameScreen(component: GameComponent) {
                         // being the body of this branch - is what a test can pin without a Compose rule:
                         // see shouldComposeField's test for the property that pausing stops the engine.
                         if (shouldComposeField(gameState.value.phase)) {
-                            Field(
-                                gameState,
-                                onTargetClicked = { id ->
-                                    // Not routed through GameEvent: a tap that does not zero its
-                                    // target emits nothing on that stream (see targetClicked), but
-                                    // the asset table wants a sound on every tap regardless.
-                                    component.playSound(SoundSample.Tap)
-                                    component.sendAction(GameViewModel.Action.TargetClicked(id))
-                                },
-                                onFireClicked = {
-                                    if (gameState.value.field.currentAction is FieldAction.BoosterAction) {
-                                        component.playSound(SoundSample.OperationSuccess)
-                                    }
-                                    component.sendAction(GameViewModel.Action.FireButtonClicked)
-                                },
-                                onTick = { component.sendAction(GameViewModel.Action.Tick(it)) },
+                            GameChrome(
+                                level = level,
+                                score = score,
+                                appliedMultiplier = appliedMultiplier,
                                 onPauseClicked = { component.sendAction(GameViewModel.Action.PauseGame) },
-                                targetZeroedSignal = targetZeroedSignal,
-                                onStashBooster = {
-                                    playTapUnlessStashFull(component, gameState.value)
-                                    component.sendAction(GameViewModel.Action.StashBooster)
-                                },
-                                onApplyBoosterFromStash = { slotIndex ->
-                                    component.playSound(SoundSample.OperationSuccess)
-                                    component.sendAction(GameViewModel.Action.ApplyBoosterFromStash(slotIndex))
-                                },
-                                onDisarmIcePick = {
-                                    component.playSound(SoundSample.Tap)
-                                    component.sendAction(GameViewModel.Action.DisarmIcePick)
-                                },
-                            )
+                            ) {
+                                Field(
+                                    gameState,
+                                    onTargetClicked = { id ->
+                                        // Not routed through GameEvent: a tap that does not zero its
+                                        // target emits nothing on that stream (see targetClicked), but
+                                        // the asset table wants a sound on every tap regardless.
+                                        component.playSound(SoundSample.Tap)
+                                        component.sendAction(GameViewModel.Action.TargetClicked(id))
+                                    },
+                                    onFireClicked = {
+                                        if (gameState.value.field.currentAction is FieldAction.BoosterAction) {
+                                            component.playSound(SoundSample.OperationSuccess)
+                                        }
+                                        component.sendAction(GameViewModel.Action.FireButtonClicked)
+                                    },
+                                    onTick = { component.sendAction(GameViewModel.Action.Tick(it)) },
+                                    targetZeroedSignal = targetZeroedSignal,
+                                    onStashBooster = {
+                                        playTapUnlessStashFull(component, gameState.value)
+                                        component.sendAction(GameViewModel.Action.StashBooster)
+                                    },
+                                    onApplyBoosterFromStash = { slotIndex ->
+                                        component.playSound(SoundSample.OperationSuccess)
+                                        component.sendAction(GameViewModel.Action.ApplyBoosterFromStash(slotIndex))
+                                    },
+                                    onDisarmIcePick = {
+                                        component.playSound(SoundSample.Tap)
+                                        component.sendAction(GameViewModel.Action.DisarmIcePick)
+                                    },
+                                )
+                            }
                         }
                     }
 

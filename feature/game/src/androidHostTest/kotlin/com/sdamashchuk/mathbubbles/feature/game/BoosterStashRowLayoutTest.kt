@@ -45,7 +45,6 @@ class BoosterStashRowLayoutTest {
                         onTargetClicked = {},
                         onFireClicked = {},
                         onTick = {},
-                        onPauseClicked = {},
                         targetZeroedSignal = null,
                     )
                 }

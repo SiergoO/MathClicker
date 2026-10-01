@@ -2,11 +2,8 @@ package com.sdamashchuk.mathbubbles.feature.game
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.MaterialTheme
@@ -16,10 +13,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.sdamashchuk.mathbubbles.core.model.Field
-import com.sdamashchuk.mathbubbles.core.ui.component.MenuButton
+import com.sdamashchuk.mathbubbles.core.ui.component.GlassButton
+import com.sdamashchuk.mathbubbles.core.ui.component.NavBar
+import com.sdamashchuk.mathbubbles.core.ui.component.ScreenWrapper
 import com.sdamashchuk.mathbubbles.core.ui.theme.Success
 import com.sdamashchuk.mathbubbles.core.ui.theme.Warning
 import com.sdamashchuk.mathbubbles.feature.game.model.ResultsSummary
@@ -37,56 +38,55 @@ fun ResultsScreen(
     onRestartClicked: () -> Unit,
     onBackToMainMenuClicked: () -> Unit,
 ) {
-    Column(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
-                .navigationBarsPadding(),
-        horizontalAlignment = Alignment.CenterHorizontally,
+    val resultsContentDescription = stringResource(id = R.string.results_content_description)
+    ScreenWrapper(
+        topBar = { NavBar(title = stringResource(id = R.string.game_over)) },
     ) {
-        Text(
-            modifier = Modifier.padding(top = 8.dp),
-            text = stringResource(id = R.string.game_over),
-            textAlign = TextAlign.Center,
-            style = MaterialTheme.typography.h2,
-        )
-        Text(
-            text = field.score.toString(),
-            style = MaterialTheme.typography.h1,
-        )
-        SummaryText(resultsSummaryOf(field, bestResult))
-        // Table and buttons are one group centred in the space left below the header, so a
-        // two-row history (new install) and a ten-row one both read as deliberate instead of the
-        // table stranding the buttons above an empty half-screen. verticalScroll is the
-        // fallback if a large font scale ever makes the group taller than that space.
         Column(
             modifier =
                 Modifier
-                    .weight(1f)
                     .fillMaxWidth()
-                    .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.Center,
+                    .weight(1f)
+                    .semantics { contentDescription = resultsContentDescription },
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            ResultsTable(
-                recentResults = recentResults,
-                bestResultId = bestResult?.id,
+            Text(
+                text = field.score.toString(),
+                style = MaterialTheme.typography.h1,
+            )
+            SummaryText(resultsSummaryOf(field, bestResult))
+            // Table and buttons are one group centred in the space left below the header, so a
+            // two-row history (new install) and a ten-row one both read as deliberate instead of the
+            // table stranding the buttons above an empty half-screen. verticalScroll is the
+            // fallback if a large font scale ever makes the group taller than that space.
+            Column(
                 modifier =
                     Modifier
+                        .weight(1f)
                         .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 8.dp),
-            )
-            MenuButton(
-                modifier = Modifier.padding(top = 20.dp, bottom = 12.dp),
-                text = stringResource(id = R.string.restart),
-                onClick = onRestartClicked,
-            )
-            MenuButton(
-                modifier = Modifier.padding(bottom = 12.dp),
-                text = stringResource(id = R.string.main_menu),
-                onClick = onBackToMainMenuClicked,
-            )
+                        .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                ResultsTable(
+                    recentResults = recentResults,
+                    bestResultId = bestResult?.id,
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                )
+                GlassButton(
+                    modifier = Modifier.padding(top = 20.dp, bottom = 12.dp),
+                    text = stringResource(id = R.string.restart),
+                    onClick = onRestartClicked,
+                )
+                GlassButton(
+                    modifier = Modifier.padding(bottom = 12.dp),
+                    text = stringResource(id = R.string.main_menu),
+                    onClick = onBackToMainMenuClicked,
+                )
+            }
         }
     }
 }

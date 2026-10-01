@@ -26,7 +26,7 @@ private const val FIELD_ID = 1
 private const val GAME_TIME_MS = 5_000L
 private const val ANIMATION_SETTLE_MS = 300L
 
-private val FIXED_FIELD_STATE =
+internal val FIXED_FIELD_STATE =
     GameViewModel.State(
         field =
             Field(
@@ -94,7 +94,7 @@ class FieldScreenshotTest {
 
         composeTestRule.setContent {
             MathBubblesTheme {
-                // Field lays its HUD, play area and dock out as successive Column children; GameScreen
+                // Field lays its play area and dock out as successive Column children; GameScreen
                 // always composes it inside one, so this mirrors that rather than Surface's own Box.
                 Column(modifier = Modifier.fillMaxSize()) {
                     Field(
@@ -102,7 +102,6 @@ class FieldScreenshotTest {
                         onTargetClicked = {},
                         onFireClicked = {},
                         onTick = {},
-                        onPauseClicked = {},
                         targetZeroedSignal = null,
                     )
                 }
@@ -194,7 +193,6 @@ class FieldScreenshotTest {
                         onTargetClicked = {},
                         onFireClicked = {},
                         onTick = {},
-                        onPauseClicked = {},
                         targetZeroedSignal = null,
                     )
                 }

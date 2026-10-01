@@ -13,7 +13,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.sdamashchuk.mathbubbles.core.ui.component.MenuButton
+import com.sdamashchuk.mathbubbles.core.ui.component.GlassButton
+import com.sdamashchuk.mathbubbles.core.ui.component.ScreenWrapper
 
 @Composable
 fun GamePausedDialog(
@@ -21,37 +22,41 @@ fun GamePausedDialog(
     onRestartClicked: () -> Unit,
     onBackToMainMenuClicked: () -> Unit,
 ) {
-    Column(
+    ScreenWrapper(
         modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(
-            modifier =
-                Modifier
-                    .weight(1f)
-                    .wrapContentSize(),
-            text = stringResource(id = R.string.pause),
-            textAlign = TextAlign.Center,
-            style = MaterialTheme.typography.h1,
-        )
         Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.Center,
+            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            MenuButton(
-                modifier = Modifier.padding(bottom = 20.dp),
-                text = stringResource(id = R.string.resume),
-                onClick = onResumeClicked,
+            Text(
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .wrapContentSize(),
+                text = stringResource(id = R.string.pause),
+                textAlign = TextAlign.Center,
+                style = MaterialTheme.typography.h1,
             )
-            MenuButton(
-                modifier = Modifier.padding(bottom = 20.dp),
-                text = stringResource(id = R.string.restart),
-                onClick = onRestartClicked,
-            )
-            MenuButton(
-                text = stringResource(id = R.string.main_menu),
-                onClick = onBackToMainMenuClicked,
-            )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.Center,
+            ) {
+                GlassButton(
+                    modifier = Modifier.padding(bottom = 20.dp),
+                    text = stringResource(id = R.string.resume),
+                    onClick = onResumeClicked,
+                )
+                GlassButton(
+                    modifier = Modifier.padding(bottom = 20.dp),
+                    text = stringResource(id = R.string.restart),
+                    onClick = onRestartClicked,
+                )
+                GlassButton(
+                    text = stringResource(id = R.string.main_menu),
+                    onClick = onBackToMainMenuClicked,
+                )
+            }
         }
     }
 }

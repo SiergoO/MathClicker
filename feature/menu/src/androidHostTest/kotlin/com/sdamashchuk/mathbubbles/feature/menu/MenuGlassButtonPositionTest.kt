@@ -19,7 +19,7 @@ private const val MIN_BOTTOM_MARGIN_DP = 24f
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [34], qualifiers = "w360dp-h800dp-xhdpi")
-class MenuButtonPositionTest {
+class MenuGlassButtonPositionTest {
     @get:Rule
     val composeTestRule = createComposeRule()
 

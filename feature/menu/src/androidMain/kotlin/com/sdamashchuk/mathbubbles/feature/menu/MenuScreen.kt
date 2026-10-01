@@ -8,9 +8,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.material.Icon
-import androidx.compose.material.IconButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
@@ -22,11 +19,9 @@ import com.sdamashchuk.mathbubbles.core.ui.component.GlassBackdrop
 import com.sdamashchuk.mathbubbles.core.ui.component.GlassButton
 import com.sdamashchuk.mathbubbles.core.ui.component.MathBubblesDialog
 import com.sdamashchuk.mathbubbles.core.ui.component.NavBar
+import com.sdamashchuk.mathbubbles.core.ui.component.NavBarAction
 import com.sdamashchuk.mathbubbles.core.ui.component.ScreenWrapper
-import com.sdamashchuk.mathbubbles.core.ui.theme.Accent
 
-private val NAV_BAR_ICON_SIZE = 24.dp
-private val NAV_BAR_TOUCH_TARGET = 48.dp
 private val LOGO_HORIZONTAL_INSET = 40.dp
 private val MENU_BUTTON_GAP = 20.dp
 private val MENU_BUTTON_BOTTOM_MARGIN = 28.dp
@@ -51,19 +46,11 @@ fun MenuScreen(component: MenuComponent) {
         topBar = {
             NavBar(
                 actions = {
-                    IconButton(
+                    NavBarAction(
+                        painter = painterResource(id = R.drawable.ic_help),
+                        contentDescription = stringResource(id = R.string.how_to_play_icon_content_description),
                         onClick = { component.sendAction(MenuViewModel.Action.OpenDialog) },
-                        modifier = Modifier.size(NAV_BAR_TOUCH_TARGET),
-                    ) {
-                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.CenterEnd) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.ic_help),
-                                contentDescription = stringResource(id = R.string.how_to_play_icon_content_description),
-                                modifier = Modifier.size(NAV_BAR_ICON_SIZE),
-                                tint = Accent,
-                            )
-                        }
-                    }
+                    )
                 },
             )
         },

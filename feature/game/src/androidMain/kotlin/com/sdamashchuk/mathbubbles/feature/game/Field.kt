@@ -5,18 +5,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.Divider
-import androidx.compose.material.MaterialTheme
-import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
@@ -26,10 +19,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.intl.Locale
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.toUpperCase
 import androidx.compose.ui.unit.dp
 import com.sdamashchuk.mathbubbles.core.game.model.IcePickSource
 import com.sdamashchuk.mathbubbles.core.model.Booster
@@ -39,7 +28,6 @@ import com.sdamashchuk.mathbubbles.core.ui.theme.AccentDeep
 import com.sdamashchuk.mathbubbles.feature.game.model.TargetZeroedSignal
 import kotlinx.collections.immutable.toImmutableList
 
-private const val HUD_HEIGHT_FRACTION = 0.05f
 private val SHIELD_MARK_SIZE = 16.dp
 
 @Composable
@@ -48,7 +36,6 @@ fun Field(
     onTargetClicked: (id: Int) -> Unit,
     onFireClicked: () -> Unit,
     onTick: (elapsedMs: Int) -> Unit,
-    onPauseClicked: () -> Unit,
     targetZeroedSignal: TargetZeroedSignal?,
     // The readiness hint's on/off switch, not a property of the game itself. A constant
     // today; once difficulty/mods exist, that's what supplies this value - TargetButton never sees
@@ -62,10 +49,7 @@ fun Field(
     // composable's body. GameViewModel.State is a fresh object on every tick because gameTimeMs
     // moved, so each of those reads dragged the whole HUD, the life stripes and the dock through
     // composition sixty times a second to render numbers that change once a second at most.
-    val level by remember { derivedStateOf { gameState.value.field.level } }
-    val score by remember { derivedStateOf { gameState.value.field.score } }
     val lifeCount by remember { derivedStateOf { gameState.value.field.lifeCount } }
-    val appliedMultiplier by remember { derivedStateOf { gameState.value.field.appliedMultiplier } }
     val currentAction by remember { derivedStateOf { gameState.value.field.currentAction } }
     val nextAction by remember { derivedStateOf { gameState.value.field.nextAction } }
     val boosterStash by remember {
@@ -90,57 +74,11 @@ fun Field(
         }
     }
 
-    Row(
-        modifier =
-            Modifier
-                .statusBarsPadding()
-                .fillMaxWidth()
-                .fillMaxHeight(HUD_HEIGHT_FRACTION),
-    ) {
-        Text(
-            modifier =
-                Modifier
-                    .weight(1f)
-                    .align(Alignment.CenterVertically),
-            textAlign = TextAlign.Center,
-            text =
-                stringResource(id = R.string.game_session_level, level).toUpperCase(Locale.current),
-            style = MaterialTheme.typography.body1,
-        )
-        Text(
-            modifier =
-                Modifier
-                    .weight(1f)
-                    .align(Alignment.CenterVertically),
-            textAlign = TextAlign.Center,
-            text =
-                scoreLabel(
-                    appliedMultiplier = appliedMultiplier,
-                    plainScore = stringResource(id = R.string.game_session_score, score),
-                    comboScore = stringResource(id = R.string.game_session_score_combo, appliedMultiplier, score),
-                ).toUpperCase(Locale.current),
-            style = MaterialTheme.typography.body1,
-        )
-        // Fixed width, not weight(1f): Level and Score stay centred on each other regardless of
-        // this button's presence.
-        Box(
-            modifier =
-                Modifier
-                    .width(56.dp)
-                    .align(Alignment.CenterVertically),
-            contentAlignment = Alignment.Center,
-        ) {
-            PauseButton(onClick = onPauseClicked)
-        }
-    }
     Divider()
     PlayArea(gameState, onTargetClicked, targetZeroedSignal, readinessHintsEnabled)
 
     Box(
-        modifier =
-            Modifier
-                .navigationBarsPadding()
-                .fillMaxSize(),
+        modifier = Modifier.fillMaxSize(),
     ) {
         Column(
             modifier =
@@ -163,7 +101,6 @@ fun Field(
         Row(
             modifier =
                 Modifier
-                    .navigationBarsPadding()
                     .fillMaxSize(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -197,12 +134,6 @@ fun Field(
         }
     }
 }
-
-internal fun scoreLabel(
-    appliedMultiplier: Int,
-    plainScore: String,
-    comboScore: String,
-): String = if (appliedMultiplier > 1) comboScore else plainScore
 
 // maxOf, not the bare cap: a lifeCount above INITIAL_LIFE_COUNT (a future random-event grant -
 // see LifeBonusTest) must still get a slot, or the extra life stays invisible.
