@@ -5,10 +5,10 @@ import com.sdamashchuk.mathbubbles.core.game.model.BoosterDropResult
 import com.sdamashchuk.mathbubbles.core.model.Booster
 import kotlin.random.Random
 
-// The owner targets one booster per 10-15 draws; retune these on the device, together.
-private const val SILENT_DRAWS = 6
-private const val GUARANTEED_DRAW = 20
-private const val CHANCE_STEP_PER_DRAW = 0.01
+// Mean interval 8.4 draws, first drop around the 12th; retune these on the device, together.
+private const val SILENT_DRAWS = 4
+private const val GUARANTEED_DRAW = 15
+private const val CHANCE_STEP_PER_DRAW = 0.02
 
 private const val BASE_FREEZE_WEIGHT = 3
 private const val BASE_REWIND_WEIGHT = 2
@@ -23,8 +23,8 @@ private const val LAST_LIFE_SHIELD_MULTIPLIER = 3
 internal class BoosterDropRule(
     private val random: Random,
 ) {
-    // The 6 silent draws happen once per session: repeating them after every drop lifts the mean
-    // interval from 11.8 to over 16.
+    // The silent draws happen once per session: repeating them after every drop lifts the mean
+    // interval from 8.4 to 11.7.
     fun roll(
         counter: Int,
         hasDroppedBefore: Boolean,

@@ -85,7 +85,7 @@ class GameBoosterTest {
                 game.stateFlow.value.field.copy(
                     currentOperationSign = OperationSign.SUBTRACTION,
                     currentOperationDigit = 1,
-                    boosterDropCounter = 19,
+                    boosterDropCounter = 14,
                     hasDroppedBoosterThisSession = true,
                 ),
             )

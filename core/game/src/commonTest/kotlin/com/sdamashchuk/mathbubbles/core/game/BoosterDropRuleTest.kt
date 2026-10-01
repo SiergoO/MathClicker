@@ -17,9 +17,9 @@ private val NEUTRAL_CONTEXT =
         shieldActive = false,
     )
 
-// The 20th draw (counter 19) is BoosterDropRule's own guaranteed slot - forcing every sampled roll
+// The 15th draw (counter 14) is BoosterDropRule's own guaranteed slot - forcing every sampled roll
 // onto it isolates pickBooster's weighting from the chance curve above it.
-private const val FORCED_DROP_COUNTER = 19
+private const val FORCED_DROP_COUNTER = 14
 
 private const val WEIGHT_SAMPLE_TRIALS = 20_000
 
@@ -32,7 +32,7 @@ private fun sampleBoosters(
     val counts = Booster.values().associateWith { 0 }.toMutableMap()
     repeat(trials) {
         val result = rule.roll(FORCED_DROP_COUNTER, hasDroppedBefore = false, stashFull = false, context = context)
-        val booster = requireNotNull(result.booster) { "the 20th draw must always drop" }
+        val booster = requireNotNull(result.booster) { "the 15th draw must always drop" }
         counts[booster] = counts.getValue(booster) + 1
     }
     return counts
@@ -45,11 +45,11 @@ private fun Map<Booster, Int>.percentOf(
 
 class BoosterDropRuleTest {
     @Test
-    fun `the first six draws of a session never drop regardless of seed`() {
+    fun `the first four draws of a session never drop regardless of seed`() {
         for (seed in 0 until 50) {
             val rule = BoosterDropRule(Random(seed.toLong()))
             var counter = 0
-            repeat(6) {
+            repeat(4) {
                 val result = rule.roll(counter, hasDroppedBefore = false, stashFull = false, context = NEUTRAL_CONTEXT)
                 assertNull(result.booster, "seed $seed draw ${counter + 1} dropped early")
                 counter = result.counter
@@ -58,7 +58,7 @@ class BoosterDropRuleTest {
     }
 
     @Test
-    fun `the 20th draw without a drop is guaranteed and resets the counter`() {
+    fun `the 15th draw without a drop is guaranteed and resets the counter`() {
         for (seed in 0 until 50) {
             val rule = BoosterDropRule(Random(seed.toLong()))
             val result =
@@ -68,13 +68,12 @@ class BoosterDropRuleTest {
                     stashFull = false,
                     context = NEUTRAL_CONTEXT,
                 )
-            assertTrue(result.booster != null, "seed $seed did not drop on the 20th draw")
+            assertTrue(result.booster != null, "seed $seed did not drop on the 15th draw")
             assertEquals(0, result.counter)
         }
     }
 
-    // "0% for the first 6 draws" is a one-time session grace period, not reset on every drop - the
-    // spec's own worked mean (about 11.8) only holds once a later drought skips straight to 1%.
+    // The silent opening is once per session: the 8.4 mean holds only if a later drought starts at 2%.
     @Test
     fun `the silent opening window does not repeat once the session has already dropped once`() {
         val rule = BoosterDropRule(Random(11))
@@ -86,8 +85,7 @@ class BoosterDropRuleTest {
         }
 
         val percent = drops * 100 / WEIGHT_SAMPLE_TRIALS
-        // A reinstated 6-draw silence would measure 0% here instead of the 1% base chance.
-        assertTrue(percent in 0..3, "draw 1 of a later drought dropped $percent% of the time, expected about 1%")
+        assertTrue(percent in 1..3, "draw 1 of a later drought dropped $percent% of the time, expected about 2%")
         assertTrue(drops > 0, "draw 1 of a later drought never dropped - the silent window looks reinstated")
     }
 
@@ -108,7 +106,7 @@ class BoosterDropRuleTest {
     }
 
     @Test
-    fun `drop intervals average between 11 and 13 draws and never exceed 20`() {
+    fun `drop intervals average between 7 and 10 draws and never exceed 15`() {
         val rule = BoosterDropRule(Random(1234))
         val intervals = mutableListOf<Int>()
         var counter = 0
@@ -124,9 +122,9 @@ class BoosterDropRuleTest {
         }
 
         val mean = intervals.average()
-        assertTrue(mean in 11.0..13.0, "mean interval was $mean over ${intervals.size} drops")
+        assertTrue(mean in 7.0..10.0, "mean interval was $mean over ${intervals.size} drops")
         assertTrue(
-            intervals.all { it <= 20 },
+            intervals.all { it <= 15 },
             "an interval of ${intervals.max()} draws exceeded the guaranteed bound",
         )
     }
