@@ -17,8 +17,6 @@ class ResultDateFormatterTest {
         TimeZone.setDefault(defaultTimeZone)
     }
 
-    // M4: a null date treated as zero rather than unknown. Epoch zero itself is exercised
-    // separately below so a regression to "null coerced to 0L" can't pass by coincidence.
     @Test
     fun `formatResultDate renders a null finishedAt as the no-date placeholder, not epoch zero`() {
         assertEquals("—", formatResultDate(epochMillis = null, noDateText = "—"))
@@ -41,8 +39,6 @@ class ResultDateFormatterTest {
 
     @Test
     fun `formatResultDate agrees with the device's own clock`() {
-        // A host running in UTC cannot tell this from the old UTC-pinned format; the zone is
-        // carried by the absent setTimeZone call, not proven here.
         val instant = 1_790_208_000_000L
         assertEquals(expected(instant), formatResultDate(instant, noDateText = "—"))
     }
