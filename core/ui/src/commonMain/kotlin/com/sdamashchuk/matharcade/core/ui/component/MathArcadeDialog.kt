@@ -3,8 +3,6 @@ package com.sdamashchuk.matharcade.core.ui.component
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.Button
@@ -16,8 +14,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-
-private const val DIALOG_HEIGHT_FRACTION = 0.9f
 
 @Composable
 fun MathArcadeDialog(
@@ -33,17 +29,12 @@ fun MathArcadeDialog(
         onDismissRequest = onDismiss,
         content = {
             Card(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .fillMaxHeight(DIALOG_HEIGHT_FRACTION),
+                modifier = Modifier.fillMaxWidth(),
             ) {
-                Column(
-                    modifier = Modifier.fillMaxSize(),
-                ) {
+                Column {
                     Header(headerText)
                     Body(
-                        Modifier.weight(1f),
+                        Modifier.weight(1f, fill = false),
                         bodyText,
                     )
                     Row(
