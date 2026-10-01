@@ -10,6 +10,11 @@ data class Field(
     val currentOperationDigit: Int = 0,
     val nextOperationSign: OperationSign = OperationSign.DIVISION,
     val nextOperationDigit: Int = 0,
+    // A set booster overrides the operation pair below it; Game keeps that pair a freshly drawn,
+    // checked operation regardless, so it is always a valid fallback.
+    val currentBooster: Booster? = null,
+    val nextBooster: Booster? = null,
+    val boosterStash: List<Booster> = emptyList(),
     val isClosed: Boolean = false,
     // Epoch milliseconds set once, when closeIfNecessary() first closes the field (see
     // FieldMapper). Null for a still-open run and, permanently, for any run that closed before
@@ -27,4 +32,14 @@ data class Field(
     // own award, hence the floor at 1.
     val appliedMultiplier: Int
         get() = maxOf(1, bonusMultiplier)
+
+    val currentAction: FieldAction
+        get() =
+            currentBooster?.let { FieldAction.BoosterAction(it) }
+                ?: FieldAction.Operation(currentOperationSign, currentOperationDigit)
+
+    val nextAction: FieldAction
+        get() =
+            nextBooster?.let { FieldAction.BoosterAction(it) }
+                ?: FieldAction.Operation(nextOperationSign, nextOperationDigit)
 }

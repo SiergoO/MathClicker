@@ -1,5 +1,6 @@
 package com.sdamashchuk.mathbubbles.core.game.objectmapper
 
+import com.sdamashchuk.mathbubbles.core.model.Booster
 import com.sdamashchuk.mathbubbles.core.model.Field
 import com.sdamashchuk.mathbubbles.core.model.INITIAL_LIFE_COUNT
 import com.sdamashchuk.mathbubbles.core.model.OperationSign
@@ -51,13 +52,18 @@ internal fun Field.updateScore(scoreToAdd: Int): Field =
 internal fun Field.updateActionButtons(
     nextOperationSign: OperationSign,
     nextOperationDigit: Int,
+    nextBooster: Booster? = null,
 ): Field =
     this.copy(
         currentOperationSign = this.nextOperationSign,
         currentOperationDigit = this.nextOperationDigit,
+        currentBooster = this.nextBooster,
         nextOperationSign = nextOperationSign,
         nextOperationDigit = nextOperationDigit,
+        nextBooster = nextBooster,
     )
+
+internal fun Field.stashCurrentBooster(booster: Booster): Field = copy(boosterStash = boosterStash + booster)
 
 /**
  * Replaces the multiplier with this press's own count, rather than accumulating across presses.

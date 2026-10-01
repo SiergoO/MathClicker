@@ -1,6 +1,8 @@
 package com.sdamashchuk.mathbubbles.core.game
 
 import com.sdamashchuk.mathbubbles.core.game.helper.SessionHelper
+import com.sdamashchuk.mathbubbles.core.game.model.BoosterDropContext
+import com.sdamashchuk.mathbubbles.core.game.model.BoosterDropResult
 import com.sdamashchuk.mathbubbles.core.game.model.GameEvent
 import com.sdamashchuk.mathbubbles.core.game.model.GameState
 import com.sdamashchuk.mathbubbles.core.game.objectmapper.advanceClock
@@ -13,11 +15,13 @@ import com.sdamashchuk.mathbubbles.core.game.objectmapper.ensureAlive
 import com.sdamashchuk.mathbubbles.core.game.objectmapper.grantLife
 import com.sdamashchuk.mathbubbles.core.game.objectmapper.resetStreak
 import com.sdamashchuk.mathbubbles.core.game.objectmapper.shortenAppearanceDelay
+import com.sdamashchuk.mathbubbles.core.game.objectmapper.stashCurrentBooster
 import com.sdamashchuk.mathbubbles.core.game.objectmapper.updateActionButtons
 import com.sdamashchuk.mathbubbles.core.game.objectmapper.updateLevel
 import com.sdamashchuk.mathbubbles.core.game.objectmapper.updateScore
 import com.sdamashchuk.mathbubbles.core.game.scoring.performOperation
 import com.sdamashchuk.mathbubbles.core.model.Field
+import com.sdamashchuk.mathbubbles.core.model.FieldAction
 import com.sdamashchuk.mathbubbles.core.model.OperationSign
 import com.sdamashchuk.mathbubbles.core.model.Target
 import kotlinx.coroutines.CoroutineScope
@@ -44,6 +48,8 @@ internal const val MAX_TICK_MS = 250
 // Termination bound: a board no candidate digit can touch must still return in finite time.
 private const val MAX_OPERATION_DRAW_ATTEMPTS = 20
 
+private const val BOOSTER_STASH_CAPACITY = 3
+
 // Ten of the nineteen are the engine's public contract, so the threshold is unreachable without
 // collapsing it. Suppressed here rather than in a baseline so anything new still fails.
 @Suppress("TooManyFunctions")
@@ -54,9 +60,12 @@ class Game(
     // Injected, not read from Clock.System: two engines seeded alike must reach identical state,
     // finishedAt included.
     private val clock: Clock = Clock.System,
+    private val boostersEnabled: Boolean = false,
 ) {
     private val _stateFlow: MutableStateFlow<GameState> = MutableStateFlow(GameState(Field(), listOf()))
     val stateFlow: StateFlow<GameState> = _stateFlow.asStateFlow()
+
+    private val boosterDropRule = BoosterDropRule(random)
 
     // tryEmit, never emit: emit suspends, and tick runs inside the mutex on the frame path.
     // DROP_OLDEST for the same reason - a full buffer must never stall tick.
@@ -77,6 +86,11 @@ class Game(
     // Set by createField, consumed by that session's first fireButtonClicked - which is what makes
     // recreateField's unvalidated next draw safe to promote.
     private var pendingOpeningPromotionCheck = false
+
+    // TODO(MC-114): persist with the field; until then a restored session restarts the drop curve.
+    private var boosterDropCounter = 0
+
+    private var hasDroppedBoosterThisSession = false
 
     fun start() {
         collectorJob?.cancel()
@@ -104,6 +118,8 @@ class Game(
         mutex.withLock {
             _stateFlow.value = _stateFlow.value.copy(field = recreateField(id))
             pendingOpeningPromotionCheck = true
+            boosterDropCounter = 0
+            hasDroppedBoosterThisSession = false
         }
 
     suspend fun createTargets() = mutex.withLock { createTargetsLocked() }
@@ -138,40 +154,77 @@ class Game(
     suspend fun fireButtonClicked() =
         mutex.withLock {
             val current = _stateFlow.value
-            val pressOutcome =
-                current.targets.performOperation(
-                    current.field.currentOperationSign,
-                    current.field.currentOperationDigit,
-                    sessionHelper.failedGrowthCap(current.field.level),
-                    current.field.gameTimeMs,
-                )
-            val updatedTargets =
-                pressOutcome.targets
-                    .ensureAlive()
-            val (nextOperationSign, nextOperationDigit) =
-                getNextSignAndDigit(updatedTargets, current.field.level, current.field.gameTimeMs)
-            val comboField =
-                current.field
-                    .applyCombo(pressOutcome.scored)
-                    .let { field ->
-                        if (pendingOpeningPromotionCheck) {
-                            pendingOpeningPromotionCheck = false
-                            ensurePromotedOperationSucceeds(field, updatedTargets)
-                        } else {
-                            field
-                        }
+            when (val action = current.field.currentAction) {
+                is FieldAction.Operation -> fireOperationLocked(current, action)
+                is FieldAction.BoosterAction -> fireBoosterLocked(current)
+            }
+        }
+
+    private fun fireOperationLocked(
+        current: GameState,
+        action: FieldAction.Operation,
+    ) {
+        val pressOutcome =
+            current.targets.performOperation(
+                action.sign,
+                action.digit,
+                sessionHelper.failedGrowthCap(current.field.level),
+                current.field.gameTimeMs,
+            )
+        val updatedTargets =
+            pressOutcome.targets
+                .ensureAlive()
+        val drop = rollBoosterDrop(current.field, updatedTargets)
+        val (nextOperationSign, nextOperationDigit) =
+            getNextSignAndDigit(updatedTargets, current.field.level, current.field.gameTimeMs)
+        val comboField =
+            current.field
+                .applyCombo(pressOutcome.scored)
+                .let { field ->
+                    if (pendingOpeningPromotionCheck) {
+                        pendingOpeningPromotionCheck = false
+                        ensurePromotedOperationSucceeds(field, updatedTargets)
+                    } else {
+                        field
                     }
-            // The product is where an unbounded multiplier would overflow Int.
-            val gained =
-                (pressOutcome.totalScore.toLong() * comboField.appliedMultiplier)
-                    .coerceAtMost(Int.MAX_VALUE.toLong())
-                    .toInt()
-            val updatedField =
-                comboField
-                    .updateActionButtons(nextOperationSign, nextOperationDigit)
-                    .updateScore(gained)
-            _stateFlow.value = GameState(updatedField, updatedTargets)
-            _events.tryEmit(GameEvent.OperationResolved(gained, comboField.bonusMultiplier))
+                }
+        // The product is where an unbounded multiplier would overflow Int.
+        val gained =
+            (pressOutcome.totalScore.toLong() * comboField.appliedMultiplier)
+                .coerceAtMost(Int.MAX_VALUE.toLong())
+                .toInt()
+        boosterDropCounter = drop.counter
+        val updatedField =
+            comboField
+                .updateActionButtons(nextOperationSign, nextOperationDigit, drop.booster)
+                .updateScore(gained)
+        _stateFlow.value = GameState(updatedField, updatedTargets)
+        _events.tryEmit(GameEvent.OperationResolved(gained, comboField.bonusMultiplier))
+    }
+
+    private fun fireBoosterLocked(current: GameState) {
+        // TODO(MC-113): apply the booster's effect here instead of a no-op consume.
+        val drop = rollBoosterDrop(current.field, current.targets)
+        val (nextOperationSign, nextOperationDigit) =
+            getNextSignAndDigit(current.targets, current.field.level, current.field.gameTimeMs)
+        boosterDropCounter = drop.counter
+        val updatedField = current.field.updateActionButtons(nextOperationSign, nextOperationDigit, drop.booster)
+        _stateFlow.value = GameState(updatedField, current.targets)
+    }
+
+    // A swipe on an operation or into a full stash is a UI slip, so it is ignored rather than reported.
+    suspend fun stashBooster() =
+        mutex.withLock {
+            val current = _stateFlow.value
+            val booster = current.field.currentBooster ?: return@withLock
+            if (current.field.boosterStash.size >= BOOSTER_STASH_CAPACITY) return@withLock
+            val stashedField = current.field.stashCurrentBooster(booster)
+            val drop = rollBoosterDrop(stashedField, current.targets)
+            val (nextOperationSign, nextOperationDigit) =
+                getNextSignAndDigit(current.targets, stashedField.level, stashedField.gameTimeMs)
+            boosterDropCounter = drop.counter
+            val promotedField = stashedField.updateActionButtons(nextOperationSign, nextOperationDigit, drop.booster)
+            _stateFlow.value = GameState(promotedField, current.targets)
         }
 
     suspend fun tick(
@@ -378,6 +431,32 @@ class Game(
             val (sign, digit) = drawSignAndDigit(visibleActiveTargets, field.level)
             field.copy(nextOperationSign = sign, nextOperationDigit = digit)
         }
+    }
+
+    // TODO(MC-113): feed icePickArmed and shieldActive from the effect state.
+    private fun rollBoosterDrop(
+        field: Field,
+        targets: List<Target>,
+    ): BoosterDropResult {
+        if (!boostersEnabled) return BoosterDropResult(booster = null, counter = boosterDropCounter)
+        val visibleActiveTargets = targets.filter { it.isActive && it.isVisible(field.gameTimeMs) }
+        val context =
+            BoosterDropContext(
+                anyVisibleBeyondTelegraph = visibleActiveTargets.any { it.isTelegraphingBreakout(field.gameTimeMs) },
+                noVisibleBubble = visibleActiveTargets.isEmpty(),
+                oneLifeLeft = field.lifeCount == 1,
+                icePickArmed = false,
+                shieldActive = false,
+            )
+        val result =
+            boosterDropRule.roll(
+                counter = boosterDropCounter,
+                hasDroppedBefore = hasDroppedBoosterThisSession,
+                stashFull = field.boosterStash.size >= BOOSTER_STASH_CAPACITY,
+                context = context,
+            )
+        if (result.booster != null) hasDroppedBoosterThisSession = true
+        return result
     }
 
     // The redraw loop itself, shared with ensureOpeningOperationSucceeds above: the only thing that
