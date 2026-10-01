@@ -1,15 +1,15 @@
 plugins {
-    id("matharcade.kmp.library")
-    id("matharcade.roborazzi")
+    id("mathbubbles.kmp.library")
+    id("mathbubbles.roborazzi")
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.compose.multiplatform)
 }
 
-// This module has no components and no DI, so matharcade.kmp.feature (Decompose/Essenty, Koin)
+// This module has no components and no DI, so mathbubbles.kmp.feature (Decompose/Essenty, Koin)
 // would hand it dependencies it never uses — Compose is declared directly instead.
 compose {
     resources {
-        packageOfResClass = "com.sdamashchuk.matharcade.core.ui.resources"
+        packageOfResClass = "com.sdamashchuk.mathbubbles.core.ui.resources"
     }
 }
 

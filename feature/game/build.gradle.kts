@@ -1,6 +1,6 @@
 plugins {
-    id("matharcade.kmp.feature")
-    id("matharcade.roborazzi")
+    id("mathbubbles.kmp.feature")
+    id("mathbubbles.roborazzi")
 }
 
 kotlin {

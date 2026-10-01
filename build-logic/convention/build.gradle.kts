@@ -1,12 +1,12 @@
 plugins {
     `kotlin-dsl`
-    // Applied directly, not through matharcade.quality: that plugin lives in this very module,
+    // Applied directly, not through mathbubbles.quality: that plugin lives in this very module,
     // so applying it here would ask the build to compile itself before it can be configured.
     alias(libs.plugins.detekt)
     alias(libs.plugins.spotless)
 }
 
-group = "com.sdamashchuk.matharcade.buildlogic"
+group = "com.sdamashchuk.mathbubbles.buildlogic"
 
 java {
     toolchain {
@@ -27,32 +27,32 @@ dependencies {
 gradlePlugin {
     plugins {
         register("androidLibrary") {
-            id = "matharcade.android.library"
-            implementationClass = "com.sdamashchuk.matharcade.buildlogic.AndroidLibraryConventionPlugin"
+            id = "mathbubbles.android.library"
+            implementationClass = "com.sdamashchuk.mathbubbles.buildlogic.AndroidLibraryConventionPlugin"
         }
         register("androidApplication") {
-            id = "matharcade.android.application"
-            implementationClass = "com.sdamashchuk.matharcade.buildlogic.AndroidApplicationConventionPlugin"
+            id = "mathbubbles.android.application"
+            implementationClass = "com.sdamashchuk.mathbubbles.buildlogic.AndroidApplicationConventionPlugin"
         }
         register("androidCompose") {
-            id = "matharcade.android.compose"
-            implementationClass = "com.sdamashchuk.matharcade.buildlogic.AndroidComposeConventionPlugin"
+            id = "mathbubbles.android.compose"
+            implementationClass = "com.sdamashchuk.mathbubbles.buildlogic.AndroidComposeConventionPlugin"
         }
         register("quality") {
-            id = "matharcade.quality"
-            implementationClass = "com.sdamashchuk.matharcade.buildlogic.QualityConventionPlugin"
+            id = "mathbubbles.quality"
+            implementationClass = "com.sdamashchuk.mathbubbles.buildlogic.QualityConventionPlugin"
         }
         register("kmpLibrary") {
-            id = "matharcade.kmp.library"
-            implementationClass = "com.sdamashchuk.matharcade.buildlogic.KmpLibraryConventionPlugin"
+            id = "mathbubbles.kmp.library"
+            implementationClass = "com.sdamashchuk.mathbubbles.buildlogic.KmpLibraryConventionPlugin"
         }
         register("kmpFeature") {
-            id = "matharcade.kmp.feature"
-            implementationClass = "com.sdamashchuk.matharcade.buildlogic.KmpFeatureConventionPlugin"
+            id = "mathbubbles.kmp.feature"
+            implementationClass = "com.sdamashchuk.mathbubbles.buildlogic.KmpFeatureConventionPlugin"
         }
         register("roborazzi") {
-            id = "matharcade.roborazzi"
-            implementationClass = "com.sdamashchuk.matharcade.buildlogic.RoborazziConventionPlugin"
+            id = "mathbubbles.roborazzi"
+            implementationClass = "com.sdamashchuk.mathbubbles.buildlogic.RoborazziConventionPlugin"
         }
     }
 }

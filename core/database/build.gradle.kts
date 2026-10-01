@@ -1,5 +1,5 @@
 plugins {
-    id("matharcade.kmp.library")
+    id("mathbubbles.kmp.library")
     alias(libs.plugins.sqldelight)
 }
 
@@ -9,8 +9,8 @@ sqldelight {
         // builds the driver — see DatabaseModule.kt. The name, schema version and CREATE TABLE
         // text must not drift: SQLDelight opens Room's existing on-device file in place only
         // because they still match.
-        create("MathArcadeDatabase") {
-            packageName.set("com.sdamashchuk.matharcade.core.database.local")
+        create("MathBubblesDatabase") {
+            packageName.set("com.sdamashchuk.mathbubbles.core.database.local")
             // .sqm files live next to the .sq files they migrate. SQLDelight numbers a migration
             // file by the version it migrates *from* — 1.sqm takes version 1 to 2 — and both Room
             // (`@Database(version = 1)`) and the pre-migration SQLDelight schema already wrote
@@ -27,7 +27,7 @@ sqldelight {
             // RENAME. SQLDelight's comparator normalises away double quotes and whitespace but not
             // backticks, so a backtick-quoted .sq reads as a permanent false CHANGED against every
             // rebuild migration. Double quotes make both sides normalise identically.
-            // Where `generateCommonMainMathArcadeDatabaseSchema` writes a `<version>.db` snapshot of
+            // Where `generateCommonMainMathBubblesDatabaseSchema` writes a `<version>.db` snapshot of
             // the schema as it stood at that version, and where verifyMigrations expects to find one
             // per released version to replay each later .sqm against.
             schemaOutputDirectory.set(layout.projectDirectory.dir("src/commonMain/sqldelight/databases"))

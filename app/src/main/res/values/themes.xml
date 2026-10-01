@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <style name="Theme.MathArcade" parent="android:Theme.Material.NoActionBar">
+    <style name="Theme.MathBubbles" parent="android:Theme.Material.NoActionBar">
         <item name="android:windowBackground">@color/water_deep</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:windowDrawsSystemBarBackgrounds">true</item>

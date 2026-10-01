@@ -1,3 +1,3 @@
 plugins {
-    id("matharcade.kmp.library")
+    id("mathbubbles.kmp.library")
 }

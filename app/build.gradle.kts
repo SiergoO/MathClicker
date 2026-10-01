@@ -1,14 +1,14 @@
 plugins {
-    id("matharcade.android.application")
-    id("matharcade.android.compose")
+    id("mathbubbles.android.application")
+    id("mathbubbles.android.compose")
     alias(libs.plugins.kotlin.serialization)
 }
 
 android {
-    namespace = "com.sdamashchuk.matharcade"
+    namespace = "com.sdamashchuk.mathbubbles"
 
     defaultConfig {
-        applicationId = "com.sdamashchuk.matharcade"
+        applicationId = "com.sdamashchuk.mathbubbles"
         versionCode = 1
         versionName = "1.0"
 

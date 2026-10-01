@@ -1,9 +1,9 @@
 # Math Bubbles
 
 Android Compose game, heading for Kotlin Multiplatform. The app is called Math Bubbles (renamed in
-MC-85) and has not been released yet. `applicationId` is still `com.sdamashchuk.matharcade`, sources
-live under `com/sdamashchuk/matharcade/`, and code names such as `MathArcadeTheme` keep the older
-Math Arcade name. The directory on disk is still `MathClicker`, because the tooling resolves through it.
+MC-85) and has not been released yet. `applicationId` is `com.sdamashchuk.mathbubbles`, sources
+live under `com/sdamashchuk/mathbubbles/`, and code names such as `MathBubblesTheme` match. The
+directory on disk is still `MathClicker`, because the tooling resolves through it.
 
 Eight modules: `:app`, `:core:model`, `:core:game`, `:core:database`, `:core:ui`, `:core:component`,
 `:feature:game`, `:feature:menu`. `data/` and `domain/` directories exist on disk but are **not** in

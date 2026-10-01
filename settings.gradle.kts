@@ -17,5 +17,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "MathArcade"
+rootProject.name = "MathBubbles"
 include(":app", ":core:model", ":core:game", ":core:database", ":core:ui", ":core:component", ":feature:game", ":feature:menu")
