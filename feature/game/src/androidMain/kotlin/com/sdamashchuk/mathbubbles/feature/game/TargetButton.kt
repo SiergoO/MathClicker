@@ -22,12 +22,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -37,7 +35,8 @@ import com.sdamashchuk.mathbubbles.core.ui.theme.BubbleFillReady
 import com.sdamashchuk.mathbubbles.core.ui.theme.BubbleRimIdle
 import com.sdamashchuk.mathbubbles.core.ui.theme.BubbleRimReady
 import com.sdamashchuk.mathbubbles.core.ui.theme.Ink
-import com.sdamashchuk.mathbubbles.core.ui.theme.Warning
+import com.sdamashchuk.mathbubbles.feature.game.model.BubbleHighlight
+import com.sdamashchuk.mathbubbles.feature.game.model.BubbleStyle
 import com.sdamashchuk.mathbubbles.feature.game.model.TargetScreenPosition
 import kotlin.math.abs
 
@@ -63,18 +62,10 @@ private const val FILL_ALPHA_READY = 0.62f
 private const val FILL_ALPHA_IDLE = 0.28f
 private const val RIM_WIDTH_FRACTION_READY = 0.027f
 private const val RIM_WIDTH_FRACTION_IDLE = 0.031f
-private const val HIGHLIGHT_X_FRACTION = -0.34f
-private const val HIGHLIGHT_Y_FRACTION = -0.33f
-private const val HIGHLIGHT_CORE_RADIUS_FRACTION = 0.20f
-private const val HIGHLIGHT_GLOW_RADIUS_FRACTION = 0.38f
 private const val HIGHLIGHT_CORE_ALPHA_READY = 0.90f
 private const val HIGHLIGHT_CORE_ALPHA_IDLE = 0.30f
 private const val HIGHLIGHT_GLOW_ALPHA_READY = 0.36f
 private const val HIGHLIGHT_GLOW_ALPHA_IDLE = 0.14f
-
-// Upright, not tilted. The reference art's blob leans; on a falling object that lean reads as the
-// bubble being askew, so the owner picked the straight ellipse from the design system instead.
-private const val HIGHLIGHT_ECCENTRICITY = 1.2f
 
 private const val DIGIT_SIZE_FRACTION = 0.28f
 
@@ -131,6 +122,7 @@ fun TargetButton(
         )
     val liveliness = liveliness(target.isProfitable, readinessFraction)
     val buttonDiameterDp = (gameColumnSize.width * TARGET_DIAMETER_FRACTION).toFloat()
+    val bubbleStyle = targetBubbleStyle(buttonDiameterDp.dp, liveliness)
     val columnCenterXDp = target.columnId * gameColumnSize.width + gameColumnSize.width * LANE_CENTER_FRACTION
     val columnHeight = gameColumnSize.height
 
@@ -160,7 +152,8 @@ fun TargetButton(
                             squashScale.value
                     scaleX = combined
                     scaleY = combined
-                }.bubble(liveliness, target, gameTimeMsProvider, icePickArmed)
+                }.bubbleSurface(bubbleStyle)
+                .icePickAndTelegraph(target, gameTimeMsProvider, icePickArmed)
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
@@ -213,35 +206,19 @@ private suspend fun squashTarget(scale: Animatable<Float, AnimationVector1D>) {
     scale.animateTo(1f, tween(SQUASH_SETTLE_MS))
 }
 
-// drawWithCache, not drawBehind: every Brush here allocates a Shader, and drawBehind would build
-// four of them per bubble per frame. This rebuilds them only when the size or the liveliness
-// actually changes - that is, during a 200ms readiness transition and not once otherwise.
-private fun Modifier.bubble(
+// A target that cannot be reduced (isUnreachable) drops to its own, lower floor instead of the
+// formula's idle values - that is what separates it from a merely unready one at a glance.
+private fun targetBubbleStyle(
+    diameter: Dp,
     liveliness: Float,
-    target: Target,
-    gameTimeMsProvider: () -> Long,
-    icePickArmed: Boolean,
-) = drawWithCache {
-    val radius = size.minDimension / 2f
-    val center = Offset(size.width / 2f, size.height / 2f)
-    val highlightCenter =
-        Offset(
-            center.x + HIGHLIGHT_X_FRACTION * radius,
-            center.y + HIGHLIGHT_Y_FRACTION * radius,
-        )
-
+): BubbleStyle {
     val isUnreachable = liveliness <= 0f
-    val fill = lerp(BubbleFillIdle, BubbleFillReady, liveliness)
     val fillAlpha =
         if (isUnreachable) {
             UNREACHABLE_FILL_ALPHA
         } else {
             FILL_ALPHA_IDLE + (FILL_ALPHA_READY - FILL_ALPHA_IDLE) * liveliness
         }
-    val rim = lerp(BubbleRimIdle, BubbleRimReady, liveliness)
-    val rimWidth =
-        size.minDimension *
-            (RIM_WIDTH_FRACTION_IDLE + (RIM_WIDTH_FRACTION_READY - RIM_WIDTH_FRACTION_IDLE) * liveliness)
     val coreAlpha =
         if (isUnreachable) {
             UNREACHABLE_CORE_ALPHA
@@ -250,48 +227,28 @@ private fun Modifier.bubble(
         }
     val glowAlpha =
         HIGHLIGHT_GLOW_ALPHA_IDLE + (HIGHLIGHT_GLOW_ALPHA_READY - HIGHLIGHT_GLOW_ALPHA_IDLE) * liveliness
+    return BubbleStyle(
+        fillColor = lerp(BubbleFillIdle, BubbleFillReady, liveliness),
+        fillAlpha = fillAlpha,
+        rimColor = lerp(BubbleRimIdle, BubbleRimReady, liveliness),
+        rimWidth =
+            diameter * (RIM_WIDTH_FRACTION_IDLE + (RIM_WIDTH_FRACTION_READY - RIM_WIDTH_FRACTION_IDLE) * liveliness),
+        highlight = BubbleHighlight(coreAlpha, glowAlpha),
+    )
+}
 
-    // The stop positions are the fitted falloff (1 - d/R)^0.6 sampled at six radii, not a guess.
-    val bodyBrush =
-        Brush.radialGradient(
-            0.00f to fill.copy(alpha = fillAlpha),
-            0.25f to fill.copy(alpha = fillAlpha * 0.84f),
-            0.50f to fill.copy(alpha = fillAlpha * 0.66f),
-            0.75f to fill.copy(alpha = fillAlpha * 0.44f),
-            0.90f to fill.copy(alpha = fillAlpha * 0.25f),
-            1.00f to fill.copy(alpha = 0f),
-            center = center,
-            radius = radius,
-        )
-    val glowBrush =
-        Brush.radialGradient(
-            0f to Color.White.copy(alpha = glowAlpha),
-            1f to Color.White.copy(alpha = 0f),
-            center = highlightCenter,
-            radius = radius * HIGHLIGHT_GLOW_RADIUS_FRACTION,
-        )
-    val coreBrush =
-        Brush.radialGradient(
-            0.00f to Color.White.copy(alpha = coreAlpha),
-            0.34f to Color.White.copy(alpha = coreAlpha),
-            0.62f to Color.White.copy(alpha = coreAlpha * 0.55f),
-            1.00f to Color.White.copy(alpha = 0f),
-            center = highlightCenter,
-            radius = radius * HIGHLIGHT_CORE_RADIUS_FRACTION,
-        )
+private fun Modifier.icePickAndTelegraph(
+    target: Target,
+    gameTimeMsProvider: () -> Long,
+    icePickArmed: Boolean,
+) = drawWithCache {
+    val radius = size.minDimension / 2f
+    val center = Offset(size.width / 2f, size.height / 2f)
 
     onDrawBehind {
-        drawCircle(bodyBrush, radius = radius, center = center)
-        // Both highlight layers share one transform: the fit puts them on the same ellipse, and
-        // stretching y is what makes that ellipse upright rather than round.
-        withTransform({ scale(scaleX = 1f, scaleY = HIGHLIGHT_ECCENTRICITY, pivot = highlightCenter) }) {
-            drawCircle(glowBrush, radius = radius * HIGHLIGHT_GLOW_RADIUS_FRACTION, center = highlightCenter)
-            drawCircle(coreBrush, radius = radius * HIGHLIGHT_CORE_RADIUS_FRACTION, center = highlightCenter)
-        }
-        drawCircle(rim, radius = radius - rimWidth / 2f, center = center, style = Stroke(rimWidth))
         if (icePickArmed) {
             val crackWidth = size.minDimension * CRACK_STROKE_WIDTH_FRACTION
-            val crackColor = Warning.copy(alpha = CRACK_ALPHA)
+            val crackColor = Ink.copy(alpha = CRACK_ALPHA)
             drawLine(
                 crackColor,
                 Offset(center.x - radius * CRACK_BRANCH_1_X, center.y - radius * CRACK_BRANCH_1_Y),
@@ -311,8 +268,6 @@ private fun Modifier.bubble(
                 crackWidth,
             )
         }
-        // Read here, not in the cache block above: the ring's colour and width are constant, so
-        // a telegraph switching on has to re-draw but must never rebuild four shaders.
         if (target.isTelegraphingBreakout(gameTimeMsProvider())) {
             val ringWidth = size.minDimension * TELEGRAPH_RING_WIDTH_FRACTION
             drawCircle(

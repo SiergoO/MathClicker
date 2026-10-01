@@ -4,7 +4,6 @@ import androidx.annotation.DrawableRes
 import androidx.compose.ui.graphics.Color
 
 data class BoosterStyle(
-    val circleColor: Color,
-    val iconColor: Color,
+    val rimColor: Color,
     @DrawableRes val iconRes: Int,
 )

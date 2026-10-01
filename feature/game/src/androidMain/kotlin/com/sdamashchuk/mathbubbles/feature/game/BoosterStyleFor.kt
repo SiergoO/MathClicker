@@ -5,17 +5,16 @@ import com.sdamashchuk.mathbubbles.core.ui.theme.Accent
 import com.sdamashchuk.mathbubbles.core.ui.theme.AccentSoft
 import com.sdamashchuk.mathbubbles.core.ui.theme.Ink
 import com.sdamashchuk.mathbubbles.core.ui.theme.Success
-import com.sdamashchuk.mathbubbles.core.ui.theme.Warning
-import com.sdamashchuk.mathbubbles.core.ui.theme.WaterDeep
 import com.sdamashchuk.mathbubbles.feature.game.model.BoosterStyle
 
-// Ink only on Accent: on the lighter tokens it has too little contrast, so the icon is WaterDeep.
+// The booster token is the bubble's rim, not a solid fill, so every icon sits on the same glass
+// fill and reads at Ink regardless of which token rims it.
 internal fun boosterStyleFor(booster: Booster): BoosterStyle =
     when (booster) {
-        Booster.FREEZE -> BoosterStyle(AccentSoft, WaterDeep, R.drawable.ic_booster_ac_unit)
-        Booster.REWIND -> BoosterStyle(Accent, Ink, R.drawable.ic_booster_history)
-        Booster.ICE_PICK -> BoosterStyle(Warning, WaterDeep, R.drawable.ic_booster_pick)
-        Booster.SHIELD -> BoosterStyle(Success, WaterDeep, R.drawable.ic_booster_shield)
+        Booster.FREEZE -> BoosterStyle(AccentSoft, R.drawable.ic_booster_ac_unit)
+        Booster.REWIND -> BoosterStyle(Accent, R.drawable.ic_booster_history)
+        Booster.ICE_PICK -> BoosterStyle(Ink, R.drawable.ic_booster_focus_2)
+        Booster.SHIELD -> BoosterStyle(Success, R.drawable.ic_booster_shield)
     }
 
 internal fun boosterLabelFor(booster: Booster): Int =

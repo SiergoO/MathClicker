@@ -184,7 +184,7 @@ fun Field(
                 val icePickArmedInFireButton = icePickArmedFrom == IcePickSource.FireButton
                 FireButton(
                     action = currentAction,
-                    countdownColor = timedBooster?.let { boosterStyleFor(it).circleColor },
+                    countdownColor = timedBooster?.let { boosterStyleFor(it).rimColor },
                     countdownFraction = countdownFraction,
                     isIcePickArmedHere = icePickArmedInFireButton,
                     onFireClicked = if (icePickArmedInFireButton) onDisarmIcePick else onFireClicked,

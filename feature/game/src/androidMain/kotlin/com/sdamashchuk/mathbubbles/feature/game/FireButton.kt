@@ -1,7 +1,6 @@
 package com.sdamashchuk.mathbubbles.feature.game
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
@@ -29,7 +28,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.sdamashchuk.mathbubbles.core.model.FieldAction
-import com.sdamashchuk.mathbubbles.core.ui.theme.Accent
+import com.sdamashchuk.mathbubbles.core.ui.theme.BubbleRimReady
 import com.sdamashchuk.mathbubbles.core.ui.theme.Ink
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
@@ -88,19 +87,23 @@ fun FireButton(
                         dragOffsetPx.animateTo(0f)
                     },
                 ).clip(CircleShape)
-                .then(if (isBooster) Modifier else Modifier.background(Accent, CircleShape))
                 .then(if (isIcePickArmedHere) Modifier.semantics { contentDescription = armedLabel } else Modifier)
                 .clickable(onClick = onFireClicked),
         contentAlignment = Alignment.Center,
     ) {
         when (action) {
             is FieldAction.Operation -> {
-                Text(
-                    text = "${action.sign.sign}${action.digit}",
-                    fontSize = 36.sp,
-                    color = Ink,
-                    style = MaterialTheme.typography.button,
-                )
+                BubbleSurface(
+                    style = dockBubbleStyle(rimColor = BubbleRimReady, diameter = FIRE_BUTTON_SIZE),
+                    modifier = Modifier.size(FIRE_BUTTON_SIZE),
+                ) {
+                    Text(
+                        text = "${action.sign.sign}${action.digit}",
+                        fontSize = 36.sp,
+                        color = Ink,
+                        style = MaterialTheme.typography.button,
+                    )
+                }
             }
 
             is FieldAction.BoosterAction -> {
