@@ -23,11 +23,8 @@ import com.sdamashchuk.mathbubbles.core.ui.theme.Accent
 private val LOGO_MARK_SIZE = 96.dp
 private val LOGO_MARK_GUTTER = 16.dp
 
-// The wordmark is laid out to the width it is actually given rather than to a pinned type size: at
-// h1's own 48sp "ARCADE" overflows a 393dp screen once the mark and the 40dp screen padding are
-// subtracted, and a plain Text answers that by wrapping - which is how this shipped once already,
-// reading MATH / ARCAD / E on a device while every build stayed green. Shrinking to fit is the one
-// behaviour that cannot wrap or clip on a narrower phone or at a larger system font scale.
+// Sized to the width it is given, not a fixed type size: at h1's 48sp the longer line wraps mid-word
+// on a narrow phone or at a large font scale.
 private val WORDMARK_AUTO_SIZE = TextAutoSize.StepBased(minFontSize = 20.sp, maxFontSize = 48.sp)
 
 @Composable
@@ -47,9 +44,8 @@ fun MenuLogo(modifier: Modifier = Modifier) {
             modifier = Modifier.size(LOGO_MARK_SIZE),
         )
         Spacer(modifier = Modifier.width(LOGO_MARK_GUTTER))
-        // One BasicText carrying both lines rather than one per line: autoSize resolves a size per
-        // text, so two of them would render MATH visibly larger than ARCADE - four characters fit at
-        // a size six do not.
+        // One BasicText for both lines: autoSize sizes each text on its own, so two would render MATH
+        // larger than BUBBLES.
         BasicText(
             text =
                 stringResource(id = R.string.logo_wordmark_line_1) + "\n" +
