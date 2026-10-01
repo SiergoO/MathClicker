@@ -4,6 +4,7 @@ import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
 import com.sdamashchuk.mathbubbles.core.database.dao.FieldDao
 import com.sdamashchuk.mathbubbles.core.database.dao.TargetsDao
 import com.sdamashchuk.mathbubbles.core.database.local.MathBubblesDatabase
+import com.sdamashchuk.mathbubbles.core.model.Booster
 import com.sdamashchuk.mathbubbles.core.model.Field
 import com.sdamashchuk.mathbubbles.core.model.OperationSign
 import com.sdamashchuk.mathbubbles.core.model.Target
@@ -50,6 +51,25 @@ class GameRepositoryImplTest {
                     isClosed = true,
                     finishedAt = 1_726_000_000_000L,
                     gameTimeMs = 45_000L,
+                )
+
+            repository.insertField(field)
+
+            assertEquals(field.copy(id = 1), fieldDao.getFieldById(1))
+        }
+
+    @Test
+    fun `field round trip preserves a full stash a next booster action and the drop counter`() =
+        runTest {
+            val field =
+                Field(
+                    currentOperationSign = OperationSign.SUBTRACTION,
+                    currentOperationDigit = 2,
+                    currentBooster = Booster.SHIELD,
+                    nextBooster = Booster.FREEZE,
+                    boosterStash = listOf(Booster.REWIND, Booster.ICE_PICK, Booster.SHIELD),
+                    boosterDropCounter = 11,
+                    hasDroppedBoosterThisSession = true,
                 )
 
             repository.insertField(field)
@@ -127,6 +147,25 @@ class GameRepositoryImplTest {
                     nextOperationDigit = 2,
                     isClosed = true,
                     gameTimeMs = 8_500L,
+                )
+            repository.updateField(advanced)
+
+            assertEquals(advanced, fieldDao.getFieldById(1))
+        }
+
+    @Test
+    fun `updateField does not cross the current and next booster columns`() =
+        runTest {
+            repository.insertField(Field())
+            val stored = fieldDao.getFieldById(1)
+
+            val advanced =
+                stored.copy(
+                    currentBooster = Booster.SHIELD,
+                    nextBooster = Booster.FREEZE,
+                    boosterStash = listOf(Booster.REWIND, Booster.ICE_PICK),
+                    boosterDropCounter = 7,
+                    hasDroppedBoosterThisSession = true,
                 )
             repository.updateField(advanced)
 

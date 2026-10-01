@@ -70,6 +70,35 @@ class GameBoosterTest {
         }
 
     @Test
+    fun `fieldRestored resumes the persisted drop curve so a restored near-guarantee still lands on one fire`() =
+        runTest {
+            val game =
+                Game(
+                    FakeSessionHelper(targetAmount = 1, targetValue = 1_000_000),
+                    backgroundScope,
+                    Random(1),
+                    boostersEnabled = true,
+                )
+            game.createField(1)
+            game.targetsRestored(listOf(scheduledTarget(id = 1, value = 1_000_000)))
+            game.fieldRestored(
+                game.stateFlow.value.field.copy(
+                    currentOperationSign = OperationSign.SUBTRACTION,
+                    currentOperationDigit = 1,
+                    boosterDropCounter = 19,
+                    hasDroppedBoosterThisSession = true,
+                ),
+            )
+
+            game.fireButtonClicked()
+
+            assertIs<FieldAction.BoosterAction>(
+                game.stateFlow.value.field.nextAction,
+                "the restored drop counter was not honoured",
+            )
+        }
+
+    @Test
     fun `firing a centre booster performs no operation and leaves targets combo and score untouched`() =
         runTest {
             val game = Game(FakeSessionHelper(targetAmount = 1), backgroundScope, Random(1), boostersEnabled = true)

@@ -1,11 +1,14 @@
 package com.sdamashchuk.mathbubbles.core.database.dao
 
 import com.sdamashchuk.mathbubbles.core.database.local.FieldQueries
+import com.sdamashchuk.mathbubbles.core.model.Booster
 import com.sdamashchuk.mathbubbles.core.model.Field
 import com.sdamashchuk.mathbubbles.core.model.OperationSign
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import com.sdamashchuk.mathbubbles.core.database.local.Field_ as LocalField
+
+private const val BOOSTER_STASH_SEPARATOR = ","
 
 class FieldDao(
     private val queries: FieldQueries,
@@ -29,6 +32,11 @@ class FieldDao(
                 isClosed = field.isClosed,
                 finishedAt = field.finishedAt,
                 gameTimeMs = field.gameTimeMs,
+                currentBooster = field.currentBooster?.name,
+                nextBooster = field.nextBooster?.name,
+                boosterStash = field.boosterStash.joinToString(BOOSTER_STASH_SEPARATOR) { it.name },
+                boosterDropCounter = field.boosterDropCounter.toLong(),
+                hasDroppedBoosterThisSession = field.hasDroppedBoosterThisSession,
             )
         }
 
@@ -46,6 +54,11 @@ class FieldDao(
                 isClosed = field.isClosed,
                 finishedAt = field.finishedAt,
                 gameTimeMs = field.gameTimeMs,
+                currentBooster = field.currentBooster?.name,
+                nextBooster = field.nextBooster?.name,
+                boosterStash = field.boosterStash.joinToString(BOOSTER_STASH_SEPARATOR) { it.name },
+                boosterDropCounter = field.boosterDropCounter.toLong(),
+                hasDroppedBoosterThisSession = field.hasDroppedBoosterThisSession,
                 id = field.id.toLong(),
             )
         }
@@ -81,4 +94,10 @@ private fun LocalField.toDomainModel() =
         isClosed = isClosed,
         finishedAt = finishedAt,
         gameTimeMs = gameTimeMs,
+        currentBooster = currentBooster?.let { Booster.valueOf(it) },
+        nextBooster = nextBooster?.let { Booster.valueOf(it) },
+        boosterStash =
+            boosterStash.split(BOOSTER_STASH_SEPARATOR).filter { it.isNotEmpty() }.map { Booster.valueOf(it) },
+        boosterDropCounter = boosterDropCounter.toInt(),
+        hasDroppedBoosterThisSession = hasDroppedBoosterThisSession,
     )

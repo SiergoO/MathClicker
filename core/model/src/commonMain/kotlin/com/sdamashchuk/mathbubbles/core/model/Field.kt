@@ -15,6 +15,8 @@ data class Field(
     val currentBooster: Booster? = null,
     val nextBooster: Booster? = null,
     val boosterStash: List<Booster> = emptyList(),
+    val boosterDropCounter: Int = 0,
+    val hasDroppedBoosterThisSession: Boolean = false,
     val isClosed: Boolean = false,
     // Epoch milliseconds set once, when closeIfNecessary() first closes the field (see
     // FieldMapper). Null for a still-open run and, permanently, for any run that closed before

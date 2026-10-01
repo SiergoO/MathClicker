@@ -229,6 +229,47 @@ class GameBoosterEffectTest {
         }
 
     @Test
+    fun `fieldRestored clears an active shield and an armed ice pick so neither survives the restore`() =
+        runTest {
+            val game =
+                Game(
+                    FakeSessionHelper(targetAmount = 2, targetValue = 5),
+                    backgroundScope,
+                    Random(1),
+                    boostersEnabled = true,
+                )
+            game.createField(1)
+            game.targetsRestored(
+                listOf(
+                    scheduledTarget(id = 1, value = 5, lifetimeMs = 100),
+                    scheduledTarget(id = 2, columnId = 1, value = 5, lifetimeMs = 1_000_000),
+                ),
+            )
+            game.fieldRestored(
+                game.stateFlow.value.field
+                    .copy(currentBooster = Booster.SHIELD, nextBooster = Booster.ICE_PICK),
+            )
+            game.fireButtonClicked() // raises the shield, promotes the ice pick into current
+            game.fireButtonClicked() // arms the ice pick
+            val startingLives = game.stateFlow.value.field.lifeCount
+
+            game.fieldRestored(
+                game.stateFlow.value.field
+                    .copy(),
+            )
+
+            repeat(5) { game.tick(50) } // clears id 1's 100ms lifetime
+            assertEquals(startingLives - 1, game.stateFlow.value.field.lifeCount, "the shield survived the restore")
+
+            game.targetClicked(2)
+            val tapped =
+                game.stateFlow.value.targets
+                    .first { it.id == 2 }
+            assertEquals(4, tapped.value, "the ice pick survived the restore")
+            assertTrue(tapped.isActive)
+        }
+
+    @Test
     fun `a rewind applied before the first breakout leaves the real tick-time gap to the second unchanged`() =
         runTest {
             val stepMs = 50

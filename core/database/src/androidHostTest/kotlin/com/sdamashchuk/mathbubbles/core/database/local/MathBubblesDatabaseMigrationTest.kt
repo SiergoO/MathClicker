@@ -3,11 +3,13 @@ package com.sdamashchuk.mathbubbles.core.database.local
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
 import com.sdamashchuk.mathbubbles.core.database.dao.FieldDao
 import com.sdamashchuk.mathbubbles.core.database.dao.TargetsDao
+import com.sdamashchuk.mathbubbles.core.model.Booster
 import com.sdamashchuk.mathbubbles.core.model.Field
 import com.sdamashchuk.mathbubbles.core.model.OperationSign
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -29,6 +31,14 @@ class MathBubblesDatabaseMigrationTest {
             "`columnId` INTEGER NOT NULL, `value` INTEGER NOT NULL, `position` INTEGER NOT NULL, " +
             "`appearanceDelayMs` INTEGER NOT NULL, `lifetimeMs` INTEGER NOT NULL, `isProfitable` INTEGER NOT NULL, " +
             "`isVisible` INTEGER NOT NULL, `isActive` INTEGER NOT NULL)"
+
+    // 5.sqm only touched `targets`, so the version-6 field table is still 4.sqm's shape.
+    private val preBoosterColumnsFieldTable =
+        "CREATE TABLE \"field\" (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `level` INTEGER NOT NULL, " +
+            "`score` INTEGER NOT NULL, `lifeCount` INTEGER NOT NULL, `bonusMultiplier` INTEGER NOT NULL, " +
+            "`currentOperationSign` TEXT NOT NULL, `currentOperationDigit` INTEGER NOT NULL, " +
+            "`nextOperationSign` TEXT NOT NULL, `nextOperationDigit` INTEGER NOT NULL, " +
+            "`isClosed` INTEGER NOT NULL, `finishedAt` INTEGER, `gameTimeMs` INTEGER NOT NULL DEFAULT 0)"
 
     private fun insertField(
         driver: JdbcSqliteDriver,
@@ -70,7 +80,7 @@ class MathBubblesDatabaseMigrationTest {
 
             MathBubblesDatabase.Schema.migrate(driver, oldVersion = 1, newVersion = MathBubblesDatabase.Schema.version)
 
-            assertEquals(6L, MathBubblesDatabase.Schema.version)
+            assertEquals(7L, MathBubblesDatabase.Schema.version)
             val database = MathBubblesDatabase(driver)
             val restoredField = FieldDao(database.fieldQueries, Dispatchers.Unconfined).getFieldById(1)
             assertEquals(
@@ -196,6 +206,31 @@ class MathBubblesDatabaseMigrationTest {
             assertEquals(0, restoredField.score)
             assertTrue(restoredField.isClosed)
             assertEquals(0L, restoredField.gameTimeMs)
+        }
+
+    @Test
+    fun `migrating from version 6 to 7 gives an existing field row an empty stash and operation actions`() =
+        runTest {
+            val driver = JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY)
+            driver.execute(null, "PRAGMA user_version = 6", 0)
+            driver.execute(null, preBoosterColumnsFieldTable, 0)
+            driver.execute(
+                null,
+                "INSERT INTO field (id, level, score, lifeCount, bonusMultiplier, currentOperationSign, " +
+                    "currentOperationDigit, nextOperationSign, nextOperationDigit, isClosed, gameTimeMs) " +
+                    "VALUES (1, 1, 0, 3, 0, '${OperationSign.DIVISION.sign}', 0, '${OperationSign.DIVISION.sign}', 0, 0, 0)",
+                0,
+            )
+
+            MathBubblesDatabase.Schema.migrate(driver, oldVersion = 6, newVersion = MathBubblesDatabase.Schema.version)
+
+            val database = MathBubblesDatabase(driver)
+            val restoredField = FieldDao(database.fieldQueries, Dispatchers.Unconfined).getFieldById(1)
+            assertNull(restoredField.currentBooster)
+            assertNull(restoredField.nextBooster)
+            assertEquals(emptyList<Booster>(), restoredField.boosterStash)
+            assertEquals(0, restoredField.boosterDropCounter)
+            assertFalse(restoredField.hasDroppedBoosterThisSession)
         }
 
     // relatedFieldId is never queried, so several field rows with differing geometry all feed the

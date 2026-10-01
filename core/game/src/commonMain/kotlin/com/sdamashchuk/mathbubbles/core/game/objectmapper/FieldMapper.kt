@@ -53,6 +53,7 @@ internal fun Field.updateActionButtons(
     nextOperationSign: OperationSign,
     nextOperationDigit: Int,
     nextBooster: Booster? = null,
+    boosterDropCounter: Int = this.boosterDropCounter,
 ): Field =
     this.copy(
         currentOperationSign = this.nextOperationSign,
@@ -61,6 +62,8 @@ internal fun Field.updateActionButtons(
         nextOperationSign = nextOperationSign,
         nextOperationDigit = nextOperationDigit,
         nextBooster = nextBooster,
+        boosterDropCounter = boosterDropCounter,
+        hasDroppedBoosterThisSession = hasDroppedBoosterThisSession || nextBooster != null,
     )
 
 /**

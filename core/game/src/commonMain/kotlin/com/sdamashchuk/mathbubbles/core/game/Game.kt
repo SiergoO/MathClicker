@@ -94,11 +94,6 @@ class Game(
     // recreateField's unvalidated next draw safe to promote.
     private var pendingOpeningPromotionCheck = false
 
-    // TODO(MC-114): persist with the field; until then a restored session restarts the drop curve.
-    private var boosterDropCounter = 0
-
-    private var hasDroppedBoosterThisSession = false
-
     private var activeTimedEffect: TimedBoosterEffect? = null
     private var icePickArmed = false
     private var shieldActive = false
@@ -129,8 +124,6 @@ class Game(
         mutex.withLock {
             _stateFlow.value = _stateFlow.value.copy(field = recreateField(id))
             pendingOpeningPromotionCheck = true
-            boosterDropCounter = 0
-            hasDroppedBoosterThisSession = false
             activeTimedEffect = null
             icePickArmed = false
             shieldActive = false
@@ -141,6 +134,9 @@ class Game(
     suspend fun fieldRestored(field: Field) =
         mutex.withLock {
             _stateFlow.value = _stateFlow.value.copy(field = field)
+            activeTimedEffect = null
+            icePickArmed = false
+            shieldActive = false
         }
 
     suspend fun targetsRestored(targets: List<Target>) =
@@ -223,10 +219,9 @@ class Game(
             (pressOutcome.totalScore.toLong() * comboField.appliedMultiplier)
                 .coerceAtMost(Int.MAX_VALUE.toLong())
                 .toInt()
-        boosterDropCounter = drop.counter
         val updatedField =
             comboField
-                .updateActionButtons(nextOperationSign, nextOperationDigit, drop.booster)
+                .updateActionButtons(nextOperationSign, nextOperationDigit, drop.booster, drop.counter)
                 .updateScore(gained)
         _stateFlow.value = GameState(updatedField, updatedTargets)
         _events.tryEmit(GameEvent.OperationResolved(gained, comboField.bonusMultiplier))
@@ -237,8 +232,8 @@ class Game(
         val drop = rollBoosterDrop(current.field, current.targets)
         val (nextOperationSign, nextOperationDigit) =
             getNextSignAndDigit(current.targets, current.field.level, current.field.gameTimeMs)
-        boosterDropCounter = drop.counter
-        val updatedField = current.field.updateActionButtons(nextOperationSign, nextOperationDigit, drop.booster)
+        val updatedField =
+            current.field.updateActionButtons(nextOperationSign, nextOperationDigit, drop.booster, drop.counter)
         _stateFlow.value = GameState(updatedField, current.targets)
     }
 
@@ -252,8 +247,8 @@ class Game(
             val drop = rollBoosterDrop(stashedField, current.targets)
             val (nextOperationSign, nextOperationDigit) =
                 getNextSignAndDigit(current.targets, stashedField.level, stashedField.gameTimeMs)
-            boosterDropCounter = drop.counter
-            val promotedField = stashedField.updateActionButtons(nextOperationSign, nextOperationDigit, drop.booster)
+            val promotedField =
+                stashedField.updateActionButtons(nextOperationSign, nextOperationDigit, drop.booster, drop.counter)
             _stateFlow.value = GameState(promotedField, current.targets)
         }
 
@@ -565,7 +560,7 @@ class Game(
         field: Field,
         targets: List<Target>,
     ): BoosterDropResult {
-        if (!boostersEnabled) return BoosterDropResult(booster = null, counter = boosterDropCounter)
+        if (!boostersEnabled) return BoosterDropResult(booster = null, counter = field.boosterDropCounter)
         val visibleActiveTargets = targets.filter { it.isActive && it.isVisible(field.gameTimeMs) }
         val context =
             BoosterDropContext(
@@ -575,15 +570,12 @@ class Game(
                 icePickArmed = icePickArmed,
                 shieldActive = shieldActive,
             )
-        val result =
-            boosterDropRule.roll(
-                counter = boosterDropCounter,
-                hasDroppedBefore = hasDroppedBoosterThisSession,
-                stashFull = field.boosterStash.size >= BOOSTER_STASH_CAPACITY,
-                context = context,
-            )
-        if (result.booster != null) hasDroppedBoosterThisSession = true
-        return result
+        return boosterDropRule.roll(
+            counter = field.boosterDropCounter,
+            hasDroppedBefore = field.hasDroppedBoosterThisSession,
+            stashFull = field.boosterStash.size >= BOOSTER_STASH_CAPACITY,
+            context = context,
+        )
     }
 
     // The redraw loop itself, shared with ensureOpeningOperationSucceeds above: the only thing that

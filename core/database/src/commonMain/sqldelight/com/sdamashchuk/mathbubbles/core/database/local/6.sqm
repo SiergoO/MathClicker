@@ -1,0 +1,5 @@
+ALTER TABLE `field` ADD COLUMN `currentBooster` TEXT;
+ALTER TABLE `field` ADD COLUMN `nextBooster` TEXT;
+ALTER TABLE `field` ADD COLUMN `boosterStash` TEXT NOT NULL DEFAULT '';
+ALTER TABLE `field` ADD COLUMN `boosterDropCounter` INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE `field` ADD COLUMN `hasDroppedBoosterThisSession` INTEGER NOT NULL DEFAULT 0;
