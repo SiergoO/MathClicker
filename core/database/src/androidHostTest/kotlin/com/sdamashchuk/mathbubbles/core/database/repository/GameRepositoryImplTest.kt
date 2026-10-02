@@ -45,7 +45,7 @@ class GameRepositoryImplTest {
         runTest {
             repository.insertField(Field(bonusMultiplier = 99))
 
-            assertEquals(4, fieldDao.getFieldById(1).bonusMultiplier)
+            assertEquals(9, fieldDao.getFieldById(1).bonusMultiplier)
         }
 
     @Test

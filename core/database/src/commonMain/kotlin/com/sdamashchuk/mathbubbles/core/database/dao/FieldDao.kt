@@ -12,7 +12,7 @@ private const val BOOSTER_STASH_SEPARATOR = ","
 
 // Mirrors core/game's own MAX_COMBO_MULTIPLIER - 1: applyCombo never writes past it, so this only
 // guards a row a future migration or external edit left out of range.
-private const val MAX_BONUS_MULTIPLIER = 4
+private const val MAX_BONUS_MULTIPLIER = 9
 
 class FieldDao(
     private val queries: FieldQueries,

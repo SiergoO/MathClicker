@@ -19,13 +19,13 @@ class ComboMapperTest {
     }
 
     @Test
-    fun `applyCombo stops raising the multiplier once appliedMultiplier reaches the x5 cap`() {
+    fun `applyCombo stops raising the multiplier once appliedMultiplier reaches the x10 cap`() {
         var field = Field(bonusMultiplier = 0)
 
         repeat(50) { field = field.applyCombo(changedTargetCount = 2) }
 
-        assertEquals(MAX_COMBO_MULTIPLIER, field.appliedMultiplier)
-        assertEquals(MAX_COMBO_MULTIPLIER - 1, field.bonusMultiplier)
+        assertEquals(10, field.appliedMultiplier)
+        assertEquals(9, field.bonusMultiplier)
     }
 
     @Test

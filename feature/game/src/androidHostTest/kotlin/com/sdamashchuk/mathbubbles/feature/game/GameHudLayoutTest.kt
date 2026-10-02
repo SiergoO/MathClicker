@@ -25,7 +25,7 @@ private const val WRAPPER_HORIZONTAL_INSET_DP = 20f
 private const val EXTREME_LEVEL = 999
 private const val EXTREME_SCORE = 9999999
 private const val LARGE_FONT_SCALE = 1.3f
-private const val MAX_COMBO_MULTIPLIER = 5
+private const val MAX_COMBO_MULTIPLIER = 10
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)

@@ -253,7 +253,7 @@ class Game(
                         field
                     }
                 }
-        // Long, not Int: totalScore times even the x5 cap can still overflow Int.
+        // Long, not Int: totalScore times even the x10 cap can still overflow Int.
         val gained =
             (pressOutcome.totalScore.toLong() * comboField.appliedMultiplier)
                 .coerceAtMost(Int.MAX_VALUE.toLong())

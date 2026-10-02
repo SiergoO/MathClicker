@@ -169,7 +169,7 @@ class GameComboTest {
         }
 
     @Test
-    fun `repeated multi-target hits stop raising the multiplier at x5`() =
+    fun `repeated multi-target hits stop raising the multiplier at x10`() =
         runTest {
             val game = Game(FakeSessionHelper(targetAmount = 2, targetValue = 1_000_000), backgroundScope, Random(1))
             game.createField(1)
@@ -188,7 +188,7 @@ class GameComboTest {
                 game.fireButtonClicked()
             }
 
-            assertEquals(5, game.stateFlow.value.field.appliedMultiplier)
+            assertEquals(10, game.stateFlow.value.field.appliedMultiplier)
         }
 
     @Test

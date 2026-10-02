@@ -83,7 +83,7 @@ class GameChromeScreenshotTest {
         composeTestRule.mainClock.autoAdvance = false
         val extremeState =
             FIXED_FIELD_STATE.copy(
-                field = FIXED_FIELD_STATE.field.copy(level = 999, score = 9999999, bonusMultiplier = 4),
+                field = FIXED_FIELD_STATE.field.copy(level = 999, score = 9999999, bonusMultiplier = 9),
             )
         val gameState = mutableStateOf(extremeState)
 
