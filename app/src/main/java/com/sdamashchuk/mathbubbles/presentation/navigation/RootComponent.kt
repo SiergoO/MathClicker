@@ -7,7 +7,6 @@ import com.arkivanov.decompose.router.stack.StackNavigation
 import com.arkivanov.decompose.router.stack.childStack
 import com.arkivanov.decompose.router.stack.pop
 import com.arkivanov.decompose.router.stack.push
-import com.arkivanov.decompose.router.stack.replaceAll
 import com.arkivanov.decompose.value.Value
 import com.sdamashchuk.mathbubbles.core.database.repository.GameRepository
 import com.sdamashchuk.mathbubbles.core.game.Game
@@ -16,7 +15,6 @@ import com.sdamashchuk.mathbubbles.core.ui.sound.SoundSettings
 import com.sdamashchuk.mathbubbles.feature.game.GameComponent
 import com.sdamashchuk.mathbubbles.feature.menu.MenuComponent
 import com.sdamashchuk.mathbubbles.feature.menu.SettingsComponent
-import com.sdamashchuk.mathbubbles.presentation.splash.SplashComponent
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.get
 
@@ -36,7 +34,7 @@ class RootComponent(
         childStack(
             source = navigation,
             serializer = RootConfig.serializer(),
-            initialConfiguration = RootConfig.Splash,
+            initialConfiguration = RootConfig.Menu,
             handleBackButton = true,
             childFactory = ::child,
         )
@@ -50,18 +48,6 @@ class RootComponent(
         componentContext: ComponentContext,
     ): RootChild =
         when (config) {
-            RootConfig.Splash -> {
-                RootChild.Splash(
-                    SplashComponent(
-                        componentContext = componentContext,
-                        // replaceAll, not push: the splash is an entrance, not somewhere to go
-                        // back to. Pushing left it under the menu, so back from the menu
-                        // replayed the logo and pushed the menu again instead of leaving.
-                        onFinished = { navigation.replaceAll(RootConfig.Menu) },
-                    ),
-                )
-            }
-
             RootConfig.Menu -> {
                 RootChild.Menu(
                     MenuComponent(

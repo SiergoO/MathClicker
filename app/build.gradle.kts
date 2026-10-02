@@ -49,10 +49,6 @@ dependencies {
     implementation(libs.essenty.instance.keeper)
     implementation(libs.kotlinx.serialization.core)
 
-    // Compottie
-    implementation(libs.compottie)
-    implementation(libs.compottie.dot)
-
     // Compose
     implementation(libs.compose.ui)
     implementation(libs.compose.material)

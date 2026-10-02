@@ -19,10 +19,13 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.intl.Locale
 import androidx.compose.ui.text.toUpperCase
 import com.sdamashchuk.mathbubbles.core.ui.theme.AccentSoft
+import com.sdamashchuk.mathbubbles.core.ui.theme.Ink
 import com.sdamashchuk.mathbubbles.core.ui.theme.Scrim
 import io.github.alexzhirkevich.compottie.Compottie
 import io.github.alexzhirkevich.compottie.DotLottie
+import io.github.alexzhirkevich.compottie.ExperimentalCompottieApi
 import io.github.alexzhirkevich.compottie.LottieCompositionSpec
+import io.github.alexzhirkevich.compottie.dynamic.rememberLottieDynamicProperties
 import io.github.alexzhirkevich.compottie.rememberLottieComposition
 import io.github.alexzhirkevich.compottie.rememberLottiePainter
 
@@ -32,6 +35,7 @@ private const val PROMPT_ANCHOR_HEIGHT_FRACTION = 0.5f
  * GamePhase.ReadyToPlay's pre-game screen - a game that hasn't started can't be "paused", so this
  * carries no pause label. The tap-highlight animation plus the hint below it already say what to do.
  */
+@OptIn(ExperimentalCompottieApi::class)
 @Composable
 fun ReadyToPlayOverlay(onClick: () -> Unit) {
     Column(
@@ -51,8 +55,20 @@ fun ReadyToPlayOverlay(onClick: () -> Unit) {
             val composition by rememberLottieComposition {
                 LottieCompositionSpec.DotLottie(resources.openRawResource(R.raw.tap_higlight).readBytes())
             }
+            val dynamicProperties =
+                rememberLottieDynamicProperties {
+                    shapeLayer("**") {
+                        fill("**") { color { Ink } }
+                        stroke("**") { color { Ink } }
+                    }
+                }
             Image(
-                painter = rememberLottiePainter(composition = composition, iterations = Compottie.IterateForever),
+                painter =
+                    rememberLottiePainter(
+                        composition = composition,
+                        iterations = Compottie.IterateForever,
+                        dynamicProperties = dynamicProperties,
+                    ),
                 contentDescription = null,
             )
         }
