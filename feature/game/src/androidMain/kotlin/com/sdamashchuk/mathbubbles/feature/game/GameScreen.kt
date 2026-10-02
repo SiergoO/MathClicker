@@ -2,7 +2,8 @@ package com.sdamashchuk.mathbubbles.feature.game
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.AnimationVector1D
+import androidx.compose.animation.core.AnimationVector2D
+import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,11 +13,13 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -34,7 +37,7 @@ import kotlinx.coroutines.launch
 
 private const val HAPTIC_REPEAT_GAP_MS = 80L
 private const val SHAKE_STEP_MS = 60
-private const val SHAKE_MAGNITUDE_PX = 24f
+private const val SHAKE_MAGNITUDE_PX = 12f
 
 @Composable
 fun GameScreen(component: GameComponent) {
@@ -43,7 +46,8 @@ fun GameScreen(component: GameComponent) {
     var targetZeroedSignal by remember { mutableStateOf<TargetZeroedSignal?>(null) }
     val shieldCrackCue = remember { ShieldCrackCue() }
     val shieldCracking by shieldCrackCue.isCracking
-    val shakeOffsetX = remember { Animatable(0f) }
+    val shakeOffset = remember { Animatable(Offset.Zero, Offset.VectorConverter) }
+    var shakeSeed by remember { mutableIntStateOf(0) }
 
     // See Field's own derivedStateOf comment: reading these fields straight off gameState.value
     // would drag the HUD through composition on every tick, not just the second it changes.
@@ -57,7 +61,10 @@ fun GameScreen(component: GameComponent) {
         collectFeedback(
             component = component,
             hapticFeedback = hapticFeedback,
-            onShake = { launch { shakeField(shakeOffsetX) } },
+            onShake = {
+                val seed = ++shakeSeed
+                launch { shakeField(shakeOffset, seed) }
+            },
             onTargetZeroed = { targetZeroedSignal = it },
             onShieldAbsorbed = { shieldCrackCue.absorb() },
         )
@@ -69,7 +76,10 @@ fun GameScreen(component: GameComponent) {
                 modifier =
                     Modifier
                         .fillMaxSize()
-                        .graphicsLayer { translationX = shakeOffsetX.value },
+                        .graphicsLayer {
+                            translationX = shakeOffset.value.x
+                            translationY = shakeOffset.value.y
+                        },
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 when (gameState.value.phase) {
@@ -213,8 +223,11 @@ private suspend fun collectFeedback(
 
 // Launched fire-and-forget on TargetBrokeOut so it never blocks the collector loop above from
 // processing the next event; three steps read as a rattle rather than one big nudge.
-private suspend fun shakeField(offsetX: Animatable<Float, AnimationVector1D>) {
-    listOf(-SHAKE_MAGNITUDE_PX, SHAKE_MAGNITUDE_PX, 0f).forEach { target ->
-        offsetX.animateTo(target, animationSpec = tween(SHAKE_STEP_MS))
+private suspend fun shakeField(
+    offset: Animatable<Offset, AnimationVector2D>,
+    seed: Int,
+) {
+    ShakeMotion.keyframes(seed, SHAKE_MAGNITUDE_PX).forEach { target ->
+        offset.animateTo(target, animationSpec = tween(SHAKE_STEP_MS))
     }
 }

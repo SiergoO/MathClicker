@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.sdamashchuk.mathbubbles.core.model.EFFECT_RAMP_MS
+import com.sdamashchuk.mathbubbles.core.model.GAME_COLUMN_COUNT
 import com.sdamashchuk.mathbubbles.core.model.Target
 import com.sdamashchuk.mathbubbles.core.ui.theme.BubbleFillIdle
 import com.sdamashchuk.mathbubbles.core.ui.theme.BubbleFillReady
@@ -44,7 +45,7 @@ import kotlin.math.abs
 import kotlin.math.sin
 
 // Telegraphs the final 15% of a fall so a breakout is never a surprise: a size pulse plus a ring.
-private const val TARGET_DIAMETER_FRACTION = 0.8
+internal const val TARGET_DIAMETER_FRACTION = 0.8
 private const val TELEGRAPH_PULSE_SCALE = 1.06f
 private const val TELEGRAPH_PULSE_MS = 300
 private const val TELEGRAPH_RING_WIDTH_FRACTION = 0.03f
@@ -106,6 +107,9 @@ fun TargetButton(
     // Frame time, not gameTimeMsProvider: the sway must keep moving while Freeze or Rewind
     // holds the game clock still or running backward.
     realTimeMsProvider: () -> Long = gameTimeMsProvider,
+    interactive: Boolean = true,
+    fadeProvider: () -> Float = { 0f },
+    modifier: Modifier = Modifier,
 ) {
     val squashScale = remember(target.id) { Animatable(1f) }
     var lastKnownValue by remember(target.id) { mutableIntStateOf(target.value) }
@@ -133,13 +137,24 @@ fun TargetButton(
     val swayPhase = remember(target.id) { swayPhase(target.id) }
     val liveliness = liveliness(target.isProfitable, readinessFraction)
     val buttonDiameterDp = (gameColumnSize.width * TARGET_DIAMETER_FRACTION).toFloat()
-    val bubbleStyle = targetBubbleStyle(buttonDiameterDp.dp, liveliness)
+    val horizontalFraction = TargetHighlightTilt.horizontalFraction(target.columnId, GAME_COLUMN_COUNT)
+    val bubbleStyle = targetBubbleStyle(buttonDiameterDp.dp, liveliness, horizontalFraction)
     val columnCenterXDp = target.columnId * gameColumnSize.width + gameColumnSize.width * LANE_CENTER_FRACTION
     val columnHeight = gameColumnSize.height
+    val interactionModifier =
+        if (interactive) {
+            Modifier.clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = { onTargetClicked.invoke(target.id) },
+            )
+        } else {
+            Modifier
+        }
 
     Box(
         modifier =
-            Modifier
+            modifier
                 .width(buttonDiameterDp.dp)
                 .height(buttonDiameterDp.dp)
                 .offset {
@@ -157,23 +172,26 @@ fun TargetButton(
                     val fallFraction = target.position(gameTimeMs)
                     val depthScale =
                         DEPTH_SCALE_AT_TOP + (DEPTH_SCALE_AT_BOTTOM - DEPTH_SCALE_AT_TOP) * fallFraction
+                    val fadeProgress = fadeProvider()
                     val combined =
                         depthScale *
                             telegraphPulse(gameTimeMs, target.isTelegraphingBreakout(gameTimeMs)) *
-                            squashScale.value
+                            squashScale.value *
+                            DisappearFade.scale(fadeProgress)
                     scaleX = combined
                     scaleY = combined
+                    alpha = DisappearFade.alpha(fadeProgress)
                     if (swayEnvelope > 0f) {
                         val offset = swayOffsetPx(realTimeMsProvider(), swayPhase, SWAY_AMPLITUDE_DP.dp.toPx())
                         translationX = offset * swayEnvelope
                     }
-                }.bubbleSurface(bubbleStyle)
-                .telegraphRing(target, gameTimeMsProvider)
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClick = { onTargetClicked.invoke(target.id) },
-                ),
+                }.bubbleSurface(
+                    bubbleStyle,
+                    highlightOffsetProvider = {
+                        TargetHighlightTilt.fallOffsetDelta(target.position(gameTimeMsProvider()))
+                    },
+                ).telegraphRing(target, gameTimeMsProvider)
+                .then(interactionModifier),
         contentAlignment = Alignment.Center,
     ) {
         Text(
@@ -221,11 +239,12 @@ private suspend fun squashTarget(scale: Animatable<Float, AnimationVector1D>) {
     scale.animateTo(1f, tween(SQUASH_SETTLE_MS))
 }
 
-// A target that cannot be reduced (isUnreachable) drops to its own, lower floor instead of the
-// formula's idle values - that is what separates it from a merely unready one at a glance.
-private fun targetBubbleStyle(
+// A target that cannot be reduced (isUnreachable) drops to its own, lower floor instead of
+// the formula's idle values.
+internal fun targetBubbleStyle(
     diameter: Dp,
     liveliness: Float,
+    horizontalFraction: Float,
 ): BubbleStyle {
     val isUnreachable = liveliness <= 0f
     val fillAlpha =
@@ -242,13 +261,21 @@ private fun targetBubbleStyle(
         }
     val glowAlpha =
         HIGHLIGHT_GLOW_ALPHA_IDLE + (HIGHLIGHT_GLOW_ALPHA_READY - HIGHLIGHT_GLOW_ALPHA_IDLE) * liveliness
+    val baseOffset = TargetHighlightTilt.baseOffsetFraction(horizontalFraction)
     return BubbleStyle(
         fillColor = lerp(BubbleFillIdle, BubbleFillReady, liveliness),
         fillAlpha = fillAlpha,
         rimColor = lerp(BubbleRimIdle, BubbleRimReady, liveliness),
         rimWidth =
             diameter * (RIM_WIDTH_FRACTION_IDLE + (RIM_WIDTH_FRACTION_READY - RIM_WIDTH_FRACTION_IDLE) * liveliness),
-        highlight = BubbleHighlight(coreAlpha, glowAlpha),
+        highlight =
+            BubbleHighlight(
+                coreAlpha = coreAlpha,
+                glowAlpha = glowAlpha,
+                offsetXFraction = baseOffset.x,
+                offsetYFraction = baseOffset.y,
+                rotationDegrees = TargetHighlightTilt.angleDegrees(horizontalFraction),
+            ),
     )
 }
 

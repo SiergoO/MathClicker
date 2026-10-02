@@ -237,6 +237,42 @@ class FieldScreenshotTest {
     }
 
     @Test
+    fun `renders a target mid-fade after popping`() {
+        composeTestRule.mainClock.autoAdvance = false
+        val gameState = mutableStateOf(FIXED_FIELD_STATE)
+
+        composeTestRule.setContent {
+            MathBubblesTheme {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    Field(
+                        gameState = gameState,
+                        onTargetClicked = {},
+                        onFireClicked = {},
+                        onTick = {},
+                        targetZeroedSignal = null,
+                    )
+                }
+            }
+        }
+        composeTestRule.mainClock.advanceTimeBy(ANIMATION_SETTLE_MS)
+
+        gameState.value =
+            gameState.value.copy(
+                targetList =
+                    persistentListOf(
+                        gameState.value.targetList[0].copy(isActive = false),
+                        gameState.value.targetList[1],
+                        gameState.value.targetList[2],
+                        gameState.value.targetList[3],
+                    ),
+            )
+        composeTestRule.waitForIdle()
+        composeTestRule.mainClock.advanceTimeBy(DisappearFade.DURATION_MS / 2L)
+
+        composeTestRule.onRoot().captureRoboImage()
+    }
+
+    @Test
     fun `renders an ice pick armed in a stash slot`() {
         renderFixedField(
             FIXED_FIELD_STATE.copy(

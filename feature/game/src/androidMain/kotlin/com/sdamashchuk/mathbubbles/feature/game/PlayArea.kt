@@ -14,6 +14,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -32,15 +33,14 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.sdamashchuk.mathbubbles.core.model.GAME_COLUMN_COUNT
+import com.sdamashchuk.mathbubbles.core.model.Target
 import com.sdamashchuk.mathbubbles.core.ui.theme.AccentSoft
 import com.sdamashchuk.mathbubbles.core.ui.theme.WaterDeep
 import com.sdamashchuk.mathbubbles.core.ui.theme.WaterMote
 import com.sdamashchuk.mathbubbles.core.ui.theme.WaterSurface
-import com.sdamashchuk.mathbubbles.feature.game.model.BurstPhase
 import com.sdamashchuk.mathbubbles.feature.game.model.TargetScreenPosition
 import com.sdamashchuk.mathbubbles.feature.game.model.TargetZeroedBurst
 import com.sdamashchuk.mathbubbles.feature.game.model.TargetZeroedSignal
-import com.sdamashchuk.mathbubbles.feature.game.model.initialBurstPhase
 import androidx.compose.ui.geometry.Size as GeometrySize
 
 private const val PLAY_AREA_HEIGHT_FRACTION = 0.75f
@@ -92,9 +92,22 @@ fun PlayArea(
     // once per target per frame.
     val targetPositions = remember { HashMap<Int, TargetScreenPosition>() }
     val bursts = remember { mutableStateListOf<TargetZeroedBurst>() }
+
+    val fadingTargets = remember { mutableStateMapOf<Int, Target>() }
+    val fadeContext = remember { FadeContext() }
+    fadeContext.sync(
+        visibleTargets = visibleTargets,
+        fadingTargets = fadingTargets,
+        operationSign = operationSign,
+        operationDigit = operationDigit,
+        readinessHintsEnabled = readinessHintsEnabled,
+        gameTimeMsProvider = gameTimeMsProvider,
+        realTimeMsProvider = realTimeMsProvider,
+    )
+
     LaunchedEffect(targetZeroedSignal) {
         val signal = targetZeroedSignal ?: return@LaunchedEffect
-        val position = targetPositions.remove(signal.targetId) ?: return@LaunchedEffect
+        val position = targetPositions[signal.targetId] ?: return@LaunchedEffect
         bursts.add(TargetZeroedBurst(signal.sequence, position, signal.viaIcePick))
     }
     LaunchedEffect(visibleTargets) {
@@ -162,23 +175,46 @@ fun PlayArea(
                         .width(gameColumnSize.width.dp),
                     contentAlignment = Alignment.TopCenter,
                 ) {
-                    visibleTargets.filter { target -> target.columnId == columnId }.forEach { target ->
-                        key(target.id) {
-                            TargetButton(
-                                target,
-                                gameColumnSize,
+                    columnTargetIds(columnId, visibleTargets, fadingTargets).forEach { id ->
+                        key(id) {
+                            val isFading = fadingTargets.containsKey(id)
+                            val target =
+                                if (isFading) fadingTargets.getValue(id) else visibleTargets.first { it.id == id }
+                            TargetSlot(
+                                id = id,
+                                target = target,
+                                gameColumnSize = gameColumnSize,
                                 isReady =
-                                    shouldShowReadinessHint(
-                                        target,
-                                        operationSign,
-                                        operationDigit,
-                                        hintsEnabled = readinessHintsEnabled,
-                                    ),
-                                gameTimeMsProvider = gameTimeMsProvider,
-                                realTimeMsProvider = realTimeMsProvider,
-                                onTargetClicked = onTargetClicked,
-                                onTargetPositioned = { id, position -> targetPositions[id] = position },
+                                    if (isFading) {
+                                        fadeContext.isReady.getOrElse(id) { false }
+                                    } else {
+                                        shouldShowReadinessHint(
+                                            target,
+                                            operationSign,
+                                            operationDigit,
+                                            readinessHintsEnabled,
+                                        )
+                                    },
+                                gameTimeMsProvider =
+                                    if (isFading) {
+                                        { fadeContext.gameTimeMs.getOrElse(id) { gameTimeMsProvider() } }
+                                    } else {
+                                        gameTimeMsProvider
+                                    },
+                                realTimeMsProvider =
+                                    if (isFading) {
+                                        { fadeContext.realTimeMs.getOrElse(id) { realTimeMsProvider() } }
+                                    } else {
+                                        realTimeMsProvider
+                                    },
                                 icePickArmed = icePickArmed,
+                                isFading = isFading,
+                                onTargetClicked = onTargetClicked,
+                                onTargetPositioned = { tid, position -> targetPositions[tid] = position },
+                                onFadeFinished = {
+                                    fadeContext.remove(id)
+                                    fadingTargets.remove(id)
+                                },
                             )
                         }
                     }
@@ -187,21 +223,18 @@ fun PlayArea(
         }
         // Drawn last, on top of the columns: a burst marks where a target was, not another lane
         // occupant.
-        bursts.forEach { burst ->
-            key(burst.id) {
-                var phase by remember(burst.id) { mutableStateOf(initialBurstPhase(burst.viaIcePick)) }
-                when (phase) {
-                    BurstPhase.Shatter -> {
-                        IcePickShatter(position = burst.position, onFinished = { phase = BurstPhase.Burst })
-                    }
-
-                    BurstPhase.Burst -> {
-                        BurstRing(position = burst.position, onFinished = { bursts.remove(burst) })
-                    }
-                }
-            }
-        }
+        TargetZeroedBurstsLayer(bursts)
     }
+}
+
+private fun columnTargetIds(
+    columnId: Int,
+    visibleTargets: List<Target>,
+    fadingTargets: Map<Int, Target>,
+): List<Int> {
+    val liveIds = visibleTargets.filter { it.columnId == columnId }.map { it.id }
+    val fadingIds = fadingTargets.filterValues { it.columnId == columnId }.keys
+    return liveIds + (fadingIds - liveIds.toSet())
 }
 
 private const val FROZEN_TINT_ALPHA = 0.55f

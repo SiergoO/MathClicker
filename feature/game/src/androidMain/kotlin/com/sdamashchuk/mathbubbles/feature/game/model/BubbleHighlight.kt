@@ -6,4 +6,7 @@ import androidx.compose.runtime.Immutable
 data class BubbleHighlight(
     val coreAlpha: Float,
     val glowAlpha: Float,
+    val offsetXFraction: Float,
+    val offsetYFraction: Float,
+    val rotationDegrees: Float = 0f,
 )
