@@ -43,6 +43,7 @@ fun Field(
     onFireClicked: () -> Unit,
     onTick: (elapsedMs: Int) -> Unit,
     targetZeroedSignal: TargetZeroedSignal?,
+    running: Boolean = true,
     // The readiness hint's on/off switch, not a property of the game itself. A constant
     // today; once difficulty/mods exist, that's what supplies this value - TargetButton never sees
     // why a hint is off, and neither does this composable's own body beyond reading the flag.
@@ -84,7 +85,10 @@ fun Field(
     // moving while the game clock itself is frozen or reversed.
     var realElapsedMs by remember { mutableLongStateOf(0L) }
     val realTimeMsProvider = remember { { realElapsedMs } }
-    LaunchedEffect(Unit) {
+    // Keyed on running so a restart takes a fresh previousFrameNanos; otherwise the first frame
+    // back would report the whole stopped interval as elapsed.
+    LaunchedEffect(running) {
+        if (!running) return@LaunchedEffect
         var previousFrameNanos = withFrameNanos { it }
         while (true) {
             withFrameNanos { frameNanos ->

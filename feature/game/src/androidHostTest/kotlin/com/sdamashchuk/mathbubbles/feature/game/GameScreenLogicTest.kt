@@ -4,11 +4,25 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class GameScreenLogicTest {
-    // M3: Field's LaunchedEffect is the engine clock. If this widens to include Paused, pausing
-    // stops being structural and the falling targets keep moving behind the pause dialog.
     @Test
-    fun `shouldComposeField is true for Playing alone`() {
+    fun `Field stays composed while Paused so the frozen game shows behind the dialog`() {
         val composesField = GamePhase.entries.associateWith(::shouldComposeField)
+        assertEquals(
+            mapOf(
+                GamePhase.ReadyToPlay to false,
+                GamePhase.CountingDown to false,
+                GamePhase.Playing to true,
+                GamePhase.Paused to true,
+                GamePhase.LevelIntro to false,
+                GamePhase.GameOver to false,
+            ),
+            composesField,
+        )
+    }
+
+    @Test
+    fun `Field only runs its frame loop for Playing, so pausing stops the engine`() {
+        val runsField = GamePhase.entries.associateWith(::shouldRunField)
         assertEquals(
             mapOf(
                 GamePhase.ReadyToPlay to false,
@@ -18,7 +32,7 @@ class GameScreenLogicTest {
                 GamePhase.LevelIntro to false,
                 GamePhase.GameOver to false,
             ),
-            composesField,
+            runsField,
         )
     }
 }

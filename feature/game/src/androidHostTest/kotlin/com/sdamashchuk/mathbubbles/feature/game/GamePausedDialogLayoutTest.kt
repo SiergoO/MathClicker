@@ -12,7 +12,9 @@ import org.robolectric.annotation.GraphicsMode
 import kotlin.test.assertEquals
 
 private const val SCREEN_WIDTH_DP = 360f
-private const val WRAPPER_HORIZONTAL_INSET_DP = 20f
+private const val SCRIM_INSET_DP = 16f
+private const val CARD_PADDING_DP = 16f
+private const val CARD_INSET_DP = SCRIM_INSET_DP + CARD_PADDING_DP
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -22,7 +24,7 @@ class GamePausedDialogLayoutTest {
     val composeTestRule = createComposeRule()
 
     @Test
-    fun `resume and restart sit on the wrapper's horizontal inset`() {
+    fun `resume and restart sit on the card's own 16dp padding`() {
         composeTestRule.setContent {
             MathBubblesTheme {
                 GamePausedDialog(
@@ -57,12 +59,12 @@ class GamePausedDialogLayoutTest {
                     .value
             }
 
-        assertEquals(WRAPPER_HORIZONTAL_INSET_DP, resumeLeft, 0.5f, "resume button left edge vs the wrapper inset")
+        assertEquals(CARD_INSET_DP, resumeLeft, 0.5f, "resume button left edge vs the scrim + card padding")
         assertEquals(
-            SCREEN_WIDTH_DP - WRAPPER_HORIZONTAL_INSET_DP,
+            SCREEN_WIDTH_DP - CARD_INSET_DP,
             restartRight,
             0.5f,
-            "restart button right edge vs the wrapper inset",
+            "restart button right edge vs the scrim + card padding",
         )
     }
 }

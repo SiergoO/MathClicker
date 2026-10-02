@@ -32,11 +32,6 @@ val InkDim = Color(0xFF8B989E)
 
 val Success = Color(0xFF6FE3B4)
 
-// Warm on purpose. Readiness is carried by saturation here (cyan against grey), so temperature is
-// a free channel - a warning can be amber without colliding with the one meaning the bubble's own
-// colour already has.
-val Warning = Color(0xFFFFA45C)
-
 // A dark scrim, not the old 40% white: over water, a light scrim washes the field out and leaves
 // overlay text with nothing to sit against.
 val Scrim = Color(0xA6071620)

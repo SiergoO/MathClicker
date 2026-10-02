@@ -51,10 +51,8 @@ fun GameScreen(component: GameComponent) {
     val score by remember { derivedStateOf { gameState.value.field.score } }
     val appliedMultiplier by remember { derivedStateOf { gameState.value.field.appliedMultiplier } }
 
-    // Hoisted above Field on purpose: Field only composes while Playing (see shouldComposeField),
-    // but a breakout or a level-up can flip the phase away from Playing in the very same tick that
-    // produced the event, so a collector living inside Field would race its own unmount and drop
-    // the feedback for exactly the events this task cares most about.
+    // Hoisted above Field: a breakout or level-up can unmount Field in the same tick that produced
+    // the event, so a collector inside Field would race its own unmount and drop the feedback.
     LaunchedEffect(Unit) {
         collectFeedback(
             component = component,
@@ -87,10 +85,7 @@ fun GameScreen(component: GameComponent) {
                         }
                     }
 
-                    GamePhase.Playing -> {
-                        // The frame loop lives inside Field's LaunchedEffect, so this guard - not just
-                        // being the body of this branch - is what a test can pin without a Compose rule:
-                        // see shouldComposeField's test for the property that pausing stops the engine.
+                    GamePhase.Playing, GamePhase.Paused -> {
                         if (shouldComposeField(gameState.value.phase)) {
                             GameChrome(
                                 level = level,
@@ -100,6 +95,7 @@ fun GameScreen(component: GameComponent) {
                             ) {
                                 Field(
                                     gameState,
+                                    running = shouldRunField(gameState.value.phase),
                                     onTargetClicked = { id ->
                                         // Not routed through GameEvent: a tap that does not zero its
                                         // target emits nothing on that stream (see targetClicked), but
@@ -132,18 +128,17 @@ fun GameScreen(component: GameComponent) {
                                 )
                             }
                         }
-                    }
-
-                    GamePhase.Paused -> {
-                        GamePausedDialog(
-                            onResumeClicked = {
-                                component.sendAction(GameViewModel.Action.ReadyToPlayButtonClicked)
-                            },
-                            onRestartClicked = { component.sendAction(GameViewModel.Action.RestartGame) },
-                            onBackToMainMenuClicked = {
-                                component.sendAction(GameViewModel.Action.BackToMainMenuClicked)
-                            },
-                        )
+                        if (gameState.value.phase == GamePhase.Paused) {
+                            GamePausedDialog(
+                                onResumeClicked = {
+                                    component.sendAction(GameViewModel.Action.ReadyToPlayButtonClicked)
+                                },
+                                onRestartClicked = { component.sendAction(GameViewModel.Action.RestartGame) },
+                                onBackToMainMenuClicked = {
+                                    component.sendAction(GameViewModel.Action.BackToMainMenuClicked)
+                                },
+                            )
+                        }
                     }
 
                     GamePhase.LevelIntro -> {
@@ -181,9 +176,9 @@ fun GameScreen(component: GameComponent) {
     }
 }
 
-// Field owns the frame loop that drives the engine clock (withFrameNanos -> onTick), so composing
-// it only for Playing is what makes pausing stop that clock structurally rather than via a flag.
-internal fun shouldComposeField(phase: GamePhase) = phase == GamePhase.Playing
+internal fun shouldComposeField(phase: GamePhase) = phase == GamePhase.Playing || phase == GamePhase.Paused
+
+internal fun shouldRunField(phase: GamePhase) = phase == GamePhase.Playing
 
 private fun playTapUnlessStashFull(
     component: GameComponent,

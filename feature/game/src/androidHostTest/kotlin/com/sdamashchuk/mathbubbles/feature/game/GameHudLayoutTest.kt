@@ -1,11 +1,14 @@
 package com.sdamashchuk.mathbubbles.feature.game
 
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
-import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.unit.Density
 import com.sdamashchuk.mathbubbles.core.ui.theme.MathBubblesTheme
 import org.junit.Rule
 import org.junit.Test
@@ -20,6 +23,7 @@ private const val SCREEN_WIDTH_DP = 360f
 private const val WRAPPER_HORIZONTAL_INSET_DP = 20f
 private const val EXTREME_LEVEL = 999
 private const val EXTREME_SCORE = 9999999
+private const val LARGE_FONT_SCALE = 1.3f
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -28,15 +32,21 @@ class GameHudLayoutTest {
     @get:Rule
     val composeTestRule = createComposeRule()
 
-    private fun setHud(appliedMultiplier: Int) {
+    private fun setHud(
+        appliedMultiplier: Int,
+        fontScale: Float = 1f,
+    ) {
         composeTestRule.setContent {
-            MathBubblesTheme {
-                GameChrome(
-                    level = EXTREME_LEVEL,
-                    score = EXTREME_SCORE,
-                    appliedMultiplier = appliedMultiplier,
-                    onPauseClicked = {},
-                ) {}
+            val density = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale)) {
+                MathBubblesTheme {
+                    GameChrome(
+                        level = EXTREME_LEVEL,
+                        score = EXTREME_SCORE,
+                        appliedMultiplier = appliedMultiplier,
+                        onPauseClicked = {},
+                    ) {}
+                }
             }
         }
     }
@@ -66,25 +76,32 @@ class GameHudLayoutTest {
 
     @Test
     fun `level and score stay one line at 360dp with an extreme score and no combo`() {
-        assertHudFitsOnOneLine(appliedMultiplier = 1, scoreText = "$EXTREME_SCORE")
+        assertHudFitsOnOneLine(appliedMultiplier = 1)
     }
 
     @Test
     fun `level and score stay one line at 360dp with an extreme score and a combo prefix`() {
-        assertHudFitsOnOneLine(appliedMultiplier = 9, scoreText = "X9 $EXTREME_SCORE")
+        assertHudFitsOnOneLine(appliedMultiplier = 9)
+    }
+
+    @Test
+    fun `level and score do not truncate at font scale 1point3 with an extreme score`() {
+        assertHudFitsOnOneLine(appliedMultiplier = 1, fontScale = LARGE_FONT_SCALE)
     }
 
     private fun assertHudFitsOnOneLine(
         appliedMultiplier: Int,
-        scoreText: String,
+        fontScale: Float = 1f,
     ) {
-        setHud(appliedMultiplier = appliedMultiplier)
+        setHud(appliedMultiplier = appliedMultiplier, fontScale = fontScale)
 
-        val levelNode = composeTestRule.onNodeWithText("LEVEL: $EXTREME_LEVEL").fetchSemanticsNode()
-        val scoreNode = composeTestRule.onNodeWithText(scoreText).fetchSemanticsNode()
         val pauseBounds = composeTestRule.onNodeWithContentDescription("Pause").fetchSemanticsNode().boundsInRoot
+        val hudTextNodes =
+            listOf(GAME_HUD_LEVEL_LABEL_TAG, GAME_HUD_LEVEL_VALUE_TAG, GAME_HUD_SCORE_VALUE_TAG).map { tag ->
+                composeTestRule.onNodeWithTag(tag).fetchSemanticsNode()
+            }
 
-        listOf(levelNode, scoreNode).forEach { node ->
+        hudTextNodes.forEach { node ->
             val layout = textLayoutResultOf(node)
             assertEquals(1, layout.lineCount, "expected a single HUD line, text layout reported ${layout.lineCount}")
             assertFalse(layout.hasVisualOverflow, "HUD text overflowed its bounds")

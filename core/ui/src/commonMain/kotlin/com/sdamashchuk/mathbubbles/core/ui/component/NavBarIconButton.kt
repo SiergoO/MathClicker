@@ -8,6 +8,7 @@ import androidx.compose.material.IconButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.unit.dp
 import com.sdamashchuk.mathbubbles.core.ui.theme.Accent
@@ -22,6 +23,7 @@ internal fun NavBarIconButton(
     onClick: () -> Unit,
     iconAlignment: Alignment,
     modifier: Modifier = Modifier,
+    tint: Color = Accent,
 ) {
     IconButton(
         onClick = onClick,
@@ -32,7 +34,7 @@ internal fun NavBarIconButton(
                 painter = painter,
                 contentDescription = contentDescription,
                 modifier = Modifier.size(NavBarIconSize),
-                tint = Accent,
+                tint = tint,
             )
         }
     }

@@ -22,8 +22,8 @@ import com.sdamashchuk.mathbubbles.core.ui.component.BottomActions
 import com.sdamashchuk.mathbubbles.core.ui.component.GlassButton
 import com.sdamashchuk.mathbubbles.core.ui.component.NavBar
 import com.sdamashchuk.mathbubbles.core.ui.component.ScreenWrapper
+import com.sdamashchuk.mathbubbles.core.ui.theme.InkHud
 import com.sdamashchuk.mathbubbles.core.ui.theme.Success
-import com.sdamashchuk.mathbubbles.core.ui.theme.Warning
 import com.sdamashchuk.mathbubbles.feature.game.model.ResultsSummary
 import kotlinx.collections.immutable.ImmutableList
 
@@ -93,9 +93,6 @@ fun ResultsScreen(
     }
 }
 
-// The near-miss line itself: a new record reads as a win (Success), falling short reads as the
-// gap left to close (Warning) - the same two colours FeedbackBanner already uses for the same two
-// meanings elsewhere on this screen's own flow.
 @Composable
 private fun SummaryText(summary: ResultsSummary) {
     val (text, color) =
@@ -105,7 +102,7 @@ private fun SummaryText(summary: ResultsSummary) {
             }
 
             is ResultsSummary.ShortOfBest -> {
-                stringResource(id = R.string.results_short_of_best, summary.deltaToBest) to Warning
+                stringResource(id = R.string.results_short_of_best, summary.deltaToBest) to InkHud
             }
 
             is ResultsSummary.NoHistory -> {
