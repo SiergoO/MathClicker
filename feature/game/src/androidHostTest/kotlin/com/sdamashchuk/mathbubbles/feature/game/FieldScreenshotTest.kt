@@ -273,6 +273,29 @@ class FieldScreenshotTest {
     }
 
     @Test
+    fun `renders rising motes for a bubble about to appear`() {
+        renderFixedField(
+            FIXED_FIELD_STATE.copy(
+                targetList =
+                    persistentListOf(
+                        FIXED_FIELD_STATE.targetList[0],
+                        FIXED_FIELD_STATE.targetList[1],
+                        FIXED_FIELD_STATE.targetList[2],
+                        Target(
+                            id = 5,
+                            relatedFieldId = FIELD_ID,
+                            columnId = 3,
+                            value = 6,
+                            appearsAtMs = GAME_TIME_MS + 800L,
+                            finishesAtMs = GAME_TIME_MS + 10_800L,
+                        ),
+                    ),
+            ),
+        )
+        composeTestRule.onRoot().captureRoboImage()
+    }
+
+    @Test
     fun `renders an ice pick armed in a stash slot`() {
         renderFixedField(
             FIXED_FIELD_STATE.copy(

@@ -59,6 +59,11 @@ private const val DEPTH_SCALE_AT_BOTTOM = 1f
 
 private const val LANE_CENTER_FRACTION = 0.5f
 
+internal fun columnCenterXDp(
+    columnId: Int,
+    columnWidthDp: Int,
+): Float = columnId * columnWidthDp + columnWidthDp * LANE_CENTER_FRACTION
+
 // Fitted numerically against the reference art, not eyeballed - mean absolute channel error 3.4%.
 // The highlight is two layers, not one: with a single blob the fit will not go below 10.7/255.
 private const val FILL_ALPHA_IDLE = 0.28f
@@ -145,7 +150,7 @@ fun TargetButton(
     val buttonDiameterDp = (gameColumnSize.width * TARGET_DIAMETER_FRACTION).toFloat()
     val horizontalFraction = TargetHighlightTilt.horizontalFraction(target.columnId, GAME_COLUMN_COUNT)
     val bubbleStyle = targetBubbleStyle(buttonDiameterDp.dp, target.isProfitable, horizontalFraction)
-    val columnCenterXDp = target.columnId * gameColumnSize.width + gameColumnSize.width * LANE_CENTER_FRACTION
+    val columnCenterXDp = columnCenterXDp(target.columnId, gameColumnSize.width)
     val columnHeight = gameColumnSize.height
     val interactionModifier =
         if (interactive) {

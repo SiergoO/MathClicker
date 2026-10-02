@@ -81,6 +81,13 @@ fun PlayArea(
                 gameState.value.targetList.filter { it.isActive && it.isVisible(gameTimeMs) }
             }
         }
+    val pendingTargets by
+        remember {
+            derivedStateOf {
+                val gameTimeMs = gameState.value.field.gameTimeMs
+                gameState.value.targetList.filter { it.isActive && !it.isVisible(gameTimeMs) }
+            }
+        }
     val icePickArmed by remember { derivedStateOf { gameState.value.effects.icePickArmed } }
 
     val depthFactor = waterDepthFactor(level)
@@ -142,6 +149,7 @@ fun PlayArea(
                             drawRect(AccentSoft.copy(alpha = FROZEN_TINT_ALPHA * freezeIntensity))
                         }
                         drawAmbientBubbles(gameTimeMsProvider())
+                        drawSpawnMotes(pendingTargets, gameColumnSize, gameTimeMsProvider())
                     }
                 },
     ) {
@@ -269,6 +277,36 @@ private fun verticalGradientStrip(
         drawRect(Brush.verticalGradient(listOf(top, bottom)))
     }
     return bitmap
+}
+
+private const val SPAWN_MOTE_DIAMETER_DP = 8f
+private const val SPAWN_MOTE_RISE_FRACTION = 1.4f
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawSpawnMotes(
+    pendingTargets: List<Target>,
+    gameColumnSize: Size,
+    gameTimeMs: Long,
+) {
+    val columnWidthDp = gameColumnSize.width
+    val spawnYDp = (columnWidthDp * TARGET_DIAMETER_FRACTION).toFloat() / 2f
+    val riseDp = columnWidthDp * SPAWN_MOTE_RISE_FRACTION
+    pendingTargets.forEach { target ->
+        val msUntilAppear = target.appearsAtMs - gameTimeMs
+        if (msUntilAppear <= 0) return@forEach
+        val centerXDp = columnCenterXDp(target.columnId, columnWidthDp)
+        repeat(SPAWN_MOTE_COUNT) { moteIndex ->
+            val progress = spawnMoteProgress(msUntilAppear, moteIndex)
+            val alpha = spawnMoteAlpha(progress)
+            if (alpha <= 0f) return@repeat
+            val jitterDp = spawnMoteJitterFraction(target.id, moteIndex) * columnWidthDp
+            val centerYDp = spawnYDp + spawnMoteRiseFraction(progress) * riseDp
+            drawCircle(
+                color = AccentSoft.copy(alpha = alpha),
+                radius = (SPAWN_MOTE_DIAMETER_DP / 2f).dp.toPx(),
+                center = Offset((centerXDp + jitterDp).dp.toPx(), centerYDp.dp.toPx()),
+            )
+        }
+    }
 }
 
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawAmbientBubbles(gameTimeMs: Long) {
