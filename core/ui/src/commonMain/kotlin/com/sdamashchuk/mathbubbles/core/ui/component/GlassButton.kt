@@ -5,6 +5,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.Button
 import androidx.compose.material.ButtonDefaults
 import androidx.compose.material.MaterialTheme
@@ -28,10 +29,9 @@ import com.sdamashchuk.mathbubbles.core.ui.theme.Accent
 import com.sdamashchuk.mathbubbles.core.ui.theme.AccentDeep
 import com.sdamashchuk.mathbubbles.core.ui.theme.BubbleRimReady
 import com.sdamashchuk.mathbubbles.core.ui.theme.Ink
-import com.sdamashchuk.mathbubbles.core.ui.theme.LargeCornerRadius
-import com.sdamashchuk.mathbubbles.core.ui.theme.Shapes
 
 private val ButtonHeight = 56.dp
+private val PillShape = RoundedCornerShape(percent = 50)
 private const val FILL_ALPHA = 0.22f
 private const val FILL_ALPHA_PRESSED = 0.32f
 private const val HIGHLIGHT_ALPHA = 0.30f
@@ -56,7 +56,6 @@ fun GlassButton(
                 rimTopColor = BubbleRimReady,
                 rimBottomColor = AccentDeep,
                 rimWidth = RIM_WIDTH_DP.dp,
-                cornerRadius = LargeCornerRadius,
             )
         }
     val surface = remember(style) { Modifier.glassSurface(style, pressedState) }
@@ -64,7 +63,7 @@ fun GlassButton(
     Button(
         onClick = onClick,
         interactionSource = interactionSource,
-        shape = Shapes.large,
+        shape = PillShape,
         colors = ButtonDefaults.buttonColors(backgroundColor = Color.Transparent),
         elevation =
             ButtonDefaults.elevation(
@@ -81,7 +80,7 @@ fun GlassButton(
                 .graphicsLayer {
                     scaleX = scaleState.value
                     scaleY = scaleState.value
-                }.clip(Shapes.large)
+                }.clip(PillShape)
                 .then(surface),
     ) {
         Text(text = text, style = MaterialTheme.typography.h2, color = Ink)
@@ -93,8 +92,6 @@ private fun Modifier.glassSurface(
     pressedState: State<Boolean>,
 ) = drawWithCache {
     val rimWidthPx = style.rimWidth.toPx()
-    val cornerRadiusPx = style.cornerRadius.toPx()
-    val rimCornerRadius = CornerRadius((cornerRadiusPx - rimWidthPx / 2f).coerceAtLeast(0f))
 
     fun fillBrush(alpha: Float) =
         Brush.verticalGradient(
@@ -121,6 +118,7 @@ private fun Modifier.glassSurface(
 
     onDrawBehind {
         val pressed = pressedState.value
+        val rimCornerRadius = CornerRadius((minOf(size.width, size.height) / 2f - rimWidthPx / 2f).coerceAtLeast(0f))
         drawRect(if (pressed) fillBrushPressed else fillBrushNormal)
         drawRect(if (pressed) highlightBrushPressed else highlightBrushNormal)
         drawRoundRect(

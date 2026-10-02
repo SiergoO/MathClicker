@@ -10,5 +10,4 @@ data class GlassButtonStyle(
     val rimTopColor: Color,
     val rimBottomColor: Color,
     val rimWidth: Dp,
-    val cornerRadius: Dp,
 )

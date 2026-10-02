@@ -10,11 +10,14 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 private const val SCREEN_HEIGHT_DP = 800f
 private const val BOTTOM_THIRD_TOP_DP = SCREEN_HEIGHT_DP * 2f / 3f
 private const val MIN_BOTTOM_MARGIN_DP = 24f
+
+private const val EXPECTED_BOTTOM_MARGIN_DP = 28f
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -79,6 +82,39 @@ class MenuGlassButtonPositionTest {
         assertTrue(
             margin >= MIN_BOTTOM_MARGIN_DP,
             "Settings bottom margin $margin dp should be at least $MIN_BOTTOM_MARGIN_DP dp",
+        )
+    }
+
+    @Test
+    fun `the Settings button sits at the shared bottom-actions margin`() {
+        val component =
+            MenuComponent(
+                componentContext = DefaultComponentContext(lifecycle = LifecycleRegistry()),
+                onPlayClicked = {},
+                onSettingsClicked = {},
+            )
+
+        composeTestRule.setContent {
+            MenuScreen(component = component)
+        }
+
+        val density = composeTestRule.density
+        val settingsBottom =
+            with(density) {
+                composeTestRule
+                    .onNodeWithText("SETTINGS")
+                    .fetchSemanticsNode()
+                    .boundsInRoot.bottom
+                    .toDp()
+                    .value
+            }
+        val margin = SCREEN_HEIGHT_DP - settingsBottom
+
+        assertEquals(
+            EXPECTED_BOTTOM_MARGIN_DP,
+            margin,
+            0.5f,
+            "Settings bottom margin $margin dp should match the shared bottom-actions margin",
         )
     }
 }

@@ -18,6 +18,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.sdamashchuk.mathbubbles.core.model.Field
+import com.sdamashchuk.mathbubbles.core.ui.component.BottomActions
 import com.sdamashchuk.mathbubbles.core.ui.component.GlassButton
 import com.sdamashchuk.mathbubbles.core.ui.component.NavBar
 import com.sdamashchuk.mathbubbles.core.ui.component.ScreenWrapper
@@ -25,6 +26,9 @@ import com.sdamashchuk.mathbubbles.core.ui.theme.Success
 import com.sdamashchuk.mathbubbles.core.ui.theme.Warning
 import com.sdamashchuk.mathbubbles.feature.game.model.ResultsSummary
 import kotlinx.collections.immutable.ImmutableList
+
+private const val TABLE_AREA_WEIGHT = 2f
+private const val BUTTON_AREA_WEIGHT = 1f
 
 /**
  * What GameOver shows instead of the old bare Game Over/Restart/Main Menu dialog (MC-53): this
@@ -55,14 +59,12 @@ fun ResultsScreen(
                 style = MaterialTheme.typography.h1,
             )
             SummaryText(resultsSummaryOf(field, bestResult))
-            // Table and buttons are one group centred in the space left below the header, so a
-            // two-row history (new install) and a ten-row one both read as deliberate instead of the
-            // table stranding the buttons above an empty half-screen. verticalScroll is the
-            // fallback if a large font scale ever makes the group taller than that space.
+            // The table sits in the space left below the header; verticalScroll is the fallback if
+            // a large font scale or a ten-row history ever makes it taller than that space.
             Column(
                 modifier =
                     Modifier
-                        .weight(1f)
+                        .weight(TABLE_AREA_WEIGHT)
                         .fillMaxWidth()
                         .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.Center,
@@ -76,13 +78,13 @@ fun ResultsScreen(
                             .fillMaxWidth()
                             .padding(vertical = 8.dp),
                 )
+            }
+            BottomActions(modifier = Modifier.fillMaxWidth().weight(BUTTON_AREA_WEIGHT)) {
                 GlassButton(
-                    modifier = Modifier.padding(top = 20.dp, bottom = 12.dp),
                     text = stringResource(id = R.string.restart),
                     onClick = onRestartClicked,
                 )
                 GlassButton(
-                    modifier = Modifier.padding(bottom = 12.dp),
                     text = stringResource(id = R.string.main_menu),
                     onClick = onBackToMainMenuClicked,
                 )
