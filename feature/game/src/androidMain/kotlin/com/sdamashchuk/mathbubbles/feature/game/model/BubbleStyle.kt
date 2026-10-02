@@ -11,4 +11,5 @@ data class BubbleStyle(
     val rimColor: Color,
     val rimWidth: Dp,
     val highlight: BubbleHighlight? = null,
+    val convexity: Float? = null,
 )

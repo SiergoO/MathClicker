@@ -18,6 +18,7 @@ fun BoosterToken(
     booster: Booster,
     diameter: Dp,
     modifier: Modifier = Modifier,
+    iconSizeFraction: Float = ICON_SIZE_FRACTION,
 ) {
     val style = boosterStyleFor(booster)
     BubbleSurface(
@@ -28,7 +29,7 @@ fun BoosterToken(
             painter = painterResource(id = style.iconRes),
             contentDescription = stringResource(id = boosterLabelFor(booster)),
             tint = Ink,
-            modifier = Modifier.fillMaxSize(ICON_SIZE_FRACTION),
+            modifier = Modifier.fillMaxSize(iconSizeFraction),
         )
     }
 }

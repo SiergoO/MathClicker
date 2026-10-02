@@ -13,7 +13,6 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.unit.Dp
 import com.sdamashchuk.mathbubbles.core.ui.theme.WaterSurface
-import com.sdamashchuk.mathbubbles.feature.game.model.BubbleHighlight
 import com.sdamashchuk.mathbubbles.feature.game.model.BubbleStyle
 
 private const val HIGHLIGHT_X_FRACTION = -0.34f
@@ -25,12 +24,14 @@ private const val HIGHLIGHT_GLOW_RADIUS_FRACTION = 0.38f
 // bubble being askew, so the owner picked the straight ellipse from the design system instead.
 private const val HIGHLIGHT_ECCENTRICITY = 1.2f
 
-// The dock bubbles - the fire button, the preview and the stash slots - share one look: a shade
-// lighter than the water, at the targets' ready-state fill and highlight strength.
+// The dock bubbles - the fire button, the preview and the stash slots - share one look: the
+// targets' ready-state radial depth shading, a shade lighter than the water, with no specular spot.
 private const val DOCK_FILL_ALPHA = 0.62f
 private const val DOCK_RIM_WIDTH_FRACTION = 0.027f
-private const val DOCK_HIGHLIGHT_CORE_ALPHA = 0.90f
-private const val DOCK_HIGHLIGHT_GLOW_ALPHA = 0.36f
+private const val DOCK_CONVEXITY = 1f
+
+private const val CONVEX_LIGHT_ALPHA = 0.16f
+private const val CONVEX_SHADE_ALPHA = 0.22f
 
 internal fun dockBubbleStyle(
     rimColor: Color,
@@ -41,7 +42,7 @@ internal fun dockBubbleStyle(
         fillAlpha = DOCK_FILL_ALPHA,
         rimColor = rimColor,
         rimWidth = diameter * DOCK_RIM_WIDTH_FRACTION,
-        highlight = BubbleHighlight(DOCK_HIGHLIGHT_CORE_ALPHA, DOCK_HIGHLIGHT_GLOW_ALPHA),
+        convexity = DOCK_CONVEXITY,
     )
 
 @Composable
@@ -80,6 +81,15 @@ internal fun Modifier.bubbleSurface(style: BubbleStyle) =
                 center = center,
                 radius = radius,
             )
+        val convexity = style.convexity
+        val convexBrush =
+            convexity?.let {
+                Brush.verticalGradient(
+                    0f to Color.White.copy(alpha = CONVEX_LIGHT_ALPHA * it),
+                    0.5f to Color.Transparent,
+                    1f to Color.Black.copy(alpha = CONVEX_SHADE_ALPHA * it),
+                )
+            }
         val highlight = style.highlight
         val glowBrush =
             highlight?.let {
@@ -104,6 +114,9 @@ internal fun Modifier.bubbleSurface(style: BubbleStyle) =
 
         onDrawBehind {
             drawCircle(bodyBrush, radius = radius, center = center)
+            if (convexBrush != null) {
+                drawCircle(convexBrush, radius = radius, center = center)
+            }
             // Both highlight layers share one transform: the fit puts them on the same ellipse, and
             // stretching y is what makes that ellipse upright rather than round.
             if (glowBrush != null && coreBrush != null) {

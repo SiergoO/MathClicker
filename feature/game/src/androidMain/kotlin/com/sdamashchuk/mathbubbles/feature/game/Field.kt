@@ -17,15 +17,20 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.unit.dp
 import com.sdamashchuk.mathbubbles.core.game.model.IcePickSource
+import com.sdamashchuk.mathbubbles.core.model.BOOSTER_STASH_CAPACITY
 import com.sdamashchuk.mathbubbles.core.model.Booster
 import com.sdamashchuk.mathbubbles.core.model.EFFECT_RAMP_MS
 import com.sdamashchuk.mathbubbles.core.model.INITIAL_LIFE_COUNT
@@ -67,6 +72,7 @@ fun Field(
                 .toImmutableList()
         }
     }
+    val firstFreeStashSlotIndex = boosterStash.size.takeIf { it < BOOSTER_STASH_CAPACITY }
     val timedBooster by remember { derivedStateOf { gameState.value.effects.timedBooster } }
     val shieldActive by remember { derivedStateOf { gameState.value.effects.shieldActive } }
     val icePickArmedFrom by remember { derivedStateOf { gameState.value.effects.icePickArmedFrom } }
@@ -138,6 +144,8 @@ fun Field(
                         },
             )
         }
+        val stashSlotCentersX = remember { mutableStateMapOf<Int, Float>() }
+        var fireButtonCenterX by remember { mutableFloatStateOf(0f) }
         Row(
             modifier =
                 Modifier
@@ -155,9 +163,18 @@ fun Field(
                             onApplyBoosterFromStash(slotIndex)
                         }
                     },
+                    onSlotPositioned = { slotIndex, centerX -> stashSlotCentersX[slotIndex] = centerX },
                 )
             }
-            Box(modifier = Modifier.width(FIRE_BUTTON_SIZE), contentAlignment = Alignment.Center) {
+            Box(
+                modifier =
+                    Modifier
+                        .width(FIRE_BUTTON_SIZE)
+                        .onGloballyPositioned {
+                            fireButtonCenterX = it.positionInRoot().x + it.size.width / 2f
+                        },
+                contentAlignment = Alignment.Center,
+            ) {
                 val icePickArmedInFireButton = icePickArmedFrom == IcePickSource.FireButton
                 FireButton(
                     action = currentAction,
@@ -167,6 +184,12 @@ fun Field(
                     isIcePickArmedHere = icePickArmedInFireButton,
                     onFireClicked = if (icePickArmedInFireButton) onDisarmIcePick else onFireClicked,
                     onStashBooster = onStashBooster,
+                    flightTargetOffsetPx = {
+                        firstFreeStashSlotIndex
+                            ?.let { stashSlotCentersX[it] }
+                            ?.let { slotCenterX -> slotCenterX - fireButtonCenterX }
+                    },
+                    flightLandingDiameter = STASH_SLOT_VISUAL_SIZE,
                 )
             }
             Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {

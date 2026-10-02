@@ -19,6 +19,7 @@ fun BoosterStashRow(
     onSlotClicked: (slotIndex: Int) -> Unit,
     modifier: Modifier = Modifier,
     armedSlotIndex: Int? = null,
+    onSlotPositioned: (slotIndex: Int, centerXInRoot: Float) -> Unit = { _, _ -> },
 ) {
     Row(
         modifier = modifier,
@@ -30,6 +31,7 @@ fun BoosterStashRow(
                 slotIndex = slotIndex,
                 onClick = { onSlotClicked(slotIndex) },
                 isArmed = slotIndex == armedSlotIndex,
+                onPositioned = onSlotPositioned,
             )
         }
     }
