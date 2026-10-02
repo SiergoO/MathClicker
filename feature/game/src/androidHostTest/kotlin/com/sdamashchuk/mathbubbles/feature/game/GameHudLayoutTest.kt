@@ -18,12 +18,14 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 private const val SCREEN_WIDTH_DP = 360f
 private const val WRAPPER_HORIZONTAL_INSET_DP = 20f
 private const val EXTREME_LEVEL = 999
 private const val EXTREME_SCORE = 9999999
 private const val LARGE_FONT_SCALE = 1.3f
+private const val MAX_COMBO_MULTIPLIER = 5
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -80,13 +82,45 @@ class GameHudLayoutTest {
     }
 
     @Test
-    fun `level and score stay one line at 360dp with an extreme score and a combo prefix`() {
-        assertHudFitsOnOneLine(appliedMultiplier = 9)
+    fun `level and score stay one line at 360dp with an extreme score and the combo bubble shown`() {
+        assertHudFitsOnOneLine(appliedMultiplier = MAX_COMBO_MULTIPLIER)
     }
 
     @Test
     fun `level and score do not truncate at font scale 1point3 with an extreme score`() {
         assertHudFitsOnOneLine(appliedMultiplier = 1, fontScale = LARGE_FONT_SCALE)
+    }
+
+    @Test
+    fun `the combo bubble never overlaps level or score text at extreme level, score and font scale`() {
+        setHud(appliedMultiplier = MAX_COMBO_MULTIPLIER, fontScale = LARGE_FONT_SCALE)
+
+        val comboBounds = composeTestRule.onNodeWithTag(GAME_HUD_COMBO_SLOT_TAG).fetchSemanticsNode().boundsInRoot
+        val comboTextNode = composeTestRule.onNodeWithTag(GAME_HUD_COMBO_VALUE_TAG).fetchSemanticsNode()
+        val levelLabelBounds = composeTestRule.onNodeWithTag(GAME_HUD_LEVEL_LABEL_TAG).fetchSemanticsNode().boundsInRoot
+        val levelValueBounds = composeTestRule.onNodeWithTag(GAME_HUD_LEVEL_VALUE_TAG).fetchSemanticsNode().boundsInRoot
+        val scoreValueBounds = composeTestRule.onNodeWithTag(GAME_HUD_SCORE_VALUE_TAG).fetchSemanticsNode().boundsInRoot
+
+        assertFalse(comboBounds.overlaps(levelLabelBounds), "combo bubble overlapped the level label")
+        assertFalse(comboBounds.overlaps(levelValueBounds), "combo bubble overlapped the level value")
+        assertFalse(comboBounds.overlaps(scoreValueBounds), "combo bubble overlapped the score value")
+
+        val comboTextLayout = textLayoutResultOf(comboTextNode)
+        assertEquals(1, comboTextLayout.lineCount, "combo text wrapped instead of fitting on one line")
+        val comboTextBounds = comboTextNode.boundsInRoot
+        assertTrue(
+            comboBounds.left <= comboTextBounds.left &&
+                comboBounds.top <= comboTextBounds.top &&
+                comboBounds.right >= comboTextBounds.right &&
+                comboBounds.bottom >= comboTextBounds.bottom,
+            "combo text $comboTextBounds did not fit inside the bubble $comboBounds",
+        )
+
+        listOf(GAME_HUD_LEVEL_LABEL_TAG, GAME_HUD_LEVEL_VALUE_TAG, GAME_HUD_SCORE_VALUE_TAG).forEach { tag ->
+            val layout = textLayoutResultOf(composeTestRule.onNodeWithTag(tag).fetchSemanticsNode())
+            assertEquals(1, layout.lineCount, "expected a single HUD line, text layout reported ${layout.lineCount}")
+            assertFalse(layout.hasVisualOverflow, "HUD text overflowed its bounds")
+        }
     }
 
     private fun assertHudFitsOnOneLine(

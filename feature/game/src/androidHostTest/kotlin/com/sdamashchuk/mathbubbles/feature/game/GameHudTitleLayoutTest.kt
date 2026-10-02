@@ -65,4 +65,26 @@ class GameHudTitleLayoutTest {
         assertEquals(levelBefore, levelAfter, "level slot bounds moved when the digit counts grew")
         assertEquals(scoreBefore, scoreAfter, "score slot bounds moved when the digit counts grew")
     }
+
+    @Test
+    fun `the combo bubble appearing does not move the level or score slots`() {
+        var appliedMultiplier by mutableStateOf(1)
+        composeTestRule.setContent {
+            MathBubblesTheme {
+                GameHudTitle(level = 3, score = 90, appliedMultiplier = appliedMultiplier)
+            }
+        }
+
+        val levelBefore = composeTestRule.onNodeWithTag(GAME_HUD_LEVEL_SLOT_TAG).fetchSemanticsNode().boundsInRoot
+        val scoreBefore = composeTestRule.onNodeWithTag(GAME_HUD_SCORE_SLOT_TAG).fetchSemanticsNode().boundsInRoot
+
+        composeTestRule.runOnIdle { appliedMultiplier = 4 }
+        composeTestRule.waitForIdle()
+
+        val levelAfter = composeTestRule.onNodeWithTag(GAME_HUD_LEVEL_SLOT_TAG).fetchSemanticsNode().boundsInRoot
+        val scoreAfter = composeTestRule.onNodeWithTag(GAME_HUD_SCORE_SLOT_TAG).fetchSemanticsNode().boundsInRoot
+
+        assertEquals(levelBefore, levelAfter, "level slot bounds moved when the combo bubble appeared")
+        assertEquals(scoreBefore, scoreAfter, "score slot bounds moved when the combo bubble appeared")
+    }
 }

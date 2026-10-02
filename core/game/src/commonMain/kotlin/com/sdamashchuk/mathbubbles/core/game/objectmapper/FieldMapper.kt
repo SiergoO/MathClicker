@@ -65,10 +65,3 @@ internal fun Field.updateActionButtons(
         boosterDropCounter = boosterDropCounter,
         hasDroppedBoosterThisSession = hasDroppedBoosterThisSession || nextBooster != null,
     )
-
-/**
- * Replaces the multiplier with this press's own count, rather than accumulating across presses.
- */
-internal fun Field.applyCombo(scored: Int): Field = this.copy(bonusMultiplier = scored)
-
-internal fun Field.resetStreak(): Field = this.copy(bonusMultiplier = 0)

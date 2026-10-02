@@ -8,7 +8,7 @@
 
     <string name="ready_to_pay_overlay_hint">Touch screen to start</string>
     <string name="game_session_level_label">Level:</string>
-    <string name="game_session_score_combo">x%1$d %2$d</string>
+    <string name="game_session_combo_value">x%1$d</string>
     <string name="game_level_intro">Level %d</string>
 
     <string name="booster_freeze">Freeze</string>

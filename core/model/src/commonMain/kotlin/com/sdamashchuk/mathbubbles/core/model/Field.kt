@@ -28,12 +28,8 @@ data class Field(
     // ~24-day range.
     val gameTimeMs: Long = 0,
 ) {
-    // Computed here rather than in the engine's mapper: the HUD renders this number, and a label
-    // should not have to import :core:game to lay itself out (the same reason Target.position
-    // lives on the model). A press that scored on nothing must still not erase its
-    // own award, hence the floor at 1.
     val appliedMultiplier: Int
-        get() = maxOf(1, bonusMultiplier)
+        get() = bonusMultiplier + 1
 
     val currentAction: FieldAction
         get() =

@@ -224,9 +224,10 @@ class Game(
         val drop = rollBoosterDrop(current.field, updatedTargets)
         val (nextOperationSign, nextOperationDigit) =
             getNextSignAndDigit(updatedTargets, current.field.level, current.field.gameTimeMs)
+        val changedTargetCount = countChangedTargets(current.targets, pressOutcome.targets)
         val comboField =
             current.field
-                .applyCombo(pressOutcome.scored)
+                .applyCombo(changedTargetCount)
                 .let { field ->
                     if (pendingOpeningPromotionCheck) {
                         pendingOpeningPromotionCheck = false
@@ -235,7 +236,7 @@ class Game(
                         field
                     }
                 }
-        // The product is where an unbounded multiplier would overflow Int.
+        // Long, not Int: totalScore times even the x5 cap can still overflow Int.
         val gained =
             (pressOutcome.totalScore.toLong() * comboField.appliedMultiplier)
                 .coerceAtMost(Int.MAX_VALUE.toLong())
@@ -780,6 +781,14 @@ class Game(
         }
         return null
     }
+}
+
+private fun countChangedTargets(
+    before: List<Target>,
+    after: List<Target>,
+): Int {
+    val valueBeforeById = before.associate { it.id to it.value }
+    return after.count { valueBeforeById[it.id] != it.value }
 }
 
 private fun Target.succeedsAgainst(

@@ -1,5 +1,6 @@
 package com.sdamashchuk.mathbubbles.core.game
 
+import com.sdamashchuk.mathbubbles.core.model.Booster
 import com.sdamashchuk.mathbubbles.core.model.Field
 import com.sdamashchuk.mathbubbles.core.model.OperationSign
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -7,38 +8,12 @@ import kotlinx.coroutines.test.runTest
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 
 // Split out of GameTest to keep both files under detekt's LargeClass threshold.
 @OptIn(ExperimentalCoroutinesApi::class)
 class GameComboTest {
     @Test
-    fun `a press that scores on one target gives a combo of one however many presses precede it`() =
-        runTest {
-            val game = Game(FakeSessionHelper(targetAmount = 1, targetValue = 1000), backgroundScope, Random(1))
-            game.createField(1)
-            game.targetsRestored(listOf(scheduledTarget(id = 1, value = 1000)))
-
-            suspend fun fireClean() {
-                val field = game.stateFlow.value.field
-                game.fieldRestored(
-                    field.copy(currentOperationSign = OperationSign.SUBTRACTION, currentOperationDigit = 1),
-                )
-                game.fireButtonClicked()
-            }
-
-            fireClean()
-            assertEquals(1, game.stateFlow.value.field.bonusMultiplier)
-            assertEquals(1, game.stateFlow.value.field.score)
-
-            fireClean()
-            fireClean()
-            assertEquals(1, game.stateFlow.value.field.bonusMultiplier)
-            assertEquals(3, game.stateFlow.value.field.score)
-        }
-
-    @Test
-    fun `a press that scores on two targets gives a combo of two and pays the square`() =
+    fun `two consecutive presses that each change two targets raise the multiplier twice to x3`() =
         runTest {
             val game = Game(FakeSessionHelper(targetAmount = 2, targetValue = 1000), backgroundScope, Random(1))
             game.createField(1)
@@ -48,17 +23,47 @@ class GameComboTest {
                     scheduledTarget(id = 2, columnId = 1, value = 1000),
                 ),
             )
-            val field = game.stateFlow.value.field
-            game.fieldRestored(field.copy(currentOperationSign = OperationSign.SUBTRACTION, currentOperationDigit = 1))
 
-            game.fireButtonClicked()
+            suspend fun fire() {
+                val field = game.stateFlow.value.field
+                game.fieldRestored(
+                    field.copy(currentOperationSign = OperationSign.SUBTRACTION, currentOperationDigit = 1),
+                )
+                game.fireButtonClicked()
+            }
 
-            assertEquals(2, game.stateFlow.value.field.bonusMultiplier)
+            fire()
+            assertEquals(2, game.stateFlow.value.field.appliedMultiplier)
             assertEquals(4, game.stateFlow.value.field.score)
+
+            fire()
+            assertEquals(3, game.stateFlow.value.field.appliedMultiplier)
+            assertEquals(10, game.stateFlow.value.field.score)
         }
 
     @Test
-    fun `a failure alongside a success no longer wipes the combo - the MC-95 bug`() =
+    fun `a press that changes one target resets the multiplier to x1`() =
+        runTest {
+            val game = Game(FakeSessionHelper(targetAmount = 1, targetValue = 2), backgroundScope, Random(1))
+            game.createField(1)
+            game.targetsRestored(listOf(scheduledTarget(id = 1, value = 2)))
+            val field = game.stateFlow.value.field
+            game.fieldRestored(
+                field.copy(
+                    currentOperationSign = OperationSign.SUBTRACTION,
+                    currentOperationDigit = 5,
+                    bonusMultiplier = 4,
+                ),
+            )
+
+            game.fireButtonClicked()
+
+            assertEquals(1, game.stateFlow.value.field.appliedMultiplier)
+            assertEquals(0, game.stateFlow.value.field.score)
+        }
+
+    @Test
+    fun `a failed overshoot still changes its target and counts toward the raise`() =
         runTest {
             val game = Game(FakeSessionHelper(targetAmount = 2, targetValue = 1000), backgroundScope, Random(1))
             game.createField(1)
@@ -78,7 +83,7 @@ class GameComboTest {
             fire(1)
             assertEquals(2, game.stateFlow.value.field.score)
 
-            // Reveal dormant and overshoot it (2 - 5 < 0) in the same press steady still succeeds in.
+            // Reveal the dormant target so this press overshoots it (2 - 5 < 0) while steady still succeeds.
             game.targetsRestored(
                 game.stateFlow.value.targets
                     .map { if (it.id == 2) it.copy(appearsAtMs = 0) else it },
@@ -86,38 +91,66 @@ class GameComboTest {
 
             fire(5)
 
-            assertEquals(1, game.stateFlow.value.field.bonusMultiplier)
-            assertEquals(7, game.stateFlow.value.field.score)
-            assertFalse(
-                game.stateFlow.value.targets
-                    .first { it.id == 2 }
-                    .isProfitable,
-            )
+            assertEquals(2, game.stateFlow.value.field.appliedMultiplier)
+            assertEquals(12, game.stateFlow.value.field.score)
         }
 
     @Test
-    fun `a press that scores on nothing drops the combo to zero`() =
+    fun `a plain bubble tap never resets an in-cap multiplier`() =
         runTest {
-            val game = Game(FakeSessionHelper(targetAmount = 1, targetValue = 2), backgroundScope, Random(1))
+            val game = Game(FakeSessionHelper(targetAmount = 1, targetValue = 10), backgroundScope, Random(1))
             game.createField(1)
-            game.targetsRestored(listOf(scheduledTarget(id = 1, value = 2)))
-            val field = game.stateFlow.value.field
+            game.targetsRestored(listOf(scheduledTarget(id = 1, value = 10)))
             game.fieldRestored(
-                field.copy(
-                    currentOperationSign = OperationSign.SUBTRACTION,
-                    currentOperationDigit = 5,
-                    bonusMultiplier = 4,
-                ),
+                game.stateFlow.value.field
+                    .copy(bonusMultiplier = 2),
+            )
+
+            game.targetClicked(1)
+
+            assertEquals(3, game.stateFlow.value.field.appliedMultiplier)
+        }
+
+    @Test
+    fun `a booster action leaves an in-cap multiplier untouched`() =
+        runTest {
+            val game = Game(FakeSessionHelper(targetAmount = 1), backgroundScope, Random(1), boostersEnabled = true)
+            game.createField(1)
+            game.fieldRestored(
+                game.stateFlow.value.field
+                    .copy(bonusMultiplier = 2, currentBooster = Booster.FREEZE),
             )
 
             game.fireButtonClicked()
 
-            assertEquals(0, game.stateFlow.value.field.bonusMultiplier)
-            assertEquals(0, game.stateFlow.value.field.score)
+            assertEquals(2, game.stateFlow.value.field.bonusMultiplier)
         }
 
     @Test
-    fun `a breakout clears the combo - driven through tick`() =
+    fun `arming and striking with the ice pick leaves an in-cap multiplier unchanged`() =
+        runTest {
+            val game =
+                Game(
+                    FakeSessionHelper(targetAmount = 1, targetValue = 7),
+                    backgroundScope,
+                    Random(1),
+                    boostersEnabled = true,
+                )
+            game.createField(1)
+            game.targetsRestored(listOf(scheduledTarget(id = 1, value = 7)))
+            game.fieldRestored(
+                game.stateFlow.value.field
+                    .copy(bonusMultiplier = 2, currentBooster = Booster.ICE_PICK),
+            )
+
+            game.fireButtonClicked()
+            game.targetClicked(1)
+
+            assertEquals(3, game.stateFlow.value.field.appliedMultiplier)
+        }
+
+    @Test
+    fun `a breakout clears the multiplier - driven through tick`() =
         runTest {
             val game = Game(FakeSessionHelper(targetAmount = 2, targetValue = 1000), backgroundScope, Random(1))
             game.createField(1)
@@ -127,29 +160,35 @@ class GameComboTest {
             val field = game.stateFlow.value.field
             game.fieldRestored(field.copy(currentOperationSign = OperationSign.SUBTRACTION, currentOperationDigit = 1))
             game.fireButtonClicked()
-            assertEquals(2, game.stateFlow.value.field.bonusMultiplier)
+            assertEquals(2, game.stateFlow.value.field.appliedMultiplier)
 
             game.tick(50) // fallingOut's fallenMs (90) + 50 clears its lifetimeMs of 100
 
-            assertEquals(0, game.stateFlow.value.field.bonusMultiplier)
+            assertEquals(1, game.stateFlow.value.field.appliedMultiplier)
             assertEquals(2, game.stateFlow.value.field.lifeCount)
         }
 
     @Test
-    fun `the combo has no ceiling of its own - only the board bounds it`() =
+    fun `repeated multi-target hits stop raising the multiplier at x5`() =
         runTest {
-            val game = Game(FakeSessionHelper(targetAmount = 12, targetValue = 1000), backgroundScope, Random(1))
+            val game = Game(FakeSessionHelper(targetAmount = 2, targetValue = 1_000_000), backgroundScope, Random(1))
             game.createField(1)
             game.targetsRestored(
-                (1..12).map { scheduledTarget(id = it, columnId = it % 3, value = 1000) },
+                listOf(
+                    scheduledTarget(id = 1, value = 1_000_000),
+                    scheduledTarget(id = 2, columnId = 1, value = 1_000_000),
+                ),
             )
-            val field = game.stateFlow.value.field
-            game.fieldRestored(field.copy(currentOperationSign = OperationSign.SUBTRACTION, currentOperationDigit = 1))
 
-            game.fireButtonClicked()
+            repeat(50) {
+                val field = game.stateFlow.value.field
+                game.fieldRestored(
+                    field.copy(currentOperationSign = OperationSign.SUBTRACTION, currentOperationDigit = 1),
+                )
+                game.fireButtonClicked()
+            }
 
-            assertEquals(12, game.stateFlow.value.field.bonusMultiplier)
-            assertEquals(144, game.stateFlow.value.field.score)
+            assertEquals(5, game.stateFlow.value.field.appliedMultiplier)
         }
 
     @Test
@@ -177,7 +216,7 @@ class GameComboTest {
         }
 
     @Test
-    fun `scoring an identical board in two target orders yields the same field - MC-39 reverses ASK-7`() =
+    fun `scoring an identical board in two target orders yields the same field`() =
         runTest {
             val sessionHelper = FakeSessionHelper()
             val gameA = Game(sessionHelper, backgroundScope, Random(1))
@@ -201,9 +240,7 @@ class GameComboTest {
             gameA.fireButtonClicked()
             gameB.fireButtonClicked()
 
-            // Old code (ASK-7, kept intentionally until this task) scored this 95 or 100 depending on
-            // which of the two targets performOperation folded first; the two never agreed.
             assertEquals(gameA.stateFlow.value.field, gameB.stateFlow.value.field)
-            assertEquals(105, gameA.stateFlow.value.field.score)
+            assertEquals(110, gameA.stateFlow.value.field.score)
         }
 }

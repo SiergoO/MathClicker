@@ -134,9 +134,9 @@ class GameEventTest {
                 testScheduler.runCurrent()
 
                 val resolved = events.filterIsInstance<GameEvent.OperationResolved>().single()
-                // Streak lands on 1 (0 -> 1), raw score is the digit (5), so gained = 5 * 1.
+                // One target changed, so the streak resets; raw score is the digit (5), gained = 5 * 1.
                 assertEquals(5, resolved.gained)
-                assertEquals(1, resolved.streak)
+                assertEquals(0, resolved.streak)
             }
 
             // TargetBrokeOut.livesLeft

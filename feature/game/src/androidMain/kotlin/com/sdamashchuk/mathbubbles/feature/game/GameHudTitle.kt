@@ -2,6 +2,7 @@ package com.sdamashchuk.mathbubbles.feature.game
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.MaterialTheme
@@ -23,9 +24,10 @@ const val GAME_HUD_LEVEL_VALUE_TAG = "GameHudLevelValue"
 const val GAME_HUD_SCORE_SLOT_TAG = "GameHudScoreSlot"
 const val GAME_HUD_SCORE_VALUE_TAG = "GameHudScoreValue"
 
-private val LevelLabelWidth = 72.dp
+private val LevelLabelWidth = 48.dp
 private val LevelValueWidth = 38.dp
-private val ScoreValueWidth = 104.dp
+private val ScoreValueWidth = 86.dp
+private val ComboGapWidth = 8.dp
 
 @Composable
 fun GameHudTitle(
@@ -36,7 +38,7 @@ fun GameHudTitle(
     Row(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.weight(1f).testTag(GAME_HUD_LEVEL_SLOT_TAG),
-            horizontalArrangement = Arrangement.Center,
+            horizontalArrangement = Arrangement.End,
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
@@ -45,7 +47,7 @@ fun GameHudTitle(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 text = stringResource(id = R.string.game_session_level_label).toUpperCase(Locale.current),
-                style = MaterialTheme.typography.body1,
+                style = MaterialTheme.typography.caption,
             )
             Text(
                 modifier = Modifier.width(LevelValueWidth).testTag(GAME_HUD_LEVEL_VALUE_TAG),
@@ -56,9 +58,12 @@ fun GameHudTitle(
                 style = MaterialTheme.typography.body1,
             )
         }
+        Spacer(modifier = Modifier.width(ComboGapWidth))
+        GameHudCombo(appliedMultiplier = appliedMultiplier)
+        Spacer(modifier = Modifier.width(ComboGapWidth))
         Row(
             modifier = Modifier.weight(1f).testTag(GAME_HUD_SCORE_SLOT_TAG),
-            horizontalArrangement = Arrangement.Center,
+            horizontalArrangement = Arrangement.Start,
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
@@ -66,12 +71,7 @@ fun GameHudTitle(
                 textAlign = TextAlign.Center,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                text =
-                    scoreLabel(
-                        appliedMultiplier = appliedMultiplier,
-                        plainScore = score.toString(),
-                        comboScore = stringResource(id = R.string.game_session_score_combo, appliedMultiplier, score),
-                    ).toUpperCase(Locale.current),
+                text = score.toString().toUpperCase(Locale.current),
                 style = MaterialTheme.typography.body1,
             )
         }

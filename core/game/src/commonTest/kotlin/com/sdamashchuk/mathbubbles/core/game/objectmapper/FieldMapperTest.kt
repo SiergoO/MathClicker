@@ -84,39 +84,20 @@ class FieldMapperTest {
     }
 
     @Test
-    fun `applyCombo is the number of targets the press scored on - not a running streak`() {
-        assertEquals(3, Field(bonusMultiplier = 0).applyCombo(3).bonusMultiplier)
-        assertEquals(1, Field(bonusMultiplier = 7).applyCombo(1).bonusMultiplier)
-        assertEquals(0, Field(bonusMultiplier = 7).applyCombo(0).bonusMultiplier)
-    }
-
-    @Test
-    fun `applyCombo has no ceiling of its own`() {
-        assertEquals(10, Field(bonusMultiplier = 0).applyCombo(10).bonusMultiplier)
-        assertEquals(1000, Field(bonusMultiplier = 0).applyCombo(1000).bonusMultiplier)
-    }
-
-    @Test
     fun `updateScore saturates instead of wrapping negative`() {
-        // The reason the streak can be uncapped at all. Wrapping would land on a negative sum, which
-        // the floor below then turns into a score of 0 - erasing the run of the only player good
-        // enough to get there.
+        // Wrapping would land on a negative sum, which the floor below then turns into a score of
+        // 0 - erasing the run of the only player good enough to get there.
         assertEquals(Int.MAX_VALUE, Field(score = Int.MAX_VALUE - 1).updateScore(100).score)
         assertEquals(Int.MAX_VALUE, Field(score = Int.MAX_VALUE).updateScore(Int.MAX_VALUE).score)
         assertEquals(0, Field(score = 10).updateScore(-100).score)
     }
 
     @Test
-    fun `resetStreak zeroes the streak regardless of its current value`() {
-        assertEquals(0, Field(bonusMultiplier = 7).resetStreak().bonusMultiplier)
-    }
-
-    @Test
-    fun `appliedMultiplier floors a resting streak at one but passes a live streak through`() {
+    fun `appliedMultiplier is one step above whatever the streak carries`() {
         // The property itself lives on :core:model's Field, not this mapper - covered from here
         // because :core:model has no test source set, the same as Target.position.
         assertEquals(1, Field(bonusMultiplier = 0).appliedMultiplier)
-        assertEquals(4, Field(bonusMultiplier = 4).appliedMultiplier)
+        assertEquals(5, Field(bonusMultiplier = 4).appliedMultiplier)
     }
 
     @Test
