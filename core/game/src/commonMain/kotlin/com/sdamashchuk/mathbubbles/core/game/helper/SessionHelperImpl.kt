@@ -13,7 +13,7 @@ class SessionHelperImpl(
         private const val LEVEL_MIN = 1
         private const val LEVEL_MAX = 999
 
-        private const val INITIAL_TARGET_VALUE_MIN = 1
+        private const val INITIAL_TARGET_VALUE_MIN = 3
         private const val INITIAL_TARGET_VALUE_MAX = 9
 
         // A speed multiplier drawn from (MIN_SPEED_MULTIPLIER, 1] lands flight time in [base, base * 1.25].

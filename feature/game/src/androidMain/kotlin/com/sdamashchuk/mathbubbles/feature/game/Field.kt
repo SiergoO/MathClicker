@@ -49,10 +49,10 @@ fun Field(
     onTick: (elapsedMs: Int) -> Unit,
     targetZeroedSignal: TargetZeroedSignal?,
     running: Boolean = true,
-    // The readiness hint's on/off switch, not a property of the game itself. A constant
+    // The division hint's on/off switch, not a property of the game itself. A constant
     // today; once difficulty/mods exist, that's what supplies this value - TargetButton never sees
     // why a hint is off, and neither does this composable's own body beyond reading the flag.
-    readinessHintsEnabled: Boolean = true,
+    divisionHintsEnabled: Boolean = true,
     onStashBooster: () -> Unit = {},
     onApplyBoosterFromStash: (slotIndex: Int) -> Unit = {},
     onDisarmIcePick: () -> Unit = {},
@@ -107,7 +107,7 @@ fun Field(
     }
 
     Divider()
-    PlayArea(gameState, onTargetClicked, targetZeroedSignal, readinessHintsEnabled, realTimeMsProvider)
+    PlayArea(gameState, onTargetClicked, targetZeroedSignal, divisionHintsEnabled, realTimeMsProvider)
 
     Box(
         modifier = Modifier.fillMaxSize(),

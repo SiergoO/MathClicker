@@ -14,6 +14,7 @@ import kotlin.test.assertTrue
 
 private const val SAMPLE_ITERATIONS = 200
 private const val SAMPLE_LEVEL = 50
+private const val MIN_TARGET_VALUE_SAMPLE_ITERATIONS = 20
 
 // Mirrors the constants in SessionHelperImpl (private there) so these tests fail when production
 // stops scaling, stops flooring, or reverses direction (MC-52/MC-73 mutations) rather than passing
@@ -148,11 +149,20 @@ class SessionHelperImplTest {
     private val helper = SessionHelperImpl()
 
     @Test
+    fun `no level from 1 to 999 ever generates a target value below 3`() {
+        for (level in helper.levelRange) {
+            repeat(MIN_TARGET_VALUE_SAMPLE_ITERATIONS) {
+                assertTrue(helper.getTargetValueByLevel(level, operationDigit = 1) >= 3)
+            }
+        }
+    }
+
+    @Test
     fun `the starting difficulty is the one the game was balanced around`() {
         // Literals on purpose. Every other test here derives its expectation from these same
         // properties, so none of them can notice a constant changing — a ten-fold rise in starting
         // target value would leave the suite green. This test is the only thing pinning the balance.
-        assertEquals(1..9, helper.initialTargetValueRange)
+        assertEquals(3..9, helper.initialTargetValueRange)
         assertEquals(7600..9500, helper.initialTargetFlightTimeMsRange)
         assertEquals(9..14, helper.initialTargetAmountRange)
         assertEquals(2..3, helper.initialDivisionValueRange)
@@ -463,7 +473,7 @@ class SessionHelperImplTest {
         // Literal, not the production formula recomputed - see failedGrowthCap's own pinned tests for
         // why (a test that re-derives the formula can't catch the formula itself drifting).
         assertEquals(
-            6,
+            11,
             SessionHelperImpl(random = Random(PINNED_SEED)).getTargetValueByLevel(level = 1, operationDigit = 5),
         )
     }

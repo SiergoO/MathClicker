@@ -17,7 +17,7 @@ internal class FadeContext {
         fadingTargets: MutableMap<Int, Target>,
         operationSign: OperationSign,
         operationDigit: Int,
-        readinessHintsEnabled: Boolean,
+        divisionHintsEnabled: Boolean,
         gameTimeMsProvider: () -> Long,
         realTimeMsProvider: () -> Long,
     ) {
@@ -27,7 +27,7 @@ internal class FadeContext {
                 val target = lastSeenTargets[id] ?: continue
                 gameTimeMs[id] = gameTimeMsProvider()
                 realTimeMs[id] = realTimeMsProvider()
-                isReady[id] = shouldShowReadinessHint(target, operationSign, operationDigit, readinessHintsEnabled)
+                isReady[id] = shouldShowDivisionHint(target, operationSign, operationDigit, divisionHintsEnabled)
                 fadingTargets[id] = target
             }
             previousVisibleIds.clear()

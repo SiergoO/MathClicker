@@ -53,7 +53,7 @@ fun PlayArea(
     gameState: State<GameViewModel.State>,
     onTargetClicked: (id: Int) -> Unit,
     targetZeroedSignal: TargetZeroedSignal?,
-    readinessHintsEnabled: Boolean,
+    divisionHintsEnabled: Boolean,
     realTimeMsProvider: () -> Long = { 0L },
 ) {
     var gameColumnSize by remember { mutableStateOf(Size(0, 0)) }
@@ -100,7 +100,7 @@ fun PlayArea(
         fadingTargets = fadingTargets,
         operationSign = operationSign,
         operationDigit = operationDigit,
-        readinessHintsEnabled = readinessHintsEnabled,
+        divisionHintsEnabled = divisionHintsEnabled,
         gameTimeMsProvider = gameTimeMsProvider,
         realTimeMsProvider = realTimeMsProvider,
     )
@@ -188,11 +188,11 @@ fun PlayArea(
                                     if (isFading) {
                                         fadeContext.isReady.getOrElse(id) { false }
                                     } else {
-                                        shouldShowReadinessHint(
+                                        shouldShowDivisionHint(
                                             target,
                                             operationSign,
                                             operationDigit,
-                                            readinessHintsEnabled,
+                                            divisionHintsEnabled,
                                         )
                                     },
                                 gameTimeMsProvider =

@@ -16,6 +16,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -51,8 +52,6 @@ private const val TELEGRAPH_PULSE_MS = 300
 private const val TELEGRAPH_RING_WIDTH_FRACTION = 0.03f
 private const val TELEGRAPH_RING_ALPHA = 0.85f
 
-private const val READINESS_TRANSITION_MS = 200
-
 // 0.72 is a hard floor, not a taste call: the target is 0.8 of a column, a column is about 81.6dp on a
 // 411dp phone, and 48dp of minimum touch target is 0.59 of that. Do not lower it without redoing this.
 private const val DEPTH_SCALE_AT_TOP = 0.72f
@@ -62,14 +61,27 @@ private const val LANE_CENTER_FRACTION = 0.5f
 
 // Fitted numerically against the reference art, not eyeballed - mean absolute channel error 3.4%.
 // The highlight is two layers, not one: with a single blob the fit will not go below 10.7/255.
-private const val FILL_ALPHA_READY = 0.62f
 private const val FILL_ALPHA_IDLE = 0.28f
-private const val RIM_WIDTH_FRACTION_READY = 0.027f
+private const val FILL_ALPHA_READY = 0.62f
 private const val RIM_WIDTH_FRACTION_IDLE = 0.031f
-private const val HIGHLIGHT_CORE_ALPHA_READY = 0.90f
+private const val RIM_WIDTH_FRACTION_READY = 0.027f
 private const val HIGHLIGHT_CORE_ALPHA_IDLE = 0.30f
-private const val HIGHLIGHT_GLOW_ALPHA_READY = 0.36f
+private const val HIGHLIGHT_CORE_ALPHA_READY = 0.90f
 private const val HIGHLIGHT_GLOW_ALPHA_IDLE = 0.14f
+private const val HIGHLIGHT_GLOW_ALPHA_READY = 0.36f
+
+// The standard look every profitable bubble now holds steady at: the old readiness blend's
+// not-yet-ready floor, baked in rather than animated toward the READY constants above.
+private const val STANDARD_LIVELINESS = 0.62f
+private val STANDARD_FILL_COLOR = lerp(BubbleFillIdle, BubbleFillReady, STANDARD_LIVELINESS)
+private val STANDARD_RIM_COLOR = lerp(BubbleRimIdle, BubbleRimReady, STANDARD_LIVELINESS)
+private const val STANDARD_FILL_ALPHA = FILL_ALPHA_IDLE + (FILL_ALPHA_READY - FILL_ALPHA_IDLE) * STANDARD_LIVELINESS
+private const val STANDARD_RIM_WIDTH_FRACTION =
+    RIM_WIDTH_FRACTION_IDLE + (RIM_WIDTH_FRACTION_READY - RIM_WIDTH_FRACTION_IDLE) * STANDARD_LIVELINESS
+private const val STANDARD_CORE_ALPHA =
+    HIGHLIGHT_CORE_ALPHA_IDLE + (HIGHLIGHT_CORE_ALPHA_READY - HIGHLIGHT_CORE_ALPHA_IDLE) * STANDARD_LIVELINESS
+private const val STANDARD_GLOW_ALPHA =
+    HIGHLIGHT_GLOW_ALPHA_IDLE + (HIGHLIGHT_GLOW_ALPHA_READY - HIGHLIGHT_GLOW_ALPHA_IDLE) * STANDARD_LIVELINESS
 
 private const val DIGIT_SIZE_FRACTION = 0.28f
 
@@ -78,13 +90,10 @@ private const val DIGIT_SIZE_FRACTION = 0.28f
 private const val SWAY_PERIOD_MS = 2_000
 private const val SWAY_AMPLITUDE_DP = 5f
 
-// A target that cannot be reduced by the armed operation is fully idle; one that can, but is not
-// yet a single press from zero, sits partway. One number drives every layer, so the three states
-// are one animatable value rather than three branches. An unreachable target additionally loses its
-// highlight core, which is what separates it from a merely unready one at a glance.
-private const val LIVELINESS_PROFITABLE_FLOOR = 0.62f
 private const val UNREACHABLE_CORE_ALPHA = 0.06f
 private const val UNREACHABLE_FILL_ALPHA = 0.16f
+
+private const val READY_HINT_SHAKE_AMPLITUDE_DP = 2f
 
 // Three short steps land the whole gesture under 200ms, so rapid tapping never waits on the previous one.
 private const val SQUASH_COMPRESS_SCALE = 0.93f
@@ -120,12 +129,10 @@ fun TargetButton(
         if (shouldSquashTarget(target.value, lastKnownValue)) squashTarget(squashScale)
         lastKnownValue = target.value
     }
-    val readinessFraction by
-        animateFloatAsState(
-            targetValue = if (isReady) 1f else 0f,
-            animationSpec = tween(READINESS_TRANSITION_MS),
-            label = "readinessFraction",
-        )
+    var reachableSinceMs by remember(target.id) { mutableStateOf<Long?>(null) }
+    LaunchedEffect(target.id, isReady) {
+        reachableSinceMs = if (isReady) gameTimeMsProvider() else null
+    }
     // The ice pick's own onset: every bubble's sway grows in as it arms and shrinks out as it
     // disarms, on the same span every other booster cue ramps over.
     val swayEnvelope by
@@ -135,10 +142,9 @@ fun TargetButton(
             label = "icePickSwayEnvelope",
         )
     val swayPhase = remember(target.id) { swayPhase(target.id) }
-    val liveliness = liveliness(target.isProfitable, readinessFraction)
     val buttonDiameterDp = (gameColumnSize.width * TARGET_DIAMETER_FRACTION).toFloat()
     val horizontalFraction = TargetHighlightTilt.horizontalFraction(target.columnId, GAME_COLUMN_COUNT)
-    val bubbleStyle = targetBubbleStyle(buttonDiameterDp.dp, liveliness, horizontalFraction)
+    val bubbleStyle = targetBubbleStyle(buttonDiameterDp.dp, target.isProfitable, horizontalFraction)
     val columnCenterXDp = target.columnId * gameColumnSize.width + gameColumnSize.width * LANE_CENTER_FRACTION
     val columnHeight = gameColumnSize.height
     val interactionModifier =
@@ -183,7 +189,18 @@ fun TargetButton(
                     alpha = DisappearFade.alpha(fadeProgress)
                     if (swayEnvelope > 0f) {
                         val offset = swayOffsetPx(realTimeMsProvider(), swayPhase, SWAY_AMPLITUDE_DP.dp.toPx())
-                        translationX = offset * swayEnvelope
+                        translationX += offset * swayEnvelope
+                    }
+                    reachableSinceMs?.let { since ->
+                        val hint =
+                            ShakeHintTiming.offsetAt(
+                                reachableSinceMs = since,
+                                nowMs = gameTimeMs,
+                                seed = target.id,
+                                amplitudePx = READY_HINT_SHAKE_AMPLITUDE_DP.dp.toPx(),
+                            )
+                        translationX += hint.x
+                        translationY += hint.y
                     }
                 }.bubbleSurface(
                     bubbleStyle,
@@ -216,16 +233,6 @@ internal fun telegraphPulse(
     return 1f + (TELEGRAPH_PULSE_SCALE - 1f) * (1f - abs(2f * phase - 1f))
 }
 
-internal fun liveliness(
-    isProfitable: Boolean,
-    readinessFraction: Float,
-): Float =
-    if (!isProfitable) {
-        0f
-    } else {
-        LIVELINESS_PROFITABLE_FLOOR + (1f - LIVELINESS_PROFITABLE_FLOOR) * readinessFraction
-    }
-
 // A real hit only: a tap that misses (value unchanged) or a fresh target reusing this slot (value
 // reset upward by remember(target.id)) must never trigger the squash.
 internal fun shouldSquashTarget(
@@ -239,44 +246,39 @@ private suspend fun squashTarget(scale: Animatable<Float, AnimationVector1D>) {
     scale.animateTo(1f, tween(SQUASH_SETTLE_MS))
 }
 
-// A target that cannot be reduced (isUnreachable) drops to its own, lower floor instead of
-// the formula's idle values.
+// Every target shares one standard look; only a target that would bring no points
+// (isProfitable false) drops to the dimmer, coreless unreachable look.
 internal fun targetBubbleStyle(
     diameter: Dp,
-    liveliness: Float,
+    isProfitable: Boolean,
     horizontalFraction: Float,
 ): BubbleStyle {
-    val isUnreachable = liveliness <= 0f
-    val fillAlpha =
-        if (isUnreachable) {
-            UNREACHABLE_FILL_ALPHA
-        } else {
-            FILL_ALPHA_IDLE + (FILL_ALPHA_READY - FILL_ALPHA_IDLE) * liveliness
-        }
-    val coreAlpha =
-        if (isUnreachable) {
-            UNREACHABLE_CORE_ALPHA
-        } else {
-            HIGHLIGHT_CORE_ALPHA_IDLE + (HIGHLIGHT_CORE_ALPHA_READY - HIGHLIGHT_CORE_ALPHA_IDLE) * liveliness
-        }
-    val glowAlpha =
-        HIGHLIGHT_GLOW_ALPHA_IDLE + (HIGHLIGHT_GLOW_ALPHA_READY - HIGHLIGHT_GLOW_ALPHA_IDLE) * liveliness
     val baseOffset = TargetHighlightTilt.baseOffsetFraction(horizontalFraction)
-    return BubbleStyle(
-        fillColor = lerp(BubbleFillIdle, BubbleFillReady, liveliness),
-        fillAlpha = fillAlpha,
-        rimColor = lerp(BubbleRimIdle, BubbleRimReady, liveliness),
-        rimWidth =
-            diameter * (RIM_WIDTH_FRACTION_IDLE + (RIM_WIDTH_FRACTION_READY - RIM_WIDTH_FRACTION_IDLE) * liveliness),
-        highlight =
-            BubbleHighlight(
-                coreAlpha = coreAlpha,
-                glowAlpha = glowAlpha,
-                offsetXFraction = baseOffset.x,
-                offsetYFraction = baseOffset.y,
-                rotationDegrees = TargetHighlightTilt.angleDegrees(horizontalFraction),
-            ),
-    )
+    val highlight =
+        BubbleHighlight(
+            coreAlpha = if (isProfitable) STANDARD_CORE_ALPHA else UNREACHABLE_CORE_ALPHA,
+            glowAlpha = if (isProfitable) STANDARD_GLOW_ALPHA else HIGHLIGHT_GLOW_ALPHA_IDLE,
+            offsetXFraction = baseOffset.x,
+            offsetYFraction = baseOffset.y,
+            rotationDegrees = TargetHighlightTilt.angleDegrees(horizontalFraction),
+        )
+    return if (isProfitable) {
+        BubbleStyle(
+            fillColor = STANDARD_FILL_COLOR,
+            fillAlpha = STANDARD_FILL_ALPHA,
+            rimColor = STANDARD_RIM_COLOR,
+            rimWidth = diameter * STANDARD_RIM_WIDTH_FRACTION,
+            highlight = highlight,
+        )
+    } else {
+        BubbleStyle(
+            fillColor = BubbleFillIdle,
+            fillAlpha = UNREACHABLE_FILL_ALPHA,
+            rimColor = BubbleRimIdle,
+            rimWidth = diameter * RIM_WIDTH_FRACTION_IDLE,
+            highlight = highlight,
+        )
+    }
 }
 
 private fun Modifier.telegraphRing(

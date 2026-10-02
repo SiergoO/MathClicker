@@ -80,7 +80,7 @@ class TargetFadeOutTest {
                     gameState = gameState,
                     onTargetClicked = {},
                     targetZeroedSignal = null,
-                    readinessHintsEnabled = true,
+                    divisionHintsEnabled = true,
                 )
             }
         }
@@ -112,7 +112,7 @@ class TargetFadeOutTest {
                     gameState = gameState,
                     onTargetClicked = {},
                     targetZeroedSignal = null,
-                    readinessHintsEnabled = true,
+                    divisionHintsEnabled = true,
                 )
             }
         }
