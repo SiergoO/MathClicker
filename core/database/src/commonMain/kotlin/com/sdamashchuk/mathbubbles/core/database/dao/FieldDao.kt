@@ -71,7 +71,7 @@ class FieldDao(
 
     suspend fun getFieldCount(): Int = withContext(dispatcher) { queries.getFieldCount().executeAsOne().toInt() }
 
-    // Newest first, capped at 10 (see Field.sq); the best among them is a separate query below
+    // Newest first, capped at 7 (see Field.sq); the best among them is a separate query below
     // because it has to read past this window, not just this page.
     suspend fun getRecentClosedFields(): List<Field> =
         withContext(dispatcher) { queries.getRecentClosedFields().executeAsList().map { it.toDomainModel() } }

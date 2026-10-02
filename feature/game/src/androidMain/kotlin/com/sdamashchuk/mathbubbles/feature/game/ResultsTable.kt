@@ -22,8 +22,7 @@ import com.sdamashchuk.mathbubbles.core.ui.theme.InkDim
 import kotlinx.collections.immutable.ImmutableList
 
 /**
- * The last ten finished runs, most recent first (see Field.sq's getRecentClosedFields). No scroll:
- * ten rows plus a header is the whole table, by design (MC-53 spec).
+ * The last seven finished runs, most recent first (see Field.sq's getRecentClosedFields).
  */
 @Composable
 fun ResultsTable(
@@ -69,7 +68,7 @@ private fun RowScope.HeaderCell(
         Text(
             text = text.toUpperCase(Locale.current),
             color = InkDim,
-            style = MaterialTheme.typography.caption,
+            style = MaterialTheme.typography.subtitle2,
         )
     }
 }

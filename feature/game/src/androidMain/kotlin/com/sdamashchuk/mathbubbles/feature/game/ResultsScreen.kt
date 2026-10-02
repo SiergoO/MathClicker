@@ -12,6 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -30,9 +31,10 @@ import kotlinx.collections.immutable.ImmutableList
 private const val TABLE_AREA_WEIGHT = 2f
 private const val BUTTON_AREA_WEIGHT = 1f
 
+internal const val RESULTS_TABLE_SCROLL_TAG = "ResultsTableScroll"
+
 /**
- * What GameOver shows instead of the old bare Game Over/Restart/Main Menu dialog (MC-53): this
- * run's score, its near-miss delta to the player's best, and the last ten finished runs.
+ * This run's score, its near-miss delta to the player's best, and the last seven finished runs.
  */
 @Composable
 fun ResultsScreen(
@@ -60,12 +62,13 @@ fun ResultsScreen(
             )
             SummaryText(resultsSummaryOf(field, bestResult))
             // The table sits in the space left below the header; verticalScroll is the fallback if
-            // a large font scale or a ten-row history ever makes it taller than that space.
+            // a large font scale or a seven-row history ever makes it taller than that space.
             Column(
                 modifier =
                     Modifier
                         .weight(TABLE_AREA_WEIGHT)
                         .fillMaxWidth()
+                        .testTag(RESULTS_TABLE_SCROLL_TAG)
                         .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally,

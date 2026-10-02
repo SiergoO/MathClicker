@@ -1,11 +1,15 @@
 package com.sdamashchuk.mathbubbles.feature.game
 
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import com.sdamashchuk.mathbubbles.core.model.Field
 import com.sdamashchuk.mathbubbles.core.ui.theme.MathBubblesTheme
 import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.toPersistentList
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -13,6 +17,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 private const val SCREEN_WIDTH_DP = 360f
 private const val WRAPPER_HORIZONTAL_INSET_DP = 20f
@@ -104,5 +109,32 @@ class ResultsScreenLayoutTest {
             0.5f,
             "results table right edge vs the wrapper inset",
         )
+    }
+
+    @Test
+    fun `seven rows of results fit at 360x800 and font scale 1 without scrolling`() {
+        val field = Field(id = 1, level = 1, score = 60, isClosed = true)
+        val recentResults = (1..7).map { field.copy(id = it, level = it, score = it * 10) }.toPersistentList()
+
+        composeTestRule.setContent {
+            MathBubblesTheme {
+                ResultsScreen(
+                    field = field,
+                    recentResults = recentResults,
+                    bestResult = null,
+                    onRestartClicked = {},
+                    onBackToMainMenuClicked = {},
+                )
+            }
+        }
+
+        val scrollRange =
+            composeTestRule
+                .onNodeWithTag(RESULTS_TABLE_SCROLL_TAG)
+                .fetchSemanticsNode()
+                .config
+                .getOrNull(SemanticsProperties.VerticalScrollAxisRange)
+
+        assertTrue(scrollRange == null || scrollRange.maxValue() <= 0f, "table area should not need to scroll")
     }
 }

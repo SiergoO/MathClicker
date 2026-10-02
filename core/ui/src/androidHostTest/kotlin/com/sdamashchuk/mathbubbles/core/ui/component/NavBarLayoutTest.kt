@@ -8,6 +8,7 @@ import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.Density
@@ -23,6 +24,7 @@ import kotlin.test.assertTrue
 
 private const val TOUCH_TARGET_DP = 48f
 private const val NAV_BAR_HEIGHT_DP = 56f
+private const val NAV_BAR_WIDTH_DP = 360f
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -75,6 +77,22 @@ class NavBarLayoutTest {
             0.5f,
             "title baselines relative to each bar's own top: $titleBaselines",
         )
+    }
+
+    @Test
+    fun `title text is centred across the bar's full width`() {
+        composeTestRule.setContent {
+            MathBubblesTheme {
+                NavBar(title = "Settings")
+            }
+        }
+
+        val density = composeTestRule.density
+        val bounds = composeTestRule.onNodeWithText("Settings").fetchSemanticsNode().boundsInRoot
+        val left = with(density) { bounds.left.toDp().value }
+        val right = with(density) { bounds.right.toDp().value }
+
+        assertEquals(left, NAV_BAR_WIDTH_DP - right, 0.5f, "title should be centred, not start-aligned")
     }
 }
 

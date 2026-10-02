@@ -48,6 +48,12 @@ fun Typography(): Typography {
                 fontWeight = FontWeight.Normal,
                 fontSize = 14.sp,
             ),
+        subtitle2 =
+            TextStyle(
+                fontFamily = quickSand,
+                fontWeight = FontWeight.Medium,
+                fontSize = 14.sp,
+            ),
         button =
             TextStyle(
                 fontFamily = quickSand,

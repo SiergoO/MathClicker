@@ -11,6 +11,7 @@ import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.sdamashchuk.mathbubbles.core.ui.resources.Res
@@ -38,6 +39,7 @@ fun NavBar(
                 Text(
                     text = text,
                     style = MaterialTheme.typography.h2,
+                    textAlign = TextAlign.Center,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -61,6 +63,7 @@ fun NavBar(
                         .align(Alignment.Center)
                         .fillMaxWidth()
                         .padding(horizontal = NavBarIconButtonTouchTarget),
+                contentAlignment = Alignment.Center,
             ) {
                 resolvedTitleContent()
             }

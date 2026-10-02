@@ -33,9 +33,9 @@ SELECT COUNT(id) FROM field;
 -- no finishedAt at all - sorting by it would scatter that history to one end instead of keeping it
 -- in place among the rows around it.
 getRecentClosedFields:
-SELECT * FROM field WHERE isClosed = 1 ORDER BY id DESC LIMIT 10;
+SELECT * FROM field WHERE isClosed = 1 ORDER BY id DESC LIMIT 7;
 
 -- Over all history, not the recent window above: a best run must not stop being the record just
--- because it scrolled past the last ten. Tied scores break on level, not left to insertion order.
+-- because it scrolled past the last seven. Tied scores break on level, not left to insertion order.
 getBestClosedField:
 SELECT * FROM field WHERE isClosed = 1 ORDER BY score DESC, level DESC LIMIT 1;

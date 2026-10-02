@@ -166,7 +166,7 @@ class GameViewModel(
         gameRepository.updateTargets(targets)
     }
 
-    // All history, not the recent window: a best outside the last ten must still be found.
+    // All history, not the recent window: a best outside the last seven must still be found.
     private suspend fun loadResults() {
         _state.value =
             state.value.copy(

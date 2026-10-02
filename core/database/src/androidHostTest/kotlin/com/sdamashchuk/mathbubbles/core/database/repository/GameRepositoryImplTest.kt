@@ -173,30 +173,30 @@ class GameRepositoryImplTest {
         }
 
     // M1: best computed over the returned page instead of all history. The highest score here is
-    // the oldest run, id 1 - it is pushed out of getRecentClosedFields' window by ids 2..11, so a
+    // the oldest run, id 1 - it is pushed out of getRecentClosedFields' window by ids 2..8, so a
     // best derived from that window alone would report a lower score than the true best.
     @Test
     fun `getBestClosedField is taken over all history, not just the recent window`() =
         runTest {
             repository.insertField(Field(score = 999, level = 1, isClosed = true))
-            (2..11).forEach { repository.insertField(Field(score = it, level = 1, isClosed = true)) }
+            (2..8).forEach { repository.insertField(Field(score = it, level = 1, isClosed = true)) }
 
             assertEquals(999, repository.getBestClosedField()?.score)
-            assertEquals(10, repository.getRecentClosedFields().size)
+            assertEquals(7, repository.getRecentClosedFields().size)
             assertTrue(repository.getRecentClosedFields().none { it.score == 999 })
         }
 
-    // M2: LIMIT 10 dropped. M1 (best over the window) is also re-proven here from the list's own
-    // side: 11 closed rows must still cap at exactly 10.
+    // M2: LIMIT 7 dropped. M1 (best over the window) is also re-proven here from the list's own
+    // side: 8 closed rows must still cap at exactly 7.
     @Test
-    fun `getRecentClosedFields excludes unfinished runs and caps at ten`() =
+    fun `getRecentClosedFields excludes unfinished runs and caps at seven`() =
         runTest {
             repository.insertField(Field(isClosed = false))
-            repeat(11) { repository.insertField(Field(isClosed = true)) }
+            repeat(8) { repository.insertField(Field(isClosed = true)) }
 
             val recent = repository.getRecentClosedFields()
 
-            assertEquals(10, recent.size)
+            assertEquals(7, recent.size)
             assertTrue(recent.all { it.isClosed })
         }
 

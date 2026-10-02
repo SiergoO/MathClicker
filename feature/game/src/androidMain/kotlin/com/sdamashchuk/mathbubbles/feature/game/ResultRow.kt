@@ -20,11 +20,13 @@ import com.sdamashchuk.mathbubbles.core.ui.theme.Accent
 import com.sdamashchuk.mathbubbles.core.ui.theme.Ink
 import com.sdamashchuk.mathbubbles.core.ui.theme.InkHud
 
+private val ROW_VERTICAL_PADDING = 16.dp
+
 /**
  * One row of the results table - a single closed run. [isBest] marks the player's record among
  * [ResultsTable]'s window, which is not necessarily this row's position in it (see
  * GameRepository.getBestClosedField's own contract: the best is taken over all history, so it can
- * be absent from a ten-row recent window entirely).
+ * be absent from a seven-row recent window entirely).
  */
 @Composable
 fun ResultRow(
@@ -35,7 +37,7 @@ fun ResultRow(
     val supportColor = if (isBest) Accent else InkHud
     val scoreColor = if (isBest) Accent else Ink
     Row(
-        modifier = modifier.fillMaxWidth().padding(vertical = 5.dp),
+        modifier = modifier.fillMaxWidth().padding(vertical = ROW_VERTICAL_PADDING),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Cell(
@@ -43,14 +45,14 @@ fun ResultRow(
             weight = ResultsColumns.DATE_WEIGHT,
             alignment = ResultsColumns.DATE_ALIGNMENT,
             color = supportColor,
-            style = MaterialTheme.typography.body2,
+            style = MaterialTheme.typography.body1,
         )
         Cell(
             text = field.level.toString(),
             weight = ResultsColumns.LEVEL_WEIGHT,
             alignment = ResultsColumns.NUMBER_ALIGNMENT,
             color = supportColor,
-            style = MaterialTheme.typography.body2,
+            style = MaterialTheme.typography.body1,
         )
         Cell(
             text = field.score.toString(),
