@@ -1,14 +1,19 @@
 package com.sdamashchuk.mathbubbles.feature.menu
 
 import com.sdamashchuk.mathbubbles.core.component.ComponentViewModel
+import com.sdamashchuk.mathbubbles.core.database.repository.GameRepository
+import com.sdamashchuk.mathbubbles.core.model.Field
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.consumeAsFlow
 import kotlinx.coroutines.launch
+import kotlin.time.Clock
 
-class MenuViewModel : ComponentViewModel() {
+class MenuViewModel(
+    private val gameRepository: GameRepository,
+) : ComponentViewModel() {
     private val action = Channel<Action>(Channel.UNLIMITED)
 
     private val _state = MutableStateFlow(State())
@@ -19,6 +24,7 @@ class MenuViewModel : ComponentViewModel() {
 
     init {
         handleAction()
+        refreshUnfinishedField()
     }
 
     fun sendAction(actionToSend: Action) {
@@ -29,7 +35,16 @@ class MenuViewModel : ComponentViewModel() {
         viewModelScope.launch {
             action.consumeAsFlow().collect { action ->
                 when (action) {
+                    Action.ScreenResumed -> {
+                        refreshUnfinishedField()
+                    }
+
                     Action.ButtonPlayClicked -> {
+                        abandonUnfinishedField()
+                        _uiEvents.trySend(UiEvent.NavigateToGameScreen)
+                    }
+
+                    Action.ButtonContinueClicked -> {
                         _uiEvents.trySend(UiEvent.NavigateToGameScreen)
                     }
 
@@ -38,21 +53,29 @@ class MenuViewModel : ComponentViewModel() {
                     }
 
                     Action.OpenDialog -> {
-                        _state.value =
-                            state.value.copy(
-                                isOpenDialog = true,
-                            )
+                        _state.value = state.value.copy(isOpenDialog = true)
                     }
 
                     Action.CloseDialog -> {
-                        _state.value =
-                            state.value.copy(
-                                isOpenDialog = false,
-                            )
+                        _state.value = state.value.copy(isOpenDialog = false)
                     }
                 }
             }
         }
+    }
+
+    private fun refreshUnfinishedField() {
+        viewModelScope.launch {
+            _state.value = state.value.copy(unfinishedField = gameRepository.getUnfinishedField())
+        }
+    }
+
+    // Closed, not deleted, so it still surfaces in results history the same way RestartGame's
+    // abandon path does.
+    private suspend fun abandonUnfinishedField() {
+        val field = state.value.unfinishedField ?: return
+        gameRepository.updateField(field.copy(isClosed = true, finishedAt = Clock.System.now().toEpochMilliseconds()))
+        _state.value = state.value.copy(unfinishedField = null)
     }
 
     sealed class UiEvent {
@@ -62,7 +85,11 @@ class MenuViewModel : ComponentViewModel() {
     }
 
     sealed class Action {
+        object ScreenResumed : Action()
+
         object ButtonPlayClicked : Action()
+
+        object ButtonContinueClicked : Action()
 
         object ButtonSettingsClicked : Action()
 
@@ -73,5 +100,8 @@ class MenuViewModel : ComponentViewModel() {
 
     data class State(
         val isOpenDialog: Boolean = false,
-    )
+        val unfinishedField: Field? = null,
+    ) {
+        val hasUnfinishedField: Boolean get() = unfinishedField != null
+    }
 }

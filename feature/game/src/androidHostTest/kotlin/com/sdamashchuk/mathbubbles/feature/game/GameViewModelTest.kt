@@ -4,18 +4,22 @@ import com.sdamashchuk.mathbubbles.core.database.repository.GameRepository
 import com.sdamashchuk.mathbubbles.core.game.Game
 import com.sdamashchuk.mathbubbles.core.game.helper.SessionHelper
 import com.sdamashchuk.mathbubbles.core.game.model.GameEvent
+import com.sdamashchuk.mathbubbles.core.model.Booster
 import com.sdamashchuk.mathbubbles.core.model.Field
 import com.sdamashchuk.mathbubbles.core.model.OperationSign
 import com.sdamashchuk.mathbubbles.core.model.Target
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -96,6 +100,112 @@ private class FakeGameRepository(
     override suspend fun getRecentClosedFields(): List<Field> = recentClosedFields
 
     override suspend fun getBestClosedField(): Field? = bestClosedField
+
+    override suspend fun saveFieldAndTargets(
+        field: Field,
+        targets: List<Target>,
+        replaceTargets: Boolean,
+    ) {
+        updateField(field)
+        if (replaceTargets) refreshTargets(targets) else updateTargets(targets)
+    }
+}
+
+// Tracks the latest write, unlike FakeGameRepository above which always hands back its
+// constructor snapshot - what a "kill the VM, start a fresh one against the same storage" test
+// needs in place of a real database.
+private class StatefulFakeGameRepository(
+    field: Field,
+    targets: List<Target>,
+) : GameRepository {
+    private var storedField = field
+    private var storedTargets = targets
+
+    override suspend fun insertField(field: Field) {
+        storedField = field
+    }
+
+    override suspend fun updateField(field: Field) {
+        storedField = field
+    }
+
+    override suspend fun getUnfinishedField(): Field? = storedField
+
+    override suspend fun getFieldCount(): Int = 1
+
+    override suspend fun updateTargets(targets: List<Target>) {
+        storedTargets = targets
+    }
+
+    override suspend fun getTargets(): List<Target> = storedTargets
+
+    override suspend fun refreshTargets(targets: List<Target>) {
+        storedTargets = targets
+    }
+
+    override suspend fun getRecentClosedFields(): List<Field> = emptyList()
+
+    override suspend fun getBestClosedField(): Field? = null
+
+    override suspend fun saveFieldAndTargets(
+        field: Field,
+        targets: List<Target>,
+        replaceTargets: Boolean,
+    ) {
+        updateField(field)
+        if (replaceTargets) refreshTargets(targets) else updateTargets(targets)
+    }
+}
+
+// getUnfinishedField's delay gives a collector racing ahead of updateSession a window to run
+// first, the same window a real DB round-trip leaves open.
+private class RacyFakeGameRepository(
+    initialField: Field,
+) : GameRepository {
+    private val fields = mutableMapOf(initialField.id to initialField)
+    private var nextId = initialField.id + 1
+    private var targets: List<Target> = emptyList()
+
+    fun fieldById(id: Int): Field? = fields[id]
+
+    override suspend fun insertField(field: Field) {
+        val id = if (field.id == 0) nextId++ else field.id
+        fields[id] = field.copy(id = id)
+    }
+
+    override suspend fun updateField(field: Field) {
+        fields[field.id] = field
+    }
+
+    override suspend fun getUnfinishedField(): Field? {
+        delay(1)
+        return fields.values.filter { !it.isClosed }.maxByOrNull { it.id }
+    }
+
+    override suspend fun getFieldCount(): Int = fields.size
+
+    override suspend fun updateTargets(targets: List<Target>) {
+        this.targets = targets
+    }
+
+    override suspend fun getTargets(): List<Target> = targets
+
+    override suspend fun refreshTargets(targets: List<Target>) {
+        this.targets = targets
+    }
+
+    override suspend fun getRecentClosedFields(): List<Field> = emptyList()
+
+    override suspend fun getBestClosedField(): Field? = null
+
+    override suspend fun saveFieldAndTargets(
+        field: Field,
+        targets: List<Target>,
+        replaceTargets: Boolean,
+    ) {
+        updateField(field)
+        if (replaceTargets) refreshTargets(targets) else updateTargets(targets)
+    }
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -327,6 +437,108 @@ class GameViewModelTest {
             assertEquals(GamePhase.GameOver, viewModel.state.value.phase)
             assertEquals(trueBest, viewModel.state.value.bestResult)
             assertEquals(listOf(mostRecent, trueBest), viewModel.state.value.recentResults)
+        }
+
+    // A restored session never drops the player straight into falling bubbles - Continue always
+    // lands on the pause dialog over the frozen, restored field.
+    @Test
+    fun `restoring an unfinished field lands in Paused, never ReadyToPlay`() =
+        runTest {
+            val repository =
+                FakeGameRepository(
+                    unfinishedField = Field(id = 5, level = 3, isClosed = false),
+                    unfinishedTargets =
+                        listOf(
+                            Target(
+                                id = 1,
+                                relatedFieldId = 5,
+                                columnId = 0,
+                                value = 4,
+                                appearsAtMs = 0,
+                                finishesAtMs = 1000,
+                            ),
+                        ),
+                )
+            val game = Game(FakeSessionHelper(targetAmount = 1), CoroutineScope(Dispatchers.Unconfined))
+
+            val viewModel = GameViewModel(game, repository)
+
+            assertEquals(GamePhase.Paused, viewModel.state.value.phase)
+        }
+
+    // Counterpart: a brand new session (no unfinished field) still opens on ReadyToPlay, exactly as
+    // Play expects.
+    @Test
+    fun `starting a new session (no unfinished field) still lands in ReadyToPlay`() =
+        runTest {
+            val repository = FakeGameRepository(unfinishedField = null, unfinishedTargets = emptyList())
+            val game = Game(FakeSessionHelper(targetAmount = 1), CoroutineScope(Dispatchers.Unconfined))
+
+            val viewModel = GameViewModel(game, repository)
+
+            assertEquals(GamePhase.ReadyToPlay, viewModel.state.value.phase)
+        }
+
+    // Game is a Koin single: Menu abandoning field 5 and navigating to a fresh GameViewModel for
+    // Play must not let that new VM's own collector observe (and re-persist) the stale field 5
+    // still sitting in Game's state from the session the player just left.
+    @Test
+    fun `Play after Back to Menu does not reopen a field the menu already abandoned`() =
+        runTest {
+            val repository = RacyFakeGameRepository(Field(id = 5, score = 10, isClosed = false))
+            val game = Game(FakeSessionHelper(targetAmount = 1), CoroutineScope(Dispatchers.Unconfined))
+            game.start()
+            game.fieldRestored(Field(id = 5, score = 10, isClosed = false))
+            game.targetsRestored(
+                listOf(
+                    Target(id = 1, relatedFieldId = 5, columnId = 0, value = 5, appearsAtMs = 0, finishesAtMs = 1000),
+                ),
+            )
+            repository.updateField(Field(id = 5, score = 10, isClosed = true))
+
+            GameViewModel(game, repository)
+            advanceUntilIdle()
+
+            assertTrue(repository.fieldById(5)?.isClosed == true)
+            assertFalse(game.stateFlow.value.field.id == 5)
+        }
+
+    // A kill right after an action, with no pause in between, must lose nothing - a fresh VM
+    // reading the same repository restores identical score, values and stash.
+    @Test
+    fun `a VM dropped right after an action restores identically in a fresh VM`() =
+        runTest {
+            val target =
+                Target(id = 1, relatedFieldId = 5, columnId = 0, value = 9, appearsAtMs = 0, finishesAtMs = 100_000)
+            val seedField = Field(id = 5, level = 1, isClosed = false, currentBooster = Booster.SHIELD)
+            val repository = StatefulFakeGameRepository(seedField, listOf(target))
+            val firstGame =
+                Game(
+                    FakeSessionHelper(targetAmount = 1),
+                    CoroutineScope(Dispatchers.Unconfined),
+                    boostersEnabled = true,
+                )
+            GameViewModel(firstGame, repository)
+
+            firstGame.targetClicked(target.id)
+            firstGame.stashBooster()
+
+            val secondGame =
+                Game(
+                    FakeSessionHelper(targetAmount = 1),
+                    CoroutineScope(Dispatchers.Unconfined),
+                    boostersEnabled = true,
+                )
+            val secondViewModel = GameViewModel(secondGame, repository)
+
+            assertEquals(
+                8,
+                secondViewModel.state.value.targetList
+                    .single()
+                    .value,
+            )
+            assertEquals(firstGame.stateFlow.value.field.score, secondViewModel.state.value.field.score)
+            assertEquals(listOf(Booster.SHIELD), secondViewModel.state.value.field.boosterStash)
         }
 
     // MC-58 M4: dropping the game.events collector in init leaves this channel forever empty while

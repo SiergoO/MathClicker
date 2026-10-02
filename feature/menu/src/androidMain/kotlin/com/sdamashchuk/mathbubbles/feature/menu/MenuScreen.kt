@@ -61,6 +61,12 @@ fun MenuScreen(component: MenuComponent) {
                 modifier = Modifier.fillMaxWidth().weight(BUTTON_AREA_WEIGHT),
             ) {
                 BottomActions {
+                    if (state.value.hasUnfinishedField) {
+                        GlassButton(
+                            text = stringResource(id = R.string.menu_button_continue),
+                            onClick = { component.sendAction(MenuViewModel.Action.ButtonContinueClicked) },
+                        )
+                    }
                     GlassButton(
                         text = stringResource(id = R.string.menu_button_play),
                         onClick = { component.sendAction(MenuViewModel.Action.ButtonPlayClicked) },

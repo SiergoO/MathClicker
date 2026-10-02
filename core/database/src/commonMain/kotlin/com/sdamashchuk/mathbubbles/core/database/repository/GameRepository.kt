@@ -21,4 +21,12 @@ interface GameRepository {
     suspend fun getTargets(): List<Target>
 
     suspend fun refreshTargets(targets: List<Target>)
+
+    // The field and its targets land in one transaction, so a kill between the two writes can
+    // never leave a field paired with a target set it never actually had.
+    suspend fun saveFieldAndTargets(
+        field: Field,
+        targets: List<Target>,
+        replaceTargets: Boolean,
+    )
 }

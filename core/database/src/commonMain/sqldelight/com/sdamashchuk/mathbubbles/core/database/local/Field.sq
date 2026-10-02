@@ -1,15 +1,15 @@
-CREATE TABLE IF NOT EXISTS "field" (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `level` INTEGER NOT NULL, `score` INTEGER NOT NULL, `lifeCount` INTEGER NOT NULL, `bonusMultiplier` INTEGER NOT NULL, `currentOperationSign` TEXT NOT NULL, `currentOperationDigit` INTEGER NOT NULL, `nextOperationSign` TEXT NOT NULL, `nextOperationDigit` INTEGER NOT NULL, `isClosed` INTEGER AS kotlin.Boolean NOT NULL, `finishedAt` INTEGER, `gameTimeMs` INTEGER NOT NULL DEFAULT 0, `currentBooster` TEXT, `nextBooster` TEXT, `boosterStash` TEXT NOT NULL DEFAULT '', `boosterDropCounter` INTEGER NOT NULL DEFAULT 0, `hasDroppedBoosterThisSession` INTEGER AS kotlin.Boolean NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS "field" (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `level` INTEGER NOT NULL, `score` INTEGER NOT NULL, `lifeCount` INTEGER NOT NULL, `bonusMultiplier` INTEGER NOT NULL, `currentOperationSign` TEXT NOT NULL, `currentOperationDigit` INTEGER NOT NULL, `nextOperationSign` TEXT NOT NULL, `nextOperationDigit` INTEGER NOT NULL, `isClosed` INTEGER AS kotlin.Boolean NOT NULL, `finishedAt` INTEGER, `gameTimeMs` INTEGER NOT NULL DEFAULT 0, `currentBooster` TEXT, `nextBooster` TEXT, `boosterStash` TEXT NOT NULL DEFAULT '', `boosterDropCounter` INTEGER NOT NULL DEFAULT 0, `hasDroppedBoosterThisSession` INTEGER AS kotlin.Boolean NOT NULL DEFAULT 0, `timedEffectBooster` TEXT, `timedEffectRemainingMs` INTEGER NOT NULL DEFAULT 0, `timedEffectRate` REAL NOT NULL DEFAULT 1.0, `freezeTintEnvelope` REAL NOT NULL DEFAULT 0.0, `icePickArmedFireButton` INTEGER AS kotlin.Boolean NOT NULL DEFAULT 0, `icePickArmedStashIndex` INTEGER, `shieldActive` INTEGER AS kotlin.Boolean NOT NULL DEFAULT 0);
 
 -- id is nullable here even though the column is NOT NULL: SQLDelight treats an INTEGER PRIMARY
 -- KEY as a rowid alias and lets an explicit NULL bind trigger SQLite's autoincrement, matching
 -- Room's 0-means-"generate" default on this column.
 insertField:
-INSERT OR IGNORE INTO field (id, level, score, lifeCount, bonusMultiplier, currentOperationSign, currentOperationDigit, nextOperationSign, nextOperationDigit, isClosed, finishedAt, gameTimeMs, currentBooster, nextBooster, boosterStash, boosterDropCounter, hasDroppedBoosterThisSession)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+INSERT OR IGNORE INTO field (id, level, score, lifeCount, bonusMultiplier, currentOperationSign, currentOperationDigit, nextOperationSign, nextOperationDigit, isClosed, finishedAt, gameTimeMs, currentBooster, nextBooster, boosterStash, boosterDropCounter, hasDroppedBoosterThisSession, timedEffectBooster, timedEffectRemainingMs, timedEffectRate, freezeTintEnvelope, icePickArmedFireButton, icePickArmedStashIndex, shieldActive)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 updateField:
 UPDATE OR IGNORE field
-SET level = ?, score = ?, lifeCount = ?, bonusMultiplier = ?, currentOperationSign = ?, currentOperationDigit = ?, nextOperationSign = ?, nextOperationDigit = ?, isClosed = ?, finishedAt = ?, gameTimeMs = ?, currentBooster = ?, nextBooster = ?, boosterStash = ?, boosterDropCounter = ?, hasDroppedBoosterThisSession = ?
+SET level = ?, score = ?, lifeCount = ?, bonusMultiplier = ?, currentOperationSign = ?, currentOperationDigit = ?, nextOperationSign = ?, nextOperationDigit = ?, isClosed = ?, finishedAt = ?, gameTimeMs = ?, currentBooster = ?, nextBooster = ?, boosterStash = ?, boosterDropCounter = ?, hasDroppedBoosterThisSession = ?, timedEffectBooster = ?, timedEffectRemainingMs = ?, timedEffectRate = ?, freezeTintEnvelope = ?, icePickArmedFireButton = ?, icePickArmedStashIndex = ?, shieldActive = ?
 WHERE id = ?;
 
 getFieldById:

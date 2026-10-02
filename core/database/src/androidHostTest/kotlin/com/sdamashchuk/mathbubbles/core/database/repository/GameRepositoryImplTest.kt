@@ -32,8 +32,29 @@ class GameRepositoryImplTest {
             GameRepositoryImpl(
                 fieldDao,
                 TargetsDao(database.targetsQueries, Dispatchers.Unconfined),
+                database.fieldQueries,
+                database.targetsQueries,
+                Dispatchers.Unconfined,
             )
     }
+
+    // applyCombo never writes past MAX_COMBO_MULTIPLIER - 1 itself, so this only exercises the DAO's
+    // own defensive clamp against a row a migration or an external edit left out of range.
+    @Test
+    fun `a bonusMultiplier past the combo cap is clamped on read`() =
+        runTest {
+            repository.insertField(Field(bonusMultiplier = 99))
+
+            assertEquals(4, fieldDao.getFieldById(1).bonusMultiplier)
+        }
+
+    @Test
+    fun `a negative bonusMultiplier is clamped to zero on read`() =
+        runTest {
+            repository.insertField(Field(bonusMultiplier = -5))
+
+            assertEquals(0, fieldDao.getFieldById(1).bonusMultiplier)
+        }
 
     @Test
     fun `field round trip preserves every column including the boolean flags`() =
@@ -315,6 +336,69 @@ class GameRepositoryImplTest {
 
             assertEquals("boom", thrown?.message)
             assertEquals(original, repository.getTargets().sortedBy { it.id })
+        }
+
+    // The field and its targets must read back as a consistent pair: nothing short of a single
+    // transaction proves that, since two separate calls could always be interrupted between them.
+    @Test
+    fun `saveFieldAndTargets writes the field and its targets together`() =
+        runTest {
+            repository.insertField(Field(score = 0, level = 1))
+            val stored = fieldDao.getFieldById(1)
+            val advanced = stored.copy(score = 77, level = 2)
+            val targets = listOf(target(id = 1, value = 5, appearsAtMs = 1), target(id = 2, value = 6, appearsAtMs = 2))
+
+            repository.saveFieldAndTargets(advanced, targets, replaceTargets = true)
+
+            assertEquals(advanced, fieldDao.getFieldById(1))
+            assertEquals(targets, repository.getTargets().sortedBy { it.id })
+        }
+
+    @Test
+    fun `saveFieldAndTargets updates targets in place when replaceTargets is false`() =
+        runTest {
+            repository.insertField(Field())
+            repository.refreshTargets(listOf(target(id = 1, value = 9, appearsAtMs = 1)))
+            val stored = fieldDao.getFieldById(1)
+            val moved = listOf(target(id = 1, value = 2, appearsAtMs = 1))
+
+            repository.saveFieldAndTargets(stored.copy(score = 5), moved, replaceTargets = false)
+
+            assertEquals(5, fieldDao.getFieldById(1).score)
+            assertEquals(moved, repository.getTargets())
+        }
+
+    // Proves the field write and the target write share one transaction: a failure partway
+    // through the targets half must roll the field update back too, not leave it half-applied.
+    @Test
+    fun `saveFieldAndTargets rolls back the field update when the target write fails partway through`() =
+        runTest {
+            repository.insertField(Field(score = 0, level = 1))
+            val stored = fieldDao.getFieldById(1)
+            val advanced = stored.copy(score = 77, level = 2)
+
+            val poisoned =
+                object : AbstractList<Target>() {
+                    override val size = 2
+
+                    override fun get(index: Int): Target =
+                        if (index == 1) {
+                            throw IllegalStateException("boom")
+                        } else {
+                            target(id = 1, value = 5, appearsAtMs = 1)
+                        }
+                }
+
+            var thrown: IllegalStateException? = null
+            try {
+                repository.saveFieldAndTargets(advanced, poisoned, replaceTargets = true)
+            } catch (e: IllegalStateException) {
+                thrown = e
+            }
+
+            assertEquals("boom", thrown?.message)
+            assertEquals(stored, fieldDao.getFieldById(1))
+            assertTrue(repository.getTargets().isEmpty())
         }
 
     @Test

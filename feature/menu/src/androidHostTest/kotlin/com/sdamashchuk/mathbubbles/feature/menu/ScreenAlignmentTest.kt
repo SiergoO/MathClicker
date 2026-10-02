@@ -58,6 +58,7 @@ class ScreenAlignmentTest {
         val component =
             MenuComponent(
                 componentContext = DefaultComponentContext(lifecycle = LifecycleRegistry()),
+                gameRepository = FakeGameRepository(),
                 onPlayClicked = {},
                 onSettingsClicked = {},
             )

@@ -52,6 +52,7 @@ class RootComponent(
                 RootChild.Menu(
                     MenuComponent(
                         componentContext = componentContext,
+                        gameRepository = get<GameRepository>(),
                         onPlayClicked = { navigation.push(RootConfig.Game) },
                         onSettingsClicked = { navigation.push(RootConfig.Settings) },
                     ),

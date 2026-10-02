@@ -32,7 +32,7 @@ class TargetsDao(
 // fallenMs, appearanceDelayMs, lifetimeMs and isVisible are MC-72's dead columns: nothing on
 // Target carries them any more, so every write pins them to 0/false. They stay in the schema
 // because minSdk 24's SQLite has no DROP COLUMN (see 5.sqm).
-private fun TargetsQueries.insert(target: Target) =
+internal fun TargetsQueries.insert(target: Target) =
     insertTarget(
         id = target.id.toLong(),
         relatedFieldId = target.relatedFieldId.toLong(),
@@ -48,7 +48,7 @@ private fun TargetsQueries.insert(target: Target) =
         finishesAtMs = target.finishesAtMs,
     )
 
-private fun TargetsQueries.update(target: Target) =
+internal fun TargetsQueries.update(target: Target) =
     updateTarget(
         relatedFieldId = target.relatedFieldId.toLong(),
         columnId = target.columnId.toLong(),

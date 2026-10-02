@@ -115,8 +115,10 @@ class GameEffectsStateTest {
             assertFalse(game.stateFlow.value.effects.shieldActive)
         }
 
+    // A running effect is part of the field's own persisted columns, so a kill mid-effect restores
+    // at the same arm/activity state rather than losing it.
     @Test
-    fun `fieldRestored publishes no active effects even when one was armed before the restore`() =
+    fun `fieldRestored carries an armed ice pick back into the published state`() =
         runTest {
             val game =
                 Game(
@@ -135,8 +137,6 @@ class GameEffectsStateTest {
             assertTrue(game.stateFlow.value.effects.icePickArmed)
 
             game.fieldRestored(game.stateFlow.value.field)
-            assertFalse(game.stateFlow.value.effects.icePickArmed)
-            assertNull(game.stateFlow.value.effects.timedBooster)
-            assertFalse(game.stateFlow.value.effects.shieldActive)
+            assertTrue(game.stateFlow.value.effects.icePickArmed)
         }
 }

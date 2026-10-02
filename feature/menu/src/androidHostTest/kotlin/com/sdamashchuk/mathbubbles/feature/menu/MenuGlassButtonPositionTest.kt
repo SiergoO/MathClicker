@@ -31,6 +31,7 @@ class MenuGlassButtonPositionTest {
         val component =
             MenuComponent(
                 componentContext = DefaultComponentContext(lifecycle = LifecycleRegistry()),
+                gameRepository = FakeGameRepository(),
                 onPlayClicked = {},
                 onSettingsClicked = {},
             )
@@ -59,6 +60,7 @@ class MenuGlassButtonPositionTest {
         val component =
             MenuComponent(
                 componentContext = DefaultComponentContext(lifecycle = LifecycleRegistry()),
+                gameRepository = FakeGameRepository(),
                 onPlayClicked = {},
                 onSettingsClicked = {},
             )
@@ -90,6 +92,7 @@ class MenuGlassButtonPositionTest {
         val component =
             MenuComponent(
                 componentContext = DefaultComponentContext(lifecycle = LifecycleRegistry()),
+                gameRepository = FakeGameRepository(),
                 onPlayClicked = {},
                 onSettingsClicked = {},
             )

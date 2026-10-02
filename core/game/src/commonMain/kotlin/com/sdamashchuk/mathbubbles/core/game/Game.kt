@@ -18,12 +18,15 @@ import com.sdamashchuk.mathbubbles.core.game.objectmapper.ensureAlive
 import com.sdamashchuk.mathbubbles.core.game.objectmapper.freeStashSlot
 import com.sdamashchuk.mathbubbles.core.game.objectmapper.grantLife
 import com.sdamashchuk.mathbubbles.core.game.objectmapper.resetStreak
+import com.sdamashchuk.mathbubbles.core.game.objectmapper.restoredIcePickSource
+import com.sdamashchuk.mathbubbles.core.game.objectmapper.restoredTimedEffect
 import com.sdamashchuk.mathbubbles.core.game.objectmapper.rewind
 import com.sdamashchuk.mathbubbles.core.game.objectmapper.shortenAppearanceDelay
 import com.sdamashchuk.mathbubbles.core.game.objectmapper.stashCurrentBooster
 import com.sdamashchuk.mathbubbles.core.game.objectmapper.updateActionButtons
 import com.sdamashchuk.mathbubbles.core.game.objectmapper.updateLevel
 import com.sdamashchuk.mathbubbles.core.game.objectmapper.updateScore
+import com.sdamashchuk.mathbubbles.core.game.objectmapper.withEffectColumns
 import com.sdamashchuk.mathbubbles.core.game.scoring.performOperation
 import com.sdamashchuk.mathbubbles.core.model.BOOSTER_STASH_CAPACITY
 import com.sdamashchuk.mathbubbles.core.model.Booster
@@ -140,18 +143,32 @@ class Game(
             icePickArmedFrom = null
             shieldActive = false
             freezeTintEnvelope = 0.0
-            _stateFlow.value = _stateFlow.value.copy(field = recreateField(id), effects = currentEffects())
+            setState(recreateField(id), _stateFlow.value.targets)
         }
 
-    suspend fun createTargets() = mutex.withLock { createTargetsLocked() }
-
-    suspend fun fieldRestored(field: Field) =
+    // Drops back to field id 0 so a collector racing ahead of a new session's own establishment
+    // sees the existing id == 0 filter rather than a prior session's stale field.
+    suspend fun resetForNewSession() =
         mutex.withLock {
+            pendingOpeningPromotionCheck = false
             activeTimedEffect = null
             icePickArmedFrom = null
             shieldActive = false
             freezeTintEnvelope = 0.0
-            _stateFlow.value = _stateFlow.value.copy(field = field, effects = currentEffects())
+            _stateFlow.value = GameState(Field(), emptyList())
+        }
+
+    suspend fun createTargets() = mutex.withLock { createTargetsLocked() }
+
+    // The field's own effect columns are the sole record of a running effect, so this is where a
+    // persisted Freeze/Rewind, tint, armed ice pick or shield comes back.
+    suspend fun fieldRestored(field: Field) =
+        mutex.withLock {
+            activeTimedEffect = field.restoredTimedEffect()
+            icePickArmedFrom = field.restoredIcePickSource()
+            shieldActive = field.shieldActive
+            freezeTintEnvelope = field.freezeTintEnvelope
+            setState(field, _stateFlow.value.targets)
         }
 
     suspend fun targetsRestored(targets: List<Target>) =
@@ -180,7 +197,7 @@ class Game(
                         IcePickSource.FireButton -> promoteAfterIcePick(current, scoredField, updatedTargets)
                         is IcePickSource.StashSlot -> scoredField.freeStashSlot(armedFrom.index)
                     }
-                _stateFlow.value = GameState(updatedField, updatedTargets, currentEffects())
+                setState(updatedField, updatedTargets)
                 _events.tryEmit(GameEvent.TargetZeroed(id, awarded, viaIcePick = true))
                 return@withLock
             }
@@ -192,7 +209,7 @@ class Game(
             val updatedTarget = updatedTargets.first { it.id == id }
             val awarded = if (updatedTarget.isProfitable) 1 else 0
             val updatedField = if (updatedTarget.isProfitable) current.field.updateScore(1) else current.field
-            _stateFlow.value = GameState(updatedField, updatedTargets, currentEffects())
+            setState(updatedField, updatedTargets)
             if (previousValue > 0 && updatedTarget.value == 0) {
                 _events.tryEmit(GameEvent.TargetZeroed(id, awarded))
             }
@@ -245,7 +262,7 @@ class Game(
             comboField
                 .updateActionButtons(nextOperationSign, nextOperationDigit, drop.booster, drop.counter)
                 .updateScore(gained)
-        _stateFlow.value = GameState(updatedField, updatedTargets, currentEffects())
+        setState(updatedField, updatedTargets)
         _events.tryEmit(GameEvent.OperationResolved(gained, comboField.bonusMultiplier))
     }
 
@@ -253,7 +270,7 @@ class Game(
         val booster = current.field.currentBooster ?: return
         if (booster == Booster.ICE_PICK) {
             icePickArmedFrom = IcePickSource.FireButton
-            _stateFlow.value = current.copy(effects = currentEffects())
+            setState(current.field, current.targets)
             return
         }
         applyBoosterEffect(booster)
@@ -262,7 +279,7 @@ class Game(
             getNextSignAndDigit(current.targets, current.field.level, current.field.gameTimeMs)
         val updatedField =
             current.field.updateActionButtons(nextOperationSign, nextOperationDigit, drop.booster, drop.counter)
-        _stateFlow.value = GameState(updatedField, current.targets, currentEffects())
+        setState(updatedField, current.targets)
     }
 
     private fun promoteAfterIcePick(
@@ -289,7 +306,7 @@ class Game(
                 getNextSignAndDigit(current.targets, stashedField.level, stashedField.gameTimeMs)
             val promotedField =
                 stashedField.updateActionButtons(nextOperationSign, nextOperationDigit, drop.booster, drop.counter)
-            _stateFlow.value = GameState(promotedField, current.targets, currentEffects())
+            setState(promotedField, current.targets)
         }
 
     suspend fun applyBoosterFromStash(slotIndex: Int) =
@@ -298,13 +315,12 @@ class Game(
             val booster = current.field.boosterStash.getOrNull(slotIndex) ?: return@withLock
             if (booster == Booster.ICE_PICK) {
                 icePickArmedFrom = IcePickSource.StashSlot(slotIndex)
-                _stateFlow.value = current.copy(effects = currentEffects())
+                setState(current.field, current.targets)
                 return@withLock
             }
             applyBoosterEffect(booster)
             shiftArmedSlotAfterRemoving(slotIndex)
-            _stateFlow.value =
-                current.copy(field = current.field.freeStashSlot(slotIndex), effects = currentEffects())
+            setState(current.field.freeStashSlot(slotIndex), current.targets)
         }
 
     // The stash shifts left on removal, so the armed slot index must follow it.
@@ -322,8 +338,19 @@ class Game(
         mutex.withLock {
             if (icePickArmedFrom == null) return@withLock
             icePickArmedFrom = null
-            _stateFlow.value = _stateFlow.value.copy(effects = currentEffects())
+            setState(_stateFlow.value.field, _stateFlow.value.targets)
         }
+
+    // The single chokepoint every mutator publishes a new snapshot through, so the field's effect
+    // columns and the computed ActiveEffects can never drift out of sync with each other.
+    private fun setState(
+        field: Field,
+        targets: List<Target>,
+    ) {
+        val persistedField =
+            field.withEffectColumns(activeTimedEffect, freezeTintEnvelope, icePickArmedFrom, shieldActive, NEUTRAL_RATE)
+        _stateFlow.value = GameState(persistedField, targets, currentEffects())
+    }
 
     private fun currentEffects(): ActiveEffects {
         val timed = activeTimedEffect
@@ -434,13 +461,12 @@ class Game(
         targets: List<Target>,
     ): Boolean {
         val leveledUp = targets.none { it.isActive } && !field.isClosed
-        _stateFlow.value =
-            if (leveledUp) {
-                val leveledField = field.updateLevel()
-                GameState(leveledField, recreateTargets(leveledField), currentEffects())
-            } else {
-                GameState(field, targets, currentEffects())
-            }
+        if (leveledUp) {
+            val leveledField = field.updateLevel()
+            setState(leveledField, recreateTargets(leveledField))
+        } else {
+            setState(field, targets)
+        }
         return leveledUp
     }
 
@@ -566,7 +592,7 @@ class Game(
             val current = _stateFlow.value.field
             val granted = current.grantLife()
             if (granted.lifeCount > current.lifeCount) {
-                _stateFlow.value = _stateFlow.value.copy(field = granted)
+                setState(granted, _stateFlow.value.targets)
                 _events.tryEmit(GameEvent.LifeGranted(granted.lifeCount))
             }
         }
@@ -579,7 +605,7 @@ class Game(
             // A closed field must not level up: tick can close it on a step that leaves other targets active.
             if (current.targets.none { it.isActive } && !current.field.isClosed) {
                 val updatedField = current.field.updateLevel()
-                _stateFlow.value = GameState(updatedField, recreateTargets(updatedField), currentEffects())
+                setState(updatedField, recreateTargets(updatedField))
                 _events.tryEmit(GameEvent.LevelUp(updatedField.level))
             }
         }
@@ -588,8 +614,7 @@ class Game(
     private fun createTargetsLocked() {
         val field = _stateFlow.value.field
         val targets = recreateTargets(field)
-        _stateFlow.value =
-            _stateFlow.value.copy(field = ensureOpeningOperationSucceeds(field, targets), targets = targets)
+        setState(ensureOpeningOperationSucceeds(field, targets), targets)
     }
 
     // Validated against the moment the targets first become visible, not against now: nothing is visible

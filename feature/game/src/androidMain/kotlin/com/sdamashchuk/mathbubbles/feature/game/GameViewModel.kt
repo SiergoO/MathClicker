@@ -36,6 +36,10 @@ class GameViewModel(
     private val _feedback = Channel<FeedbackEffect>(capacity = Channel.UNLIMITED)
     val feedback: ReceiveChannel<FeedbackEffect> = _feedback
 
+    // False until updateSession() finishes establishing a session. Game is a Koin single, so a
+    // collector pass that lands before that point is reading a prior session's field, not this one.
+    private var sessionEstablished = false
+
     init {
         handleAction()
         viewModelScope.launch {
@@ -73,20 +77,25 @@ class GameViewModel(
                                 state.value.phase
                             },
                     )
-                if (fieldChanged) {
-                    gameRepository.updateField(field)
-                }
-                if (targetsChanged && shouldPersistTargets(previousTargets, targets)) {
-                    val previousIds = previousTargets.map { it.id }.toSet()
-                    if (shouldRefreshTargets(previousIds, targets.map { it.id }.toSet())) {
-                        gameRepository.refreshTargets(targets)
-                    } else {
-                        gameRepository.updateTargets(targets)
+                if (sessionEstablished) {
+                    val targetsReallyChanged = targetsChanged && shouldPersistTargets(previousTargets, targets)
+                    if (fieldChanged && targetsReallyChanged) {
+                        val previousIds = previousTargets.map { it.id }.toSet()
+                        val refresh = shouldRefreshTargets(previousIds, targets.map { it.id }.toSet())
+                        gameRepository.saveFieldAndTargets(field, targets, refresh)
+                    } else if (fieldChanged) {
+                        gameRepository.updateField(field)
+                    } else if (targetsReallyChanged) {
+                        val previousIds = previousTargets.map { it.id }.toSet()
+                        if (shouldRefreshTargets(previousIds, targets.map { it.id }.toSet())) {
+                            gameRepository.refreshTargets(targets)
+                        } else {
+                            gameRepository.updateTargets(targets)
+                        }
                     }
-                }
-                // After updateField: the just-finished run has to be on disk before either query below can see it.
-                if (justClosed) {
-                    loadResults()
+                    if (justClosed) {
+                        loadResults()
+                    }
                 }
             }
         }
@@ -184,6 +193,8 @@ class GameViewModel(
     }
 
     private suspend fun updateSession() {
+        sessionEstablished = false
+        game.resetForNewSession()
         with(gameRepository) {
             val unfinishedField = getUnfinishedField()
             val unfinishedTargets = getTargets()
@@ -203,8 +214,10 @@ class GameViewModel(
                 } else {
                     game.targetsRestored(unfinishedTargets)
                 }
+                _state.value = state.value.copy(phase = GamePhase.Paused)
             }
         }
+        sessionEstablished = true
     }
 
     sealed class Action {

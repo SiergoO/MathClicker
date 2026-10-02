@@ -80,7 +80,7 @@ class MathBubblesDatabaseMigrationTest {
 
             MathBubblesDatabase.Schema.migrate(driver, oldVersion = 1, newVersion = MathBubblesDatabase.Schema.version)
 
-            assertEquals(7L, MathBubblesDatabase.Schema.version)
+            assertEquals(8L, MathBubblesDatabase.Schema.version)
             val database = MathBubblesDatabase(driver)
             val restoredField = FieldDao(database.fieldQueries, Dispatchers.Unconfined).getFieldById(1)
             assertEquals(
@@ -231,6 +231,44 @@ class MathBubblesDatabaseMigrationTest {
             assertEquals(emptyList<Booster>(), restoredField.boosterStash)
             assertEquals(0, restoredField.boosterDropCounter)
             assertFalse(restoredField.hasDroppedBoosterThisSession)
+        }
+
+    // The version-7 shape (post-6.sqm): booster columns exist, effect columns do not yet.
+    private val preEffectColumnsFieldTable =
+        "CREATE TABLE \"field\" (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `level` INTEGER NOT NULL, " +
+            "`score` INTEGER NOT NULL, `lifeCount` INTEGER NOT NULL, `bonusMultiplier` INTEGER NOT NULL, " +
+            "`currentOperationSign` TEXT NOT NULL, `currentOperationDigit` INTEGER NOT NULL, " +
+            "`nextOperationSign` TEXT NOT NULL, `nextOperationDigit` INTEGER NOT NULL, " +
+            "`isClosed` INTEGER NOT NULL, `finishedAt` INTEGER, `gameTimeMs` INTEGER NOT NULL DEFAULT 0, " +
+            "`currentBooster` TEXT, `nextBooster` TEXT, `boosterStash` TEXT NOT NULL DEFAULT '', " +
+            "`boosterDropCounter` INTEGER NOT NULL DEFAULT 0, " +
+            "`hasDroppedBoosterThisSession` INTEGER NOT NULL DEFAULT 0)"
+
+    @Test
+    fun `migrating from version 7 to 8 gives an existing field row a neutral effect state`() =
+        runTest {
+            val driver = JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY)
+            driver.execute(null, "PRAGMA user_version = 7", 0)
+            driver.execute(null, preEffectColumnsFieldTable, 0)
+            driver.execute(
+                null,
+                "INSERT INTO field (id, level, score, lifeCount, bonusMultiplier, currentOperationSign, " +
+                    "currentOperationDigit, nextOperationSign, nextOperationDigit, isClosed, gameTimeMs) " +
+                    "VALUES (1, 1, 0, 3, 0, '${OperationSign.DIVISION.sign}', 0, '${OperationSign.DIVISION.sign}', 0, 0, 0)",
+                0,
+            )
+
+            MathBubblesDatabase.Schema.migrate(driver, oldVersion = 7, newVersion = MathBubblesDatabase.Schema.version)
+
+            val database = MathBubblesDatabase(driver)
+            val restoredField = FieldDao(database.fieldQueries, Dispatchers.Unconfined).getFieldById(1)
+            assertNull(restoredField.timedEffectBooster)
+            assertEquals(0, restoredField.timedEffectRemainingMs)
+            assertEquals(1.0, restoredField.timedEffectRate, 0.0)
+            assertEquals(0.0, restoredField.freezeTintEnvelope, 0.0)
+            assertFalse(restoredField.icePickArmedFireButton)
+            assertNull(restoredField.icePickArmedStashIndex)
+            assertFalse(restoredField.shieldActive)
         }
 
     // relatedFieldId is never queried, so several field rows with differing geometry all feed the

@@ -25,5 +25,5 @@ val databaseModule =
         single<TargetsQueries> { get<MathBubblesDatabase>().targetsQueries }
         single { FieldDao(get(), get()) }
         single { TargetsDao(get(), get()) }
-        single { GameRepositoryImpl(get(), get()) } bind GameRepository::class
+        single { GameRepositoryImpl(get(), get(), get(), get(), get()) } bind GameRepository::class
     }

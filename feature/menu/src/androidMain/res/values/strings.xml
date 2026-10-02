@@ -3,6 +3,7 @@
     <string name="logo_wordmark_line_1">MATH</string>
     <string name="logo_wordmark_line_2">BUBBLES</string>
 
+    <string name="menu_button_continue">CONTINUE</string>
     <string name="menu_button_play">PLAY</string>
     <string name="menu_button_settings">SETTINGS</string>
     <string name="settings_screen_title">Settings</string>

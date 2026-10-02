@@ -2,12 +2,21 @@ package com.sdamashchuk.mathbubbles.core.database.repository
 
 import com.sdamashchuk.mathbubbles.core.database.dao.FieldDao
 import com.sdamashchuk.mathbubbles.core.database.dao.TargetsDao
+import com.sdamashchuk.mathbubbles.core.database.dao.insert
+import com.sdamashchuk.mathbubbles.core.database.dao.update
+import com.sdamashchuk.mathbubbles.core.database.local.FieldQueries
+import com.sdamashchuk.mathbubbles.core.database.local.TargetsQueries
 import com.sdamashchuk.mathbubbles.core.model.Field
 import com.sdamashchuk.mathbubbles.core.model.Target
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.withContext
 
 class GameRepositoryImpl(
     private val fieldDao: FieldDao,
     private val targetsDao: TargetsDao,
+    private val fieldQueries: FieldQueries,
+    private val targetsQueries: TargetsQueries,
+    private val dispatcher: CoroutineDispatcher,
 ) : GameRepository {
     override suspend fun insertField(field: Field) {
         fieldDao.insertField(field)
@@ -33,5 +42,21 @@ class GameRepositoryImpl(
 
     override suspend fun refreshTargets(targets: List<Target>) {
         targetsDao.refreshTargets(targets)
+    }
+
+    override suspend fun saveFieldAndTargets(
+        field: Field,
+        targets: List<Target>,
+        replaceTargets: Boolean,
+    ) = withContext(dispatcher) {
+        fieldQueries.transaction {
+            fieldQueries.update(field)
+            if (replaceTargets) {
+                targetsQueries.deleteTargets()
+                targets.forEach { targetsQueries.insert(it) }
+            } else {
+                targets.forEach { targetsQueries.update(it) }
+            }
+        }
     }
 }

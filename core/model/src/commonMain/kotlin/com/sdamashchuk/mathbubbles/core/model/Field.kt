@@ -27,6 +27,15 @@ data class Field(
     // must reach identical gameTimeMs too. Long: 999 levels of tens of seconds each outlives Int's
     // ~24-day range.
     val gameTimeMs: Long = 0,
+    // A running Freeze/Rewind, its carried clock rate and tint envelope, the armed ice pick's
+    // source and an active shield, so a kill mid-effect restores at the same intensity.
+    val timedEffectBooster: Booster? = null,
+    val timedEffectRemainingMs: Int = 0,
+    val timedEffectRate: Double = 1.0,
+    val freezeTintEnvelope: Double = 0.0,
+    val icePickArmedFireButton: Boolean = false,
+    val icePickArmedStashIndex: Int? = null,
+    val shieldActive: Boolean = false,
 ) {
     val appliedMultiplier: Int
         get() = bonusMultiplier + 1

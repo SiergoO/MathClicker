@@ -14,6 +14,8 @@ kotlin {
 
     sourceSets {
         androidMain.dependencies {
+            implementation(projects.core.model)
+            implementation(projects.core.database)
             implementation(projects.core.ui)
             implementation(projects.core.component)
         }

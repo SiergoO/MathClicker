@@ -8,6 +8,8 @@ import kotlinx.coroutines.test.runTest
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -243,8 +245,10 @@ class GameBoosterEffectTest {
             assertTrue(game.stateFlow.value.field.gameTimeMs > 0)
         }
 
+    // An active shield and an armed ice pick are part of the field's persisted columns, so a
+    // restore carries both forward instead of clearing them.
     @Test
-    fun `fieldRestored clears an active shield and an armed ice pick so neither survives the restore`() =
+    fun `fieldRestored carries an active shield and an armed ice pick through the restore`() =
         runTest {
             val game =
                 Game(
@@ -274,14 +278,98 @@ class GameBoosterEffectTest {
             )
 
             repeat(5) { game.tick(50) } // clears id 1's 100ms lifetime
-            assertEquals(startingLives - 1, game.stateFlow.value.field.lifeCount, "the shield survived the restore")
+            assertEquals(startingLives, game.stateFlow.value.field.lifeCount, "the shield did not survive the restore")
 
             game.targetClicked(2)
             val tapped =
                 game.stateFlow.value.targets
                     .first { it.id == 2 }
-            assertEquals(4, tapped.value, "the ice pick survived the restore")
-            assertTrue(tapped.isActive)
+            assertEquals(0, tapped.value, "the ice pick did not survive the restore")
+            assertFalse(tapped.isActive)
+        }
+
+    // A persisted shield and a persisted freeze (with its remaining real-time ms) both come back
+    // through fieldRestored, exactly as if the field had never stopped running.
+    @Test
+    fun `a restored shield absorbs the next breakout and a restored freeze ends after its remaining ms`() =
+        runTest {
+            val game =
+                Game(
+                    FakeSessionHelper(targetAmount = 1, targetValue = 5),
+                    backgroundScope,
+                    Random(1),
+                    boostersEnabled = true,
+                )
+            game.createField(1)
+            game.targetsRestored(listOf(scheduledTarget(id = 1, value = 5, lifetimeMs = 100)))
+            game.fieldRestored(
+                game.stateFlow.value.field.copy(
+                    shieldActive = true,
+                    timedEffectBooster = Booster.FREEZE,
+                    timedEffectRemainingMs = 1200,
+                    timedEffectRate = 0.0,
+                ),
+            )
+
+            assertTrue(game.stateFlow.value.effects.shieldActive)
+            assertEquals(Booster.FREEZE, game.stateFlow.value.effects.timedBooster)
+            val startingLives = game.stateFlow.value.field.lifeCount
+
+            repeat(4) { game.tick(250) } // 1000ms of the 1200ms budget
+            game.tick(199)
+            assertEquals(Booster.FREEZE, game.stateFlow.value.effects.timedBooster, "the freeze ended early")
+
+            game.tick(1) // crosses the 1200ms mark exactly
+            assertNull(game.stateFlow.value.effects.timedBooster, "the freeze outlived its restored remaining ms")
+
+            repeat(10) { game.tick(50) } // lets the now-resumed clock reach the target's 100ms lifetime
+            assertEquals(startingLives, game.stateFlow.value.field.lifeCount, "the restored shield did not absorb")
+            assertFalse(game.stateFlow.value.effects.shieldActive)
+        }
+
+    // The carried rate, not only the remaining ms, decides intensity - a freeze re-applied mid-hold
+    // restores at full intensity rather than ramping back up from neutral.
+    @Test
+    fun `fieldRestored carries a re-applied freeze's rate back at full intensity`() =
+        runTest {
+            val game =
+                Game(
+                    FakeSessionHelper(targetAmount = 1, targetValue = 1_000_000),
+                    backgroundScope,
+                    Random(1),
+                    boostersEnabled = true,
+                )
+            game.createField(1)
+            game.targetsRestored(listOf(scheduledTarget(id = 1, value = 1_000_000, lifetimeMs = 1_000_000)))
+            game.fieldRestored(
+                game.stateFlow.value.field.copy(
+                    timedEffectBooster = Booster.FREEZE,
+                    timedEffectRemainingMs = 1500,
+                    timedEffectRate = 0.0,
+                ),
+            )
+
+            assertEquals(1f, game.stateFlow.value.effects.intensity)
+        }
+
+    @Test
+    fun `fieldRestored mid ramp-out restores the partial freeze tint rather than a forced full or neutral value`() =
+        runTest {
+            val game =
+                Game(
+                    FakeSessionHelper(targetAmount = 1, targetValue = 1_000_000),
+                    backgroundScope,
+                    Random(1),
+                    boostersEnabled = true,
+                )
+            game.createField(1)
+            game.targetsRestored(listOf(scheduledTarget(id = 1, value = 1_000_000, lifetimeMs = 1_000_000)))
+            game.fieldRestored(
+                game.stateFlow.value.field
+                    .copy(freezeTintEnvelope = 0.42),
+            )
+
+            assertEquals(0.42f, game.stateFlow.value.effects.freezeTintIntensity)
         }
 
     @Test
