@@ -21,16 +21,13 @@ class GameEventTest {
         runTest {
             val game = Game(FakeSessionHelper(targetAmount = 3, targetValue = 1), backgroundScope, Random(1))
             game.createField(1)
-            game.createTargets()
+            val visibleTargets = (1..3).map { scheduledTarget(id = it, columnId = it - 1, value = 1) }
+            game.targetsRestored(visibleTargets)
             testScheduler.runCurrent()
             val events = mutableListOf<GameEvent>()
             backgroundScope.launch { game.events.collect { events.add(it) } }
             testScheduler.runCurrent()
-            val (idA, idB) =
-                game.stateFlow.value.targets
-                    .sortedBy { it.id }
-                    .take(2)
-                    .map { it.id }
+            val (idA, idB) = visibleTargets.take(2).map { it.id }
 
             // Two separate locked calls - exactly what two rapid taps in the same UI frame are - not
             // one call touching two targets: a stateFlow diff would only ever see the final value.
@@ -220,7 +217,7 @@ class GameEventTest {
             testScheduler.runCurrent()
 
             assertTrue(game.stateFlow.value.field.isClosed)
-            assertEquals(3 - 40, game.stateFlow.value.field.lifeCount)
+            assertEquals(0, game.stateFlow.value.field.lifeCount)
 
             // This same tick also empties the board (all 40 targets went inactive), but MC-59 means
             // a field this closed does not level up - so only 41 events (40 TargetBrokeOut + this

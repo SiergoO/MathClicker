@@ -1,6 +1,7 @@
 package com.sdamashchuk.mathbubbles.core.game
 
 import com.sdamashchuk.mathbubbles.core.game.helper.SessionHelper
+import com.sdamashchuk.mathbubbles.core.game.helper.advanceRateSegment
 import com.sdamashchuk.mathbubbles.core.game.model.ActiveEffects
 import com.sdamashchuk.mathbubbles.core.game.model.BoosterDropContext
 import com.sdamashchuk.mathbubbles.core.game.model.BoosterDropResult
@@ -179,12 +180,13 @@ class Game(
     suspend fun targetClicked(id: Int) =
         mutex.withLock {
             val current = _stateFlow.value
+            if (current.field.isClosed) return@withLock
+            val target = current.targets.firstOrNull { it.id == id }
+            if (target == null || !target.isActive || !target.isVisible(current.field.gameTimeMs)) {
+                return@withLock
+            }
             val armedFrom = icePickArmedFrom
             if (armedFrom != null) {
-                val target = current.targets.firstOrNull { it.id == id }
-                if (target == null || !target.isActive || !target.isVisible(current.field.gameTimeMs)) {
-                    return@withLock
-                }
                 icePickArmedFrom = null
                 val awarded = if (target.isProfitable) target.value else 0
                 val updatedTargets =
@@ -201,7 +203,7 @@ class Game(
                 _events.tryEmit(GameEvent.TargetZeroed(id, awarded, viaIcePick = true))
                 return@withLock
             }
-            val previousValue = current.targets.first { it.id == id }.value
+            val previousValue = target.value
             val updatedTargets =
                 current.targets
                     .decrementValue(id, 1)
@@ -218,6 +220,7 @@ class Game(
     suspend fun fireButtonClicked() =
         mutex.withLock {
             val current = _stateFlow.value
+            if (current.field.isClosed) return@withLock
             when (val action = current.field.currentAction) {
                 is FieldAction.Operation -> fireOperationLocked(current, action)
                 is FieldAction.BoosterAction -> fireBoosterLocked(current)
@@ -297,6 +300,7 @@ class Game(
     suspend fun stashBooster() =
         mutex.withLock {
             val current = _stateFlow.value
+            if (current.field.isClosed) return@withLock
             val booster = current.field.currentBooster ?: return@withLock
             if (booster == Booster.ICE_PICK && icePickArmedFrom == IcePickSource.FireButton) return@withLock
             if (current.field.boosterStash.size >= BOOSTER_STASH_CAPACITY) return@withLock
@@ -312,7 +316,9 @@ class Game(
     suspend fun applyBoosterFromStash(slotIndex: Int) =
         mutex.withLock {
             val current = _stateFlow.value
+            if (current.field.isClosed) return@withLock
             val booster = current.field.boosterStash.getOrNull(slotIndex) ?: return@withLock
+            if (booster == Booster.SHIELD && shieldActive) return@withLock
             if (booster == Booster.ICE_PICK) {
                 icePickArmedFrom = IcePickSource.StashSlot(slotIndex)
                 setState(current.field, current.targets)
@@ -479,7 +485,7 @@ class Game(
         var livesLeft = startingLives
         brokenOutIds.forEachIndexed { index, id ->
             val absorbedThisOne = shieldConsumed && index == 0
-            if (!absorbedThisOne) livesLeft -= 1
+            if (!absorbedThisOne) livesLeft = (livesLeft - 1).coerceAtLeast(0)
             _events.tryEmit(GameEvent.TargetBrokeOut(id, livesLeft, shieldAbsorbed = absorbedThisOne))
         }
         if (leveledUp) {
@@ -528,26 +534,6 @@ class Game(
             current.field.advanceClock(actualStepMs)
         } else {
             current.field.rewind((-actualStepMs).toLong())
-        }
-    }
-
-    // Split at the moment the rate reaches [target] mid-segment, or a short segment inside a long
-    // tick either over- or undershoots the average.
-    private fun advanceRateSegment(
-        rate: Double,
-        target: Double,
-        speedPerMs: Double,
-        durationMs: Int,
-    ): Pair<Double, Double> {
-        val delta = target - rate
-        return if (durationMs <= 0 || speedPerMs <= 0.0 || delta == 0.0) {
-            rate to rate * durationMs.coerceAtLeast(0)
-        } else {
-            val msToTarget = (abs(delta) / speedPerMs).coerceAtMost(durationMs.toDouble())
-            val rateAtTarget = rate + (if (delta > 0) speedPerMs else -speedPerMs) * msToTarget
-            val rampStepMs = (rate + rateAtTarget) / 2.0 * msToTarget
-            val holdMs = durationMs - msToTarget
-            rateAtTarget to rampStepMs + rateAtTarget * holdMs
         }
     }
 

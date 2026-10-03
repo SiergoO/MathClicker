@@ -5,7 +5,7 @@ import com.sdamashchuk.mathbubbles.core.model.Field
 import com.sdamashchuk.mathbubbles.core.model.Target
 
 class FakeGameRepository(
-    private var unfinishedField: Field? = null,
+    var unfinishedField: Field? = null,
 ) : GameRepository {
     val updateFieldCalls = mutableListOf<Field>()
 

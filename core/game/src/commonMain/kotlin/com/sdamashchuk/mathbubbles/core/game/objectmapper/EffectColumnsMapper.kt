@@ -2,6 +2,7 @@ package com.sdamashchuk.mathbubbles.core.game.objectmapper
 
 import com.sdamashchuk.mathbubbles.core.game.model.IcePickSource
 import com.sdamashchuk.mathbubbles.core.game.model.TimedBoosterEffect
+import com.sdamashchuk.mathbubbles.core.model.Booster
 import com.sdamashchuk.mathbubbles.core.model.Field
 
 // The Field <-> Game-private-state translation for persisted effects, kept as pure functions so
@@ -13,9 +14,17 @@ internal fun Field.restoredTimedEffect(): TimedBoosterEffect? =
 internal fun Field.restoredIcePickSource(): IcePickSource? {
     val armedStashIndex = icePickArmedStashIndex
     return when {
-        icePickArmedFireButton -> IcePickSource.FireButton
-        armedStashIndex != null -> IcePickSource.StashSlot(armedStashIndex)
-        else -> null
+        icePickArmedFireButton -> {
+            IcePickSource.FireButton
+        }
+
+        armedStashIndex != null && boosterStash.getOrNull(armedStashIndex) == Booster.ICE_PICK -> {
+            IcePickSource.StashSlot(armedStashIndex)
+        }
+
+        else -> {
+            null
+        }
     }
 }
 

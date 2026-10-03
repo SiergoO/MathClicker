@@ -209,6 +209,60 @@ private class RacyFakeGameRepository(
     }
 }
 
+// An open-field write takes longer than a closing write, the order a real database can finish
+// two overlapping writes in.
+private class DelayedWriteGameRepository(
+    initialField: Field,
+    private var targets: List<Target>,
+) : GameRepository {
+    private val fields = mutableMapOf(initialField.id to initialField)
+
+    fun fieldById(id: Int): Field? = fields[id]
+
+    override suspend fun insertField(field: Field) {
+        fields[field.id] = field
+    }
+
+    override suspend fun updateField(field: Field) {
+        delay(if (field.isClosed) CLOSING_WRITE_MS else OPEN_WRITE_MS)
+        fields[field.id] = field
+    }
+
+    override suspend fun getUnfinishedField(): Field? = fields.values.filter { !it.isClosed }.maxByOrNull { it.id }
+
+    override suspend fun getNextFieldId(): Int = (fields.keys.maxOrNull() ?: 0) + 1
+
+    override suspend fun updateTargets(targets: List<Target>) {
+        this.targets = targets
+    }
+
+    override suspend fun getTargets(): List<Target> = targets
+
+    override suspend fun refreshTargets(targets: List<Target>) {
+        delay(TARGET_WRITE_MS)
+        this.targets = targets
+    }
+
+    override suspend fun getRecentClosedFields(): List<Field> = emptyList()
+
+    override suspend fun getBestClosedField(): Field? = null
+
+    override suspend fun saveFieldAndTargets(
+        field: Field,
+        targets: List<Target>,
+        replaceTargets: Boolean,
+    ) {
+        updateField(field)
+        if (replaceTargets) refreshTargets(targets) else updateTargets(targets)
+    }
+
+    private companion object {
+        const val OPEN_WRITE_MS = 100L
+        const val CLOSING_WRITE_MS = 10L
+        const val TARGET_WRITE_MS = 1L
+    }
+}
+
 @OptIn(ExperimentalCoroutinesApi::class)
 class GameViewModelTest {
     @Before
@@ -568,5 +622,43 @@ class GameViewModelTest {
 
             val received = viewModel.feedback.tryReceive().getOrNull()
             assertEquals(effectFor(GameEvent.TargetZeroed(id = target.id, awarded = 1)), received)
+        }
+
+    @Test
+    fun `restart keeps the abandoned field closed when a slower open write is still pending`() =
+        runTest {
+            val target =
+                Target(id = 1, relatedFieldId = 5, columnId = 0, value = 9, appearsAtMs = 0, finishesAtMs = 1_000_000)
+            val repository = DelayedWriteGameRepository(Field(id = 5, isClosed = false), listOf(target))
+            val game = Game(FakeSessionHelper(targetAmount = 1), CoroutineScope(Dispatchers.Unconfined))
+            val viewModel = GameViewModel(game, repository, NoOpLogger)
+            advanceUntilIdle()
+
+            game.tick(10)
+            viewModel.sendAction(GameViewModel.Action.RestartGame)
+            advanceUntilIdle()
+
+            assertTrue(repository.fieldById(5)?.isClosed == true)
+        }
+
+    @Test
+    fun `restoring an open field with zero targets persists the regenerated opening operation`() =
+        runTest {
+            val staleField =
+                Field(
+                    id = 5,
+                    currentOperationSign = OperationSign.DIVISION,
+                    currentOperationDigit = 3,
+                    isClosed = false,
+                )
+            val repository = DelayedWriteGameRepository(staleField, emptyList())
+            val game = Game(FakeSessionHelper(targetAmount = 2), CoroutineScope(Dispatchers.Unconfined))
+
+            GameViewModel(game, repository, NoOpLogger)
+            advanceUntilIdle()
+
+            val stored = repository.fieldById(5)
+            assertEquals(game.stateFlow.value.field, stored)
+            assertEquals(2, stored?.currentOperationDigit)
         }
 }

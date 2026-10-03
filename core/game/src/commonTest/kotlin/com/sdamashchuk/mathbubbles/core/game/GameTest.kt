@@ -203,26 +203,6 @@ class GameTest {
         }
 
     @Test
-    fun `a field already closed keeps its level when the last active target is tapped to zero`() =
-        runTest {
-            val game = Game(FakeSessionHelper(targetAmount = 1, targetValue = 1), backgroundScope, Random(27))
-            game.start()
-            game.fieldRestored(Field(id = 1, level = 4, lifeCount = 0, isClosed = true))
-            val soleTarget = scheduledTarget(id = 1, value = 1, lifetimeMs = 1000)
-            game.targetsRestored(listOf(soleTarget))
-            testScheduler.runCurrent()
-
-            // Not every breakout that closes the field also empties the board (other targets can
-            // still be active); this reaches the same dead-session state through targetClicked's
-            // own retirement path instead of a breakout, exercising activeTargetsAbsent() rather
-            // than tick().
-            game.targetClicked(soleTarget.id)
-            testScheduler.runCurrent()
-
-            assertEquals(4, game.stateFlow.value.field.level)
-        }
-
-    @Test
     fun `a field already closed does not recreate targets when the last active target is tapped to zero`() =
         runTest {
             val game = Game(FakeSessionHelper(targetAmount = 1, targetValue = 1), backgroundScope, Random(28))
@@ -240,10 +220,10 @@ class GameTest {
                 game.stateFlow.value.targets
                     .map { it.id },
             )
-            assertFalse(
+            assertEquals(
+                soleTarget,
                 game.stateFlow.value.targets
-                    .first()
-                    .isActive,
+                    .single(),
             )
         }
 

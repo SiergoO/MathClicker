@@ -83,11 +83,13 @@ class MenuViewModel(
     // Closed, not deleted, so it still surfaces in results history the same way RestartGame's
     // abandon path does.
     private suspend fun abandonUnfinishedField() {
-        val field = state.value.unfinishedField ?: return
         try {
-            gameRepository.updateField(
-                field.copy(isClosed = true, finishedAt = Clock.System.now().toEpochMilliseconds()),
-            )
+            val field = gameRepository.getUnfinishedField()
+            if (field != null) {
+                gameRepository.updateField(
+                    field.copy(isClosed = true, finishedAt = Clock.System.now().toEpochMilliseconds()),
+                )
+            }
         } catch (failure: PersistenceException) {
             logger.error("Could not abandon the unfinished field", failure)
         }

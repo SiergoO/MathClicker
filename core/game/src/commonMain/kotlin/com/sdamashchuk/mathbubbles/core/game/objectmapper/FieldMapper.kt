@@ -5,12 +5,8 @@ import com.sdamashchuk.mathbubbles.core.model.Field
 import com.sdamashchuk.mathbubbles.core.model.INITIAL_LIFE_COUNT
 import com.sdamashchuk.mathbubbles.core.model.OperationSign
 
-internal fun Field.decrementLifeCount(decrement: Int): Field {
-    val lifeCount = this.lifeCount - decrement
-    return this.copy(
-        lifeCount = lifeCount,
-    )
-}
+internal fun Field.decrementLifeCount(decrement: Int): Field =
+    copy(lifeCount = (lifeCount - decrement).coerceAtLeast(0))
 
 // stepMs is already clamped to MAX_TICK_MS in Game.tick - do not clamp it again here.
 internal fun Field.advanceClock(stepMs: Int): Field = copy(gameTimeMs = gameTimeMs + stepMs)

@@ -260,7 +260,7 @@ class GameBoosterTest {
 
                     val field = game.stateFlow.value.field
                     val action = field.nextAction
-                    if (action is FieldAction.Operation) {
+                    if (action is FieldAction.Operation && !field.isClosed) {
                         val visibleActiveTargets =
                             game.stateFlow.value.targets
                                 .filter { it.isActive && it.isVisible(field.gameTimeMs) }

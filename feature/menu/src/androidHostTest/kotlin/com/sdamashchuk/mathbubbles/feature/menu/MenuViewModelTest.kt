@@ -58,6 +58,32 @@ class MenuViewModelTest {
         }
 
     @Test
+    fun `Play closes an unfinished field the cached menu state never saw`() =
+        runTest {
+            val repository = FakeGameRepository(unfinishedField = null)
+            val viewModel = MenuViewModel(repository, NoOpLogger)
+            repository.unfinishedField = Field(id = 7, score = 12)
+
+            viewModel.sendAction(MenuViewModel.Action.ButtonPlayClicked)
+
+            assertEquals(listOf(7), repository.updateFieldCalls.map { it.id })
+            assertTrue(repository.updateFieldCalls.single().isClosed)
+        }
+
+    @Test
+    fun `Play closes the repository's current unfinished field rather than the cached one`() =
+        runTest {
+            val repository = FakeGameRepository(unfinishedField = Field(id = 3, score = 40))
+            val viewModel = MenuViewModel(repository, NoOpLogger)
+            repository.unfinishedField = Field(id = 4, score = 90)
+
+            viewModel.sendAction(MenuViewModel.Action.ButtonPlayClicked)
+
+            assertEquals(listOf(4), repository.updateFieldCalls.map { it.id })
+            assertEquals(90, repository.updateFieldCalls.single().score)
+        }
+
+    @Test
     fun `Play with no unfinished field closes nothing`() =
         runTest {
             val repository = FakeGameRepository(unfinishedField = null)

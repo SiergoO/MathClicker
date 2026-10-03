@@ -19,6 +19,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.consumeAsFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlin.time.Clock
 
 // Never a stored id, and not 0, which the state collector treats as "no session yet".
@@ -45,6 +47,10 @@ class GameViewModel(
     // False until updateSession() finishes establishing a session. Game is a Koin single, so a
     // collector pass that lands before that point is reading a prior session's field, not this one.
     private var sessionEstablished = false
+
+    // Serialises the collector's writes with the abandon write, so a slow open-field write cannot land
+    // after the closing one.
+    private val persistenceLock = Mutex()
 
     init {
         handleAction()
@@ -83,27 +89,30 @@ class GameViewModel(
                                 state.value.phase
                             },
                     )
-                if (sessionEstablished) {
-                    val targetsReallyChanged = targetsChanged && shouldPersistTargets(previousTargets, targets)
-                    guarded("mirror the game state") {
-                        if (fieldChanged && targetsReallyChanged) {
-                            val previousIds = previousTargets.map { it.id }.toSet()
-                            val refresh = shouldRefreshTargets(previousIds, targets.map { it.id }.toSet())
-                            gameRepository.saveFieldAndTargets(field, targets, refresh)
-                        } else if (fieldChanged) {
-                            gameRepository.updateField(field)
-                        } else if (targetsReallyChanged) {
-                            val previousIds = previousTargets.map { it.id }.toSet()
-                            if (shouldRefreshTargets(previousIds, targets.map { it.id }.toSet())) {
-                                gameRepository.refreshTargets(targets)
-                            } else {
-                                gameRepository.updateTargets(targets)
+                val persisted =
+                    persistenceLock.withLock {
+                        if (!sessionEstablished) return@withLock false
+                        val targetsReallyChanged = targetsChanged && shouldPersistTargets(previousTargets, targets)
+                        guarded("mirror the game state") {
+                            if (fieldChanged && targetsReallyChanged) {
+                                val previousIds = previousTargets.map { it.id }.toSet()
+                                val refresh = shouldRefreshTargets(previousIds, targets.map { it.id }.toSet())
+                                gameRepository.saveFieldAndTargets(field, targets, refresh)
+                            } else if (fieldChanged) {
+                                gameRepository.updateField(field)
+                            } else if (targetsReallyChanged) {
+                                val previousIds = previousTargets.map { it.id }.toSet()
+                                if (shouldRefreshTargets(previousIds, targets.map { it.id }.toSet())) {
+                                    gameRepository.refreshTargets(targets)
+                                } else {
+                                    gameRepository.updateTargets(targets)
+                                }
                             }
                         }
+                        true
                     }
-                    if (justClosed) {
-                        loadResults()
-                    }
+                if (persisted && justClosed) {
+                    loadResults()
                 }
             }
         }
@@ -197,9 +206,12 @@ class GameViewModel(
     // Closes the open field first, or updateSession would restore the very session Restart was asked to
     // discard. Left closed rather than deleted, so it still surfaces in results history.
     private suspend fun abandonUnfinishedField() {
-        val field = state.value.field
-        if (field.id == 0 || field.isClosed || !sessionEstablished) return
-        closeField(field)
+        persistenceLock.withLock {
+            val field = state.value.field
+            if (field.id == 0 || field.isClosed || !sessionEstablished) return
+            sessionEstablished = false
+            closeField(field)
+        }
     }
 
     private suspend fun closeField(field: Field) {
@@ -246,7 +258,8 @@ class GameViewModel(
                 // An old install or a corrupt row can hand back zero targets for an open field. targetsRestored with
                 // an empty list would be a no-op - the flow already starts empty - so recreate the level directly.
                 game.createTargets()
-                gameRepository.refreshTargets(game.stateFlow.value.targets)
+                val regenerated = game.stateFlow.value
+                gameRepository.saveFieldAndTargets(regenerated.field, regenerated.targets, replaceTargets = true)
             } else {
                 game.targetsRestored(unfinishedTargets)
             }
