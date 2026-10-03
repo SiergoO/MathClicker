@@ -5,6 +5,7 @@ import com.arkivanov.essenty.lifecycle.doOnDestroy
 import com.sdamashchuk.mathbubbles.core.component.viewModel
 import com.sdamashchuk.mathbubbles.core.database.repository.GameRepository
 import com.sdamashchuk.mathbubbles.core.game.Game
+import com.sdamashchuk.mathbubbles.core.model.logging.Logger
 import com.sdamashchuk.mathbubbles.core.ui.sound.SoundEventPlayer
 import com.sdamashchuk.mathbubbles.core.ui.sound.model.SoundSample
 import com.sdamashchuk.mathbubbles.feature.game.model.FeedbackEffect
@@ -29,10 +30,11 @@ class GameComponent(
     componentContext: ComponentContext,
     game: Game,
     gameRepository: GameRepository,
+    logger: Logger,
     private val soundEventPlayer: SoundEventPlayer,
     private val onBackToMenu: () -> Unit,
 ) : ComponentContext by componentContext {
-    private val viewModel: GameViewModel = viewModel { GameViewModel(game, gameRepository) }
+    private val viewModel: GameViewModel = viewModel { GameViewModel(game, gameRepository, logger) }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     val state: StateFlow<GameViewModel.State> = viewModel.state

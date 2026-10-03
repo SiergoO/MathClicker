@@ -6,6 +6,7 @@ import com.sdamashchuk.mathbubbles.core.database.dao.TargetsDao
 import com.sdamashchuk.mathbubbles.core.model.Booster
 import com.sdamashchuk.mathbubbles.core.model.Field
 import com.sdamashchuk.mathbubbles.core.model.OperationSign
+import com.sdamashchuk.mathbubbles.core.model.logging.NoOpLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -82,7 +83,7 @@ class MathBubblesDatabaseMigrationTest {
 
             assertEquals(8L, MathBubblesDatabase.Schema.version)
             val database = MathBubblesDatabase(driver)
-            val restoredField = FieldDao(database.fieldQueries, Dispatchers.Unconfined).getFieldById(1)
+            val restoredField = FieldDao(database.fieldQueries, Dispatchers.Unconfined, NoOpLogger).getFieldById(1)
             assertEquals(
                 Field(
                     id = 1,
@@ -175,6 +176,7 @@ class MathBubblesDatabaseMigrationTest {
                 FieldDao(
                     MathBubblesDatabase(driver).fieldQueries,
                     Dispatchers.Unconfined,
+                    NoOpLogger,
                 ).getFieldById(1)
             assertEquals(1, restoredField.level)
             assertEquals(0, restoredField.score)
@@ -201,6 +203,7 @@ class MathBubblesDatabaseMigrationTest {
                 FieldDao(
                     MathBubblesDatabase(driver).fieldQueries,
                     Dispatchers.Unconfined,
+                    NoOpLogger,
                 ).getFieldById(1)
             assertEquals(1, restoredField.level)
             assertEquals(0, restoredField.score)
@@ -225,7 +228,7 @@ class MathBubblesDatabaseMigrationTest {
             MathBubblesDatabase.Schema.migrate(driver, oldVersion = 6, newVersion = MathBubblesDatabase.Schema.version)
 
             val database = MathBubblesDatabase(driver)
-            val restoredField = FieldDao(database.fieldQueries, Dispatchers.Unconfined).getFieldById(1)
+            val restoredField = FieldDao(database.fieldQueries, Dispatchers.Unconfined, NoOpLogger).getFieldById(1)
             assertNull(restoredField.currentBooster)
             assertNull(restoredField.nextBooster)
             assertEquals(emptyList<Booster>(), restoredField.boosterStash)
@@ -261,7 +264,7 @@ class MathBubblesDatabaseMigrationTest {
             MathBubblesDatabase.Schema.migrate(driver, oldVersion = 7, newVersion = MathBubblesDatabase.Schema.version)
 
             val database = MathBubblesDatabase(driver)
-            val restoredField = FieldDao(database.fieldQueries, Dispatchers.Unconfined).getFieldById(1)
+            val restoredField = FieldDao(database.fieldQueries, Dispatchers.Unconfined, NoOpLogger).getFieldById(1)
             assertNull(restoredField.timedEffectBooster)
             assertEquals(0, restoredField.timedEffectRemainingMs)
             assertEquals(1.0, restoredField.timedEffectRate, 0.0)

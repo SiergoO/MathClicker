@@ -6,6 +6,7 @@ import com.arkivanov.decompose.DefaultComponentContext
 import com.arkivanov.essenty.lifecycle.LifecycleRegistry
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.sdamashchuk.mathbubbles.core.model.Field
+import com.sdamashchuk.mathbubbles.core.model.logging.NoOpLogger
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -28,6 +29,7 @@ class MenuScreenScreenshotTest {
             MenuComponent(
                 componentContext = DefaultComponentContext(lifecycle = LifecycleRegistry()),
                 gameRepository = FakeGameRepository(),
+                logger = NoOpLogger,
                 onPlayClicked = {},
                 onSettingsClicked = {},
             )
@@ -45,6 +47,7 @@ class MenuScreenScreenshotTest {
             MenuComponent(
                 componentContext = DefaultComponentContext(lifecycle = LifecycleRegistry()),
                 gameRepository = FakeGameRepository(unfinishedField = Field(id = 1, score = 40)),
+                logger = NoOpLogger,
                 onPlayClicked = {},
                 onSettingsClicked = {},
             )

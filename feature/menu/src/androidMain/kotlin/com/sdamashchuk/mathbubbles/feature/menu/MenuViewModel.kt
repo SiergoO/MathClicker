@@ -2,7 +2,9 @@ package com.sdamashchuk.mathbubbles.feature.menu
 
 import com.sdamashchuk.mathbubbles.core.component.ComponentViewModel
 import com.sdamashchuk.mathbubbles.core.database.repository.GameRepository
+import com.sdamashchuk.mathbubbles.core.database.repository.PersistenceException
 import com.sdamashchuk.mathbubbles.core.model.Field
+import com.sdamashchuk.mathbubbles.core.model.logging.Logger
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -13,6 +15,7 @@ import kotlin.time.Clock
 
 class MenuViewModel(
     private val gameRepository: GameRepository,
+    private val logger: Logger,
 ) : ComponentViewModel() {
     private val action = Channel<Action>(Channel.UNLIMITED)
 
@@ -66,7 +69,14 @@ class MenuViewModel(
 
     private fun refreshUnfinishedField() {
         viewModelScope.launch {
-            _state.value = state.value.copy(unfinishedField = gameRepository.getUnfinishedField())
+            val unfinishedField =
+                try {
+                    gameRepository.getUnfinishedField()
+                } catch (failure: PersistenceException) {
+                    logger.error("Could not read the unfinished field", failure)
+                    null
+                }
+            _state.value = state.value.copy(unfinishedField = unfinishedField)
         }
     }
 
@@ -74,7 +84,13 @@ class MenuViewModel(
     // abandon path does.
     private suspend fun abandonUnfinishedField() {
         val field = state.value.unfinishedField ?: return
-        gameRepository.updateField(field.copy(isClosed = true, finishedAt = Clock.System.now().toEpochMilliseconds()))
+        try {
+            gameRepository.updateField(
+                field.copy(isClosed = true, finishedAt = Clock.System.now().toEpochMilliseconds()),
+            )
+        } catch (failure: PersistenceException) {
+            logger.error("Could not abandon the unfinished field", failure)
+        }
         _state.value = state.value.copy(unfinishedField = null)
     }
 

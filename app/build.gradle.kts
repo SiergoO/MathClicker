@@ -68,4 +68,5 @@ dependencies {
     implementation(libs.sqldelight.android.driver)
 
     testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
 }

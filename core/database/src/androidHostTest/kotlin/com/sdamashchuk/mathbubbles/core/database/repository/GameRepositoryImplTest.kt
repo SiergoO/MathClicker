@@ -8,6 +8,7 @@ import com.sdamashchuk.mathbubbles.core.model.Booster
 import com.sdamashchuk.mathbubbles.core.model.Field
 import com.sdamashchuk.mathbubbles.core.model.OperationSign
 import com.sdamashchuk.mathbubbles.core.model.Target
+import com.sdamashchuk.mathbubbles.core.model.logging.NoOpLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -27,7 +28,7 @@ class GameRepositoryImplTest {
         val driver = JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY)
         MathBubblesDatabase.Schema.create(driver)
         val database = MathBubblesDatabase(driver)
-        fieldDao = FieldDao(database.fieldQueries, Dispatchers.Unconfined)
+        fieldDao = FieldDao(database.fieldQueries, Dispatchers.Unconfined, NoOpLogger)
         repository =
             GameRepositoryImpl(
                 fieldDao,
@@ -327,11 +328,11 @@ class GameRepositoryImplTest {
                         }
                 }
 
-            var thrown: IllegalStateException? = null
+            var thrown: Throwable? = null
             try {
                 repository.refreshTargets(poisoned)
-            } catch (e: IllegalStateException) {
-                thrown = e
+            } catch (e: PersistenceException) {
+                thrown = e.cause
             }
 
             assertEquals("boom", thrown?.message)
@@ -389,11 +390,11 @@ class GameRepositoryImplTest {
                         }
                 }
 
-            var thrown: IllegalStateException? = null
+            var thrown: Throwable? = null
             try {
                 repository.saveFieldAndTargets(advanced, poisoned, replaceTargets = true)
-            } catch (e: IllegalStateException) {
-                thrown = e
+            } catch (e: PersistenceException) {
+                thrown = e.cause
             }
 
             assertEquals("boom", thrown?.message)

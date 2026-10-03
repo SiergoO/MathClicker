@@ -7,6 +7,7 @@ import com.sdamashchuk.mathbubbles.core.model.Field
 import com.sdamashchuk.mathbubbles.core.model.INITIAL_LIFE_COUNT
 import com.sdamashchuk.mathbubbles.core.model.OperationSign
 import com.sdamashchuk.mathbubbles.core.model.Target
+import com.sdamashchuk.mathbubbles.core.model.logging.NoOpLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -57,16 +58,12 @@ private class RestartFakeSessionHelper(
     override fun failedGrowthCap(level: Int) = 4 * (initialTargetValueRange.last + 3 * level)
 }
 
-// Models the field table closely enough for this task: insertField/updateField mutate a row set
-// keyed by id, and getUnfinishedField/getFieldCount are derived from it exactly the way FieldDao's
-// real queries are (isClosed = 0, newest id first; a plain count of every row). The static
-// FakeGameRepository in GameViewModelTest can't stand in here - restarting has to observe the
-// close this task adds, not a value fixed for the life of the test.
 private class RestartFakeGameRepository(
     seedField: Field,
     private val seedTargets: List<Target>,
+    earlierFields: List<Field> = emptyList(),
 ) : GameRepository {
-    private val fields = mutableListOf(seedField)
+    private val fields = (earlierFields + seedField).toMutableList()
 
     override suspend fun insertField(field: Field) {
         fields += field
@@ -79,7 +76,7 @@ private class RestartFakeGameRepository(
 
     override suspend fun getUnfinishedField(): Field? = fields.filter { !it.isClosed }.maxByOrNull { it.id }
 
-    override suspend fun getFieldCount(): Int = fields.size
+    override suspend fun getNextFieldId(): Int = (fields.maxOfOrNull { it.id } ?: 0) + 1
 
     override suspend fun updateTargets(targets: List<Target>) = Unit
 
@@ -125,7 +122,7 @@ class GameViewModelRestartTest {
                     seedTargets = listOf(),
                 )
             val game = Game(RestartFakeSessionHelper(targetAmount = 3), CoroutineScope(Dispatchers.Unconfined))
-            val viewModel = GameViewModel(game, repository)
+            val viewModel = GameViewModel(game, repository, NoOpLogger)
 
             viewModel.sendAction(GameViewModel.Action.PauseGame)
             viewModel.sendAction(GameViewModel.Action.RestartGame)
@@ -146,7 +143,7 @@ class GameViewModelRestartTest {
                     seedTargets = listOf(),
                 )
             val game = Game(RestartFakeSessionHelper(targetAmount = 3), CoroutineScope(Dispatchers.Unconfined))
-            val viewModel = GameViewModel(game, repository)
+            val viewModel = GameViewModel(game, repository, NoOpLogger)
 
             viewModel.sendAction(GameViewModel.Action.PauseGame)
             viewModel.sendAction(GameViewModel.Action.RestartGame)
@@ -168,7 +165,7 @@ class GameViewModelRestartTest {
                     seedTargets = listOf(soleTarget),
                 )
             val game = Game(RestartFakeSessionHelper(targetAmount = 1), CoroutineScope(Dispatchers.Unconfined))
-            val viewModel = GameViewModel(game, repository)
+            val viewModel = GameViewModel(game, repository, NoOpLogger)
 
             // The sole target breaking out zeroes the only life, closing the field via Game itself -
             // the same path a real GameOver takes, independent of this task's fix.
@@ -185,5 +182,24 @@ class GameViewModelRestartTest {
             // The already-closed field's own finishedAt must survive untouched - abandonUnfinishedField
             // is a no-op once isClosed is already true, not a second write with a later timestamp.
             assertEquals(closedAtGameOver, repository.allFields().first { it.id == 5 }.finishedAt)
+        }
+
+    @Test
+    fun `restarting allocates one past the highest stored id when ids have gaps`() =
+        runTest {
+            val repository =
+                RestartFakeGameRepository(
+                    seedField = Field(id = 4, isClosed = false),
+                    seedTargets = listOf(),
+                    earlierFields = listOf(Field(id = 1, isClosed = true)),
+                )
+            val game = Game(RestartFakeSessionHelper(targetAmount = 3), CoroutineScope(Dispatchers.Unconfined))
+            val viewModel = GameViewModel(game, repository, NoOpLogger)
+
+            viewModel.sendAction(GameViewModel.Action.PauseGame)
+            viewModel.sendAction(GameViewModel.Action.RestartGame)
+
+            assertEquals(5, viewModel.state.value.field.id)
+            assertEquals(listOf(1, 4, 5), repository.allFields().map { it.id })
         }
 }

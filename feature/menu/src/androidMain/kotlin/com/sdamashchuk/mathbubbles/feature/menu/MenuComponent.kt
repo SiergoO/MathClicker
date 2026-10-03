@@ -5,6 +5,7 @@ import com.arkivanov.essenty.lifecycle.doOnDestroy
 import com.arkivanov.essenty.lifecycle.doOnResume
 import com.sdamashchuk.mathbubbles.core.component.viewModel
 import com.sdamashchuk.mathbubbles.core.database.repository.GameRepository
+import com.sdamashchuk.mathbubbles.core.model.logging.Logger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -20,10 +21,11 @@ import kotlinx.coroutines.launch
 class MenuComponent(
     componentContext: ComponentContext,
     gameRepository: GameRepository,
+    logger: Logger,
     private val onPlayClicked: () -> Unit,
     private val onSettingsClicked: () -> Unit,
 ) : ComponentContext by componentContext {
-    private val viewModel: MenuViewModel = viewModel { MenuViewModel(gameRepository) }
+    private val viewModel: MenuViewModel = viewModel { MenuViewModel(gameRepository, logger) }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     val state: StateFlow<MenuViewModel.State> = viewModel.state

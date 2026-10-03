@@ -9,4 +9,4 @@ import com.sdamashchuk.mathbubbles.core.ui.sound.di.soundModule
  * list the app actually starts with — a module registered in one place and not the other is a
  * crash on first screen, not a compile error.
  */
-val appModules = listOf(sqlDriverModule, databaseModule, gameModule, soundModule)
+val appModules = listOf(loggerModule, sqlDriverModule, databaseModule, gameModule, soundModule)

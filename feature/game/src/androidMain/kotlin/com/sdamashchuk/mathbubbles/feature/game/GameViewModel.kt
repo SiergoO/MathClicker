@@ -2,10 +2,12 @@ package com.sdamashchuk.mathbubbles.feature.game
 
 import com.sdamashchuk.mathbubbles.core.component.ComponentViewModel
 import com.sdamashchuk.mathbubbles.core.database.repository.GameRepository
+import com.sdamashchuk.mathbubbles.core.database.repository.PersistenceException
 import com.sdamashchuk.mathbubbles.core.game.Game
 import com.sdamashchuk.mathbubbles.core.game.model.ActiveEffects
 import com.sdamashchuk.mathbubbles.core.model.Field
 import com.sdamashchuk.mathbubbles.core.model.Target
+import com.sdamashchuk.mathbubbles.core.model.logging.Logger
 import com.sdamashchuk.mathbubbles.feature.game.model.FeedbackEffect
 import com.sdamashchuk.mathbubbles.feature.game.model.ResultsSummary
 import kotlinx.collections.immutable.ImmutableList
@@ -19,9 +21,13 @@ import kotlinx.coroutines.flow.consumeAsFlow
 import kotlinx.coroutines.launch
 import kotlin.time.Clock
 
+// Never a stored id, and not 0, which the state collector treats as "no session yet".
+private const val UNSAVED_FIELD_ID = -1
+
 class GameViewModel(
     private val game: Game,
     private val gameRepository: GameRepository,
+    private val logger: Logger,
 ) : ComponentViewModel() {
     private val action = Channel<Action>(Channel.UNLIMITED)
 
@@ -79,18 +85,20 @@ class GameViewModel(
                     )
                 if (sessionEstablished) {
                     val targetsReallyChanged = targetsChanged && shouldPersistTargets(previousTargets, targets)
-                    if (fieldChanged && targetsReallyChanged) {
-                        val previousIds = previousTargets.map { it.id }.toSet()
-                        val refresh = shouldRefreshTargets(previousIds, targets.map { it.id }.toSet())
-                        gameRepository.saveFieldAndTargets(field, targets, refresh)
-                    } else if (fieldChanged) {
-                        gameRepository.updateField(field)
-                    } else if (targetsReallyChanged) {
-                        val previousIds = previousTargets.map { it.id }.toSet()
-                        if (shouldRefreshTargets(previousIds, targets.map { it.id }.toSet())) {
-                            gameRepository.refreshTargets(targets)
-                        } else {
-                            gameRepository.updateTargets(targets)
+                    guarded("mirror the game state") {
+                        if (fieldChanged && targetsReallyChanged) {
+                            val previousIds = previousTargets.map { it.id }.toSet()
+                            val refresh = shouldRefreshTargets(previousIds, targets.map { it.id }.toSet())
+                            gameRepository.saveFieldAndTargets(field, targets, refresh)
+                        } else if (fieldChanged) {
+                            gameRepository.updateField(field)
+                        } else if (targetsReallyChanged) {
+                            val previousIds = previousTargets.map { it.id }.toSet()
+                            if (shouldRefreshTargets(previousIds, targets.map { it.id }.toSet())) {
+                                gameRepository.refreshTargets(targets)
+                            } else {
+                                gameRepository.updateTargets(targets)
+                            }
                         }
                     }
                     if (justClosed) {
@@ -171,53 +179,103 @@ class GameViewModel(
     // it - so a kill right after an untracked fall is not lost.
     private suspend fun persistTargetsNow() {
         val targets = state.value.targetList
-        if (targets.isEmpty()) return
-        gameRepository.updateTargets(targets)
+        if (targets.isEmpty() || !sessionEstablished) return
+        guarded("persist the targets") { gameRepository.updateTargets(targets) }
     }
 
     // All history, not the recent window: a best outside the last seven must still be found.
     private suspend fun loadResults() {
-        _state.value =
-            state.value.copy(
-                recentResults = gameRepository.getRecentClosedFields().toImmutableList(),
-                bestResult = gameRepository.getBestClosedField(),
-            )
+        guarded("load the results") {
+            _state.value =
+                state.value.copy(
+                    recentResults = gameRepository.getRecentClosedFields().toImmutableList(),
+                    bestResult = gameRepository.getBestClosedField(),
+                )
+        }
     }
 
     // Closes the open field first, or updateSession would restore the very session Restart was asked to
     // discard. Left closed rather than deleted, so it still surfaces in results history.
     private suspend fun abandonUnfinishedField() {
         val field = state.value.field
-        if (field.id == 0 || field.isClosed) return
-        gameRepository.updateField(field.copy(isClosed = true, finishedAt = Clock.System.now().toEpochMilliseconds()))
+        if (field.id == 0 || field.isClosed || !sessionEstablished) return
+        closeField(field)
+    }
+
+    private suspend fun closeField(field: Field) {
+        guarded("close field ${field.id}") {
+            gameRepository.updateField(
+                field.copy(isClosed = true, finishedAt = Clock.System.now().toEpochMilliseconds()),
+            )
+        }
+    }
+
+    private suspend fun guarded(
+        what: String,
+        block: suspend () -> Unit,
+    ) {
+        try {
+            block()
+        } catch (failure: PersistenceException) {
+            logger.error("Could not $what", failure)
+        }
     }
 
     private suspend fun updateSession() {
         sessionEstablished = false
         game.resetForNewSession()
-        with(gameRepository) {
-            val unfinishedField = getUnfinishedField()
-            val unfinishedTargets = getTargets()
-            if (unfinishedField == null) {
-                val sessionCount = getFieldCount()
-                game.createField(sessionCount + 1)
-                game.createTargets()
-                insertField(game.stateFlow.value.field)
-                refreshTargets(game.stateFlow.value.targets)
-            } else {
-                game.fieldRestored(unfinishedField)
-                if (unfinishedTargets.isEmpty()) {
-                    // An old install or a corrupt row can hand back zero targets for an open field. targetsRestored with
-                    // an empty list would be a no-op - the flow already starts empty - so recreate the level directly.
-                    game.createTargets()
-                    refreshTargets(game.stateFlow.value.targets)
-                } else {
-                    game.targetsRestored(unfinishedTargets)
-                }
-                _state.value = state.value.copy(phase = GamePhase.Paused)
+        val unfinishedField =
+            try {
+                gameRepository.getUnfinishedField()
+            } catch (failure: PersistenceException) {
+                logger.error("Could not read the unfinished session, starting a new one", failure)
+                null
             }
+        if (unfinishedField != null && restoreSession(unfinishedField)) {
+            sessionEstablished = true
+        } else {
+            startNewSession()
         }
-        sessionEstablished = true
+    }
+
+    private suspend fun restoreSession(unfinishedField: Field): Boolean =
+        try {
+            val unfinishedTargets = gameRepository.getTargets()
+            game.fieldRestored(unfinishedField)
+            if (unfinishedTargets.isEmpty()) {
+                // An old install or a corrupt row can hand back zero targets for an open field. targetsRestored with
+                // an empty list would be a no-op - the flow already starts empty - so recreate the level directly.
+                game.createTargets()
+                gameRepository.refreshTargets(game.stateFlow.value.targets)
+            } else {
+                game.targetsRestored(unfinishedTargets)
+            }
+            _state.value = state.value.copy(phase = GamePhase.Paused)
+            true
+        } catch (failure: PersistenceException) {
+            logger.error("Could not restore session ${unfinishedField.id}, abandoning it", failure)
+            game.resetForNewSession()
+            closeField(unfinishedField)
+            false
+        }
+
+    private suspend fun startNewSession() {
+        val id =
+            try {
+                gameRepository.getNextFieldId()
+            } catch (failure: PersistenceException) {
+                logger.error("Could not read the next field id, playing without saving", failure)
+                UNSAVED_FIELD_ID
+            }
+        game.createField(id)
+        game.createTargets()
+        try {
+            gameRepository.insertField(game.stateFlow.value.field)
+            gameRepository.refreshTargets(game.stateFlow.value.targets)
+            sessionEstablished = true
+        } catch (failure: PersistenceException) {
+            logger.error("Could not save the new session, playing without saving", failure)
+        }
     }
 
     sealed class Action {

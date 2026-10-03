@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS "field" (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT N
 -- KEY as a rowid alias and lets an explicit NULL bind trigger SQLite's autoincrement, matching
 -- Room's 0-means-"generate" default on this column.
 insertField:
-INSERT OR IGNORE INTO field (id, level, score, lifeCount, bonusMultiplier, currentOperationSign, currentOperationDigit, nextOperationSign, nextOperationDigit, isClosed, finishedAt, gameTimeMs, currentBooster, nextBooster, boosterStash, boosterDropCounter, hasDroppedBoosterThisSession, timedEffectBooster, timedEffectRemainingMs, timedEffectRate, freezeTintEnvelope, icePickArmedFireButton, icePickArmedStashIndex, shieldActive)
+INSERT INTO field (id, level, score, lifeCount, bonusMultiplier, currentOperationSign, currentOperationDigit, nextOperationSign, nextOperationDigit, isClosed, finishedAt, gameTimeMs, currentBooster, nextBooster, boosterStash, boosterDropCounter, hasDroppedBoosterThisSession, timedEffectBooster, timedEffectRemainingMs, timedEffectRate, freezeTintEnvelope, icePickArmedFireButton, icePickArmedStashIndex, shieldActive)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 updateField:
@@ -26,8 +26,8 @@ SELECT * FROM field WHERE id = ?;
 getUnfinishedField:
 SELECT * FROM field WHERE isClosed = 0 ORDER BY id DESC LIMIT 1;
 
-getFieldCount:
-SELECT COUNT(id) FROM field;
+getMaxFieldId:
+SELECT COALESCE(MAX(id), 0) FROM field;
 
 -- Ordered by id, not finishedAt: id is monotonic and every row has one, while a pre-MC-53 row has
 -- no finishedAt at all - sorting by it would scatter that history to one end instead of keeping it
@@ -38,4 +38,10 @@ SELECT * FROM field WHERE isClosed = 1 ORDER BY id DESC LIMIT 7;
 -- Over all history, not the recent window above: a best run must not stop being the record just
 -- because it scrolled past the last seven. Tied scores break on level, not left to insertion order.
 getBestClosedField:
-SELECT * FROM field WHERE isClosed = 1 ORDER BY score DESC, level DESC LIMIT 1;
+SELECT * FROM field
+WHERE isClosed = 1 AND currentOperationSign IN :signs AND nextOperationSign IN :signs
+ORDER BY score DESC, level DESC
+LIMIT 1;
+
+closeFieldById:
+UPDATE field SET isClosed = 1 WHERE id = ?;

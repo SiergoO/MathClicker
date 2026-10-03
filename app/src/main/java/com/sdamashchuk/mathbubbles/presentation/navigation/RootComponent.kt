@@ -10,6 +10,7 @@ import com.arkivanov.decompose.router.stack.push
 import com.arkivanov.decompose.value.Value
 import com.sdamashchuk.mathbubbles.core.database.repository.GameRepository
 import com.sdamashchuk.mathbubbles.core.game.Game
+import com.sdamashchuk.mathbubbles.core.model.logging.Logger
 import com.sdamashchuk.mathbubbles.core.ui.sound.SoundEventPlayer
 import com.sdamashchuk.mathbubbles.core.ui.sound.SoundSettings
 import com.sdamashchuk.mathbubbles.feature.game.GameComponent
@@ -53,6 +54,7 @@ class RootComponent(
                     MenuComponent(
                         componentContext = componentContext,
                         gameRepository = get<GameRepository>(),
+                        logger = get<Logger>(),
                         onPlayClicked = { navigation.push(RootConfig.Game) },
                         onSettingsClicked = { navigation.push(RootConfig.Settings) },
                     ),
@@ -65,6 +67,7 @@ class RootComponent(
                         componentContext = componentContext,
                         game = get<Game>(),
                         gameRepository = get<GameRepository>(),
+                        logger = get<Logger>(),
                         // A fresh SoundEventPlayer per entry, not a shared one: soundModule
                         // registers it as a Koin factory precisely so GameComponent gets its own
                         // SoundPool to release on the way out, never one a previous session already

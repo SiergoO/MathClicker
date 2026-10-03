@@ -1,6 +1,7 @@
 package com.sdamashchuk.mathbubbles.feature.menu
 
 import com.sdamashchuk.mathbubbles.core.model.Field
+import com.sdamashchuk.mathbubbles.core.model.logging.NoOpLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -30,7 +31,7 @@ class MenuViewModelTest {
     @Test
     fun `hasUnfinishedField is false when no session is open`() =
         runTest {
-            val viewModel = MenuViewModel(FakeGameRepository(unfinishedField = null))
+            val viewModel = MenuViewModel(FakeGameRepository(unfinishedField = null), NoOpLogger)
 
             assertFalse(viewModel.state.value.hasUnfinishedField)
         }
@@ -38,7 +39,7 @@ class MenuViewModelTest {
     @Test
     fun `hasUnfinishedField is true when a session is still open`() =
         runTest {
-            val viewModel = MenuViewModel(FakeGameRepository(unfinishedField = Field(id = 3, score = 40)))
+            val viewModel = MenuViewModel(FakeGameRepository(unfinishedField = Field(id = 3, score = 40)), NoOpLogger)
 
             assertTrue(viewModel.state.value.hasUnfinishedField)
         }
@@ -47,7 +48,7 @@ class MenuViewModelTest {
     fun `Play closes the unfinished field before starting a new game`() =
         runTest {
             val repository = FakeGameRepository(unfinishedField = Field(id = 3, score = 40))
-            val viewModel = MenuViewModel(repository)
+            val viewModel = MenuViewModel(repository, NoOpLogger)
 
             viewModel.sendAction(MenuViewModel.Action.ButtonPlayClicked)
 
@@ -60,7 +61,7 @@ class MenuViewModelTest {
     fun `Play with no unfinished field closes nothing`() =
         runTest {
             val repository = FakeGameRepository(unfinishedField = null)
-            val viewModel = MenuViewModel(repository)
+            val viewModel = MenuViewModel(repository, NoOpLogger)
 
             viewModel.sendAction(MenuViewModel.Action.ButtonPlayClicked)
 
@@ -71,7 +72,7 @@ class MenuViewModelTest {
     fun `Continue leaves the unfinished field untouched`() =
         runTest {
             val repository = FakeGameRepository(unfinishedField = Field(id = 3, score = 40))
-            val viewModel = MenuViewModel(repository)
+            val viewModel = MenuViewModel(repository, NoOpLogger)
 
             viewModel.sendAction(MenuViewModel.Action.ButtonContinueClicked)
 

@@ -8,6 +8,7 @@ import com.sdamashchuk.mathbubbles.core.model.Booster
 import com.sdamashchuk.mathbubbles.core.model.Field
 import com.sdamashchuk.mathbubbles.core.model.OperationSign
 import com.sdamashchuk.mathbubbles.core.model.Target
+import com.sdamashchuk.mathbubbles.core.model.logging.NoOpLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -85,7 +86,7 @@ private class FakeGameRepository(
 
     override suspend fun getUnfinishedField(): Field? = unfinishedField
 
-    override suspend fun getFieldCount(): Int = 0
+    override suspend fun getNextFieldId(): Int = 1
 
     override suspend fun updateTargets(targets: List<Target>) {
         updateTargetsCalls += targets
@@ -131,7 +132,7 @@ private class StatefulFakeGameRepository(
 
     override suspend fun getUnfinishedField(): Field? = storedField
 
-    override suspend fun getFieldCount(): Int = 1
+    override suspend fun getNextFieldId(): Int = 2
 
     override suspend fun updateTargets(targets: List<Target>) {
         storedTargets = targets
@@ -182,7 +183,7 @@ private class RacyFakeGameRepository(
         return fields.values.filter { !it.isClosed }.maxByOrNull { it.id }
     }
 
-    override suspend fun getFieldCount(): Int = fields.size
+    override suspend fun getNextFieldId(): Int = (fields.keys.maxOrNull() ?: 0) + 1
 
     override suspend fun updateTargets(targets: List<Target>) {
         this.targets = targets
@@ -232,7 +233,7 @@ class GameViewModelTest {
                 )
             val game = Game(FakeSessionHelper(targetAmount = 4), CoroutineScope(Dispatchers.Unconfined))
 
-            val viewModel = GameViewModel(game, repository)
+            val viewModel = GameViewModel(game, repository, NoOpLogger)
             val restoredTargets = viewModel.state.value.targetList
 
             assertTrue(restoredTargets.isNotEmpty())
@@ -272,7 +273,7 @@ class GameViewModelTest {
                 )
             val game = Game(FakeSessionHelper(targetAmount = 4), CoroutineScope(Dispatchers.Unconfined))
 
-            val viewModel = GameViewModel(game, repository)
+            val viewModel = GameViewModel(game, repository, NoOpLogger)
 
             assertEquals(existingTargets, viewModel.state.value.targetList)
             assertEquals(existingTargets, game.stateFlow.value.targets)
@@ -311,7 +312,7 @@ class GameViewModelTest {
                 )
             val game = Game(FakeSessionHelper(targetAmount = 2), CoroutineScope(Dispatchers.Unconfined))
             game.start()
-            GameViewModel(game, repository)
+            GameViewModel(game, repository, NoOpLogger)
             repository.refreshTargetsCalls.clear()
             repository.updateTargetsCalls.clear()
 
@@ -357,7 +358,7 @@ class GameViewModelTest {
                 )
             val game = Game(FakeSessionHelper(targetAmount = 3), CoroutineScope(Dispatchers.Unconfined))
 
-            val viewModel = GameViewModel(game, repository)
+            val viewModel = GameViewModel(game, repository, NoOpLogger)
 
             // All three share the same 1000ms lifetime and zero appearance delay, so four 250ms
             // ticks break them out together, taking lifeCount from 3 (Field's default) to 0 in one step.
@@ -392,7 +393,7 @@ class GameViewModelTest {
                 )
             val game = Game(FakeSessionHelper(targetAmount = 1), CoroutineScope(Dispatchers.Unconfined))
 
-            val viewModel = GameViewModel(game, repository)
+            val viewModel = GameViewModel(game, repository, NoOpLogger)
 
             // The sole target breaking out both zeroes the last life (GameOver) and empties the
             // board, in the same locked tick.
@@ -431,7 +432,7 @@ class GameViewModelTest {
                 )
             val game = Game(FakeSessionHelper(targetAmount = 3), CoroutineScope(Dispatchers.Unconfined))
 
-            val viewModel = GameViewModel(game, repository)
+            val viewModel = GameViewModel(game, repository, NoOpLogger)
             repeat(4) { game.tick(250) }
 
             assertEquals(GamePhase.GameOver, viewModel.state.value.phase)
@@ -461,7 +462,7 @@ class GameViewModelTest {
                 )
             val game = Game(FakeSessionHelper(targetAmount = 1), CoroutineScope(Dispatchers.Unconfined))
 
-            val viewModel = GameViewModel(game, repository)
+            val viewModel = GameViewModel(game, repository, NoOpLogger)
 
             assertEquals(GamePhase.Paused, viewModel.state.value.phase)
         }
@@ -474,7 +475,7 @@ class GameViewModelTest {
             val repository = FakeGameRepository(unfinishedField = null, unfinishedTargets = emptyList())
             val game = Game(FakeSessionHelper(targetAmount = 1), CoroutineScope(Dispatchers.Unconfined))
 
-            val viewModel = GameViewModel(game, repository)
+            val viewModel = GameViewModel(game, repository, NoOpLogger)
 
             assertEquals(GamePhase.ReadyToPlay, viewModel.state.value.phase)
         }
@@ -496,7 +497,7 @@ class GameViewModelTest {
             )
             repository.updateField(Field(id = 5, score = 10, isClosed = true))
 
-            GameViewModel(game, repository)
+            GameViewModel(game, repository, NoOpLogger)
             advanceUntilIdle()
 
             assertTrue(repository.fieldById(5)?.isClosed == true)
@@ -518,7 +519,7 @@ class GameViewModelTest {
                     CoroutineScope(Dispatchers.Unconfined),
                     boostersEnabled = true,
                 )
-            GameViewModel(firstGame, repository)
+            GameViewModel(firstGame, repository, NoOpLogger)
 
             firstGame.targetClicked(target.id)
             firstGame.stashBooster()
@@ -529,7 +530,7 @@ class GameViewModelTest {
                     CoroutineScope(Dispatchers.Unconfined),
                     boostersEnabled = true,
                 )
-            val secondViewModel = GameViewModel(secondGame, repository)
+            val secondViewModel = GameViewModel(secondGame, repository, NoOpLogger)
 
             assertEquals(
                 8,
@@ -561,7 +562,7 @@ class GameViewModelTest {
                     unfinishedTargets = listOf(target),
                 )
             val game = Game(FakeSessionHelper(targetAmount = 1), CoroutineScope(Dispatchers.Unconfined))
-            val viewModel = GameViewModel(game, repository)
+            val viewModel = GameViewModel(game, repository, NoOpLogger)
 
             game.targetClicked(target.id)
 

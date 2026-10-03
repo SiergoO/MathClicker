@@ -23,7 +23,7 @@ val databaseModule =
         single<MathBubblesDatabase> { MathBubblesDatabase(get<SqlDriver>()) }
         single<FieldQueries> { get<MathBubblesDatabase>().fieldQueries }
         single<TargetsQueries> { get<MathBubblesDatabase>().targetsQueries }
-        single { FieldDao(get(), get()) }
+        single { FieldDao(get(), get(), get()) }
         single { TargetsDao(get(), get()) }
         single { GameRepositoryImpl(get(), get(), get(), get(), get()) } bind GameRepository::class
     }

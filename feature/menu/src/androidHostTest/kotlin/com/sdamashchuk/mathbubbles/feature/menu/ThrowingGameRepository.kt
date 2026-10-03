@@ -1,22 +1,25 @@
 package com.sdamashchuk.mathbubbles.feature.menu
 
 import com.sdamashchuk.mathbubbles.core.database.repository.GameRepository
+import com.sdamashchuk.mathbubbles.core.database.repository.PersistenceException
 import com.sdamashchuk.mathbubbles.core.model.Field
 import com.sdamashchuk.mathbubbles.core.model.Target
 
-class FakeGameRepository(
-    private var unfinishedField: Field? = null,
+class ThrowingGameRepository(
+    var failReads: Boolean = false,
+    var failWrites: Boolean = false,
+    private val unfinishedField: Field? = null,
 ) : GameRepository {
-    val updateFieldCalls = mutableListOf<Field>()
-
     override suspend fun insertField(field: Field) = Unit
 
     override suspend fun updateField(field: Field) {
-        updateFieldCalls += field
-        unfinishedField = if (field.isClosed) null else field
+        if (failWrites) throw PersistenceException("update")
     }
 
-    override suspend fun getUnfinishedField(): Field? = unfinishedField
+    override suspend fun getUnfinishedField(): Field? {
+        if (failReads) throw PersistenceException("read")
+        return unfinishedField
+    }
 
     override suspend fun getNextFieldId(): Int = 1
 
@@ -34,8 +37,5 @@ class FakeGameRepository(
         field: Field,
         targets: List<Target>,
         replaceTargets: Boolean,
-    ) {
-        updateField(field)
-        if (replaceTargets) refreshTargets(targets) else updateTargets(targets)
-    }
+    ) = Unit
 }

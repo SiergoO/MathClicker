@@ -2,6 +2,7 @@ package com.sdamashchuk.mathbubbles.di
 
 import com.sdamashchuk.mathbubbles.core.database.repository.GameRepository
 import com.sdamashchuk.mathbubbles.core.game.Game
+import com.sdamashchuk.mathbubbles.core.model.logging.Logger
 import com.sdamashchuk.mathbubbles.core.ui.sound.SoundEventPlayer
 import com.sdamashchuk.mathbubbles.core.ui.sound.SoundSettings
 import kotlinx.coroutines.CoroutineScope
@@ -54,7 +55,7 @@ class KoinModulesTest {
     fun everyTypeRootComponentAsksKoinForHasADefinition() {
         module {
             includes(appModules)
-            factory { RootComponentProbe(get(), get(), get(), get()) }
+            factory { RootComponentProbe(get(), get(), get(), get(), get()) }
         }.verify(extraTypes = listOf(CoroutineScope::class))
     }
 
@@ -94,6 +95,7 @@ class KoinModulesTest {
     private class RootComponentProbe(
         game: Game,
         gameRepository: GameRepository,
+        logger: Logger,
         soundEventPlayer: SoundEventPlayer,
         soundSettings: SoundSettings,
     )

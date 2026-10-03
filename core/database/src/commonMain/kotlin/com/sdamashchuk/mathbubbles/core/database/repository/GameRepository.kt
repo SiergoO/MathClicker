@@ -10,7 +10,7 @@ interface GameRepository {
 
     suspend fun getUnfinishedField(): Field?
 
-    suspend fun getFieldCount(): Int
+    suspend fun getNextFieldId(): Int
 
     suspend fun getRecentClosedFields(): List<Field>
 

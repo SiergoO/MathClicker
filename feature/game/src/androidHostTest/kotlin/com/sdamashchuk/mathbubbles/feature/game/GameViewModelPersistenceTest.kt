@@ -6,6 +6,7 @@ import com.sdamashchuk.mathbubbles.core.game.helper.SessionHelper
 import com.sdamashchuk.mathbubbles.core.model.Field
 import com.sdamashchuk.mathbubbles.core.model.OperationSign
 import com.sdamashchuk.mathbubbles.core.model.Target
+import com.sdamashchuk.mathbubbles.core.model.logging.NoOpLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -82,7 +83,7 @@ private class PersistenceFakeGameRepository : GameRepository {
 
     override suspend fun getUnfinishedField(): Field? = null
 
-    override suspend fun getFieldCount(): Int = 0
+    override suspend fun getNextFieldId(): Int = 1
 
     override suspend fun updateTargets(targets: List<Target>) {
         updateTargetsCalls += targets
@@ -129,7 +130,7 @@ class GameViewModelPersistenceTest {
             val repository = PersistenceFakeGameRepository()
             val game = Game(PersistenceFakeSessionHelper(targetAmount = 1), backgroundScope, Random(1))
             game.start()
-            GameViewModel(game, repository)
+            GameViewModel(game, repository, NoOpLogger)
             testScheduler.runCurrent()
             // One tick outside the measured window reveals the target (appearanceDelayMs 0) - not
             // that revealing it writes anything either (see the isVisible test below), but this
@@ -160,7 +161,7 @@ class GameViewModelPersistenceTest {
                     Random(1),
                 )
             game.start()
-            GameViewModel(game, repository)
+            GameViewModel(game, repository, NoOpLogger)
             testScheduler.runCurrent()
             repository.clearCalls()
 
@@ -178,7 +179,7 @@ class GameViewModelPersistenceTest {
             val repository = PersistenceFakeGameRepository()
             val game = Game(PersistenceFakeSessionHelper(targetAmount = 1), backgroundScope, Random(2))
             game.start()
-            GameViewModel(game, repository)
+            GameViewModel(game, repository, NoOpLogger)
             testScheduler.runCurrent()
             repository.clearCalls()
 
@@ -213,7 +214,7 @@ class GameViewModelPersistenceTest {
                     Random(3),
                 )
             game.start()
-            GameViewModel(game, repository)
+            GameViewModel(game, repository, NoOpLogger)
             testScheduler.runCurrent()
             // One tick outside the measured window reveals the first target (appearanceDelayMs 0) -
             // a no-op on the persisted target list under MC-72 (see the isVisible test below), so
@@ -246,7 +247,7 @@ class GameViewModelPersistenceTest {
                     Random(4),
                 )
             game.start()
-            GameViewModel(game, repository)
+            GameViewModel(game, repository, NoOpLogger)
             testScheduler.runCurrent()
             repository.clearCalls()
 
@@ -267,7 +268,7 @@ class GameViewModelPersistenceTest {
                     Random(5),
                 )
             game.start()
-            GameViewModel(game, repository)
+            GameViewModel(game, repository, NoOpLogger)
             testScheduler.runCurrent()
             repository.clearCalls()
 
@@ -287,7 +288,7 @@ class GameViewModelPersistenceTest {
             val repository = PersistenceFakeGameRepository()
             val game = Game(PersistenceFakeSessionHelper(targetAmount = 1), backgroundScope, Random(6))
             game.start()
-            val viewModel = GameViewModel(game, repository)
+            val viewModel = GameViewModel(game, repository, NoOpLogger)
             testScheduler.runCurrent()
             repository.clearCalls()
 
@@ -303,7 +304,7 @@ class GameViewModelPersistenceTest {
             val repository = PersistenceFakeGameRepository()
             val game = Game(PersistenceFakeSessionHelper(targetAmount = 1), backgroundScope, Random(7))
             game.start()
-            val viewModel = GameViewModel(game, repository)
+            val viewModel = GameViewModel(game, repository, NoOpLogger)
             testScheduler.runCurrent()
             repository.clearCalls()
 

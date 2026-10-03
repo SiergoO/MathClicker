@@ -5,6 +5,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import com.arkivanov.decompose.DefaultComponentContext
 import com.arkivanov.essenty.lifecycle.LifecycleRegistry
+import com.sdamashchuk.mathbubbles.core.model.logging.NoOpLogger
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -59,6 +60,7 @@ class ScreenAlignmentTest {
             MenuComponent(
                 componentContext = DefaultComponentContext(lifecycle = LifecycleRegistry()),
                 gameRepository = FakeGameRepository(),
+                logger = NoOpLogger,
                 onPlayClicked = {},
                 onSettingsClicked = {},
             )

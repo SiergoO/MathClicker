@@ -66,10 +66,10 @@ internal fun TargetsQueries.update(target: Target) =
 
 private fun LocalTargets.toDomainModel() =
     Target(
-        id = id.toInt(),
-        relatedFieldId = relatedFieldId.toInt(),
-        columnId = columnId.toInt(),
-        value = value_.toInt(),
+        id = id.toIntClamped(),
+        relatedFieldId = relatedFieldId.toIntClamped(),
+        columnId = columnId.toIntClamped(),
+        value = value_.toIntClamped(),
         appearsAtMs = appearsAtMs,
         finishesAtMs = finishesAtMs,
         isProfitable = isProfitable,
