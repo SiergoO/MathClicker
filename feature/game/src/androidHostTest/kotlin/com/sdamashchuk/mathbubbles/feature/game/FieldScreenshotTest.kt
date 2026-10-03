@@ -160,6 +160,40 @@ class FieldScreenshotTest {
     }
 
     @Test
+    fun `renders a freeze countdown ring at sixty percent remaining`() {
+        renderFixedField(
+            FIXED_FIELD_STATE.copy(
+                field = FIXED_FIELD_STATE.field.copy(currentBooster = Booster.FREEZE),
+                effects =
+                    ActiveEffects(
+                        timedBooster = Booster.FREEZE,
+                        remainingRealMs = 1_800,
+                        remainingFraction = 0.6f,
+                        intensity = 1f,
+                    ),
+            ),
+        )
+        composeTestRule.onRoot().captureRoboImage()
+    }
+
+    @Test
+    fun `renders a rewind countdown ring at sixty percent remaining`() {
+        renderFixedField(
+            FIXED_FIELD_STATE.copy(
+                field = FIXED_FIELD_STATE.field.copy(currentBooster = Booster.REWIND),
+                effects =
+                    ActiveEffects(
+                        timedBooster = Booster.REWIND,
+                        remainingRealMs = 1_800,
+                        remainingFraction = 0.6f,
+                        intensity = 1f,
+                    ),
+            ),
+        )
+        composeTestRule.onRoot().captureRoboImage()
+    }
+
+    @Test
     fun `renders a freeze mid ramp-in half-tinted`() {
         renderFixedField(
             FIXED_FIELD_STATE.copy(

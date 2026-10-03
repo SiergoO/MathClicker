@@ -36,6 +36,7 @@ import com.sdamashchuk.mathbubbles.core.model.EFFECT_RAMP_MS
 import com.sdamashchuk.mathbubbles.core.model.INITIAL_LIFE_COUNT
 import com.sdamashchuk.mathbubbles.core.ui.theme.Accent
 import com.sdamashchuk.mathbubbles.core.ui.theme.AccentDeep
+import com.sdamashchuk.mathbubbles.core.ui.theme.Ink
 import com.sdamashchuk.mathbubbles.feature.game.model.TargetZeroedSignal
 import kotlinx.collections.immutable.toImmutableList
 
@@ -178,7 +179,7 @@ fun Field(
                 val icePickArmedInFireButton = icePickArmedFrom == IcePickSource.FireButton
                 FireButton(
                     action = currentAction,
-                    countdownColor = timedBooster?.let { boosterStyleFor(it).rimColor },
+                    countdownColor = Ink.takeIf { timedBooster != null },
                     countdownFraction = countdownFraction,
                     countdownAlpha = countdownAlpha,
                     isIcePickArmedHere = icePickArmedInFireButton,
