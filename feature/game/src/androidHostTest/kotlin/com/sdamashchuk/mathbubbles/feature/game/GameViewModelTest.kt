@@ -596,6 +596,42 @@ class GameViewModelTest {
             assertEquals(listOf(Booster.SHIELD), secondViewModel.state.value.field.boosterStash)
         }
 
+    @Test
+    fun `a VM dropped after many ticks and an action restores the action and a clock within the timer`() =
+        runTest {
+            val target =
+                Target(id = 1, relatedFieldId = 5, columnId = 0, value = 9, appearsAtMs = 0, finishesAtMs = 100_000)
+            val seedField = Field(id = 5, level = 1, isClosed = false, currentBooster = Booster.SHIELD)
+            val repository = StatefulFakeGameRepository(seedField, listOf(target))
+            val firstGame =
+                Game(
+                    FakeSessionHelper(targetAmount = 1),
+                    CoroutineScope(Dispatchers.Unconfined),
+                    boostersEnabled = true,
+                )
+            GameViewModel(firstGame, repository, NoOpLogger)
+            repeat(600) { firstGame.tick(16) }
+
+            firstGame.targetClicked(target.id)
+            firstGame.stashBooster()
+            firstGame.applyBoosterFromStash(0)
+
+            val secondGame =
+                Game(
+                    FakeSessionHelper(targetAmount = 1),
+                    CoroutineScope(Dispatchers.Unconfined),
+                    boostersEnabled = true,
+                )
+            val restored = GameViewModel(secondGame, repository, NoOpLogger).state.value
+            val live = firstGame.stateFlow.value.field
+
+            assertEquals(live.score, restored.field.score)
+            assertEquals(8, restored.targetList.single().value)
+            assertEquals(live.boosterStash, restored.field.boosterStash)
+            assertTrue(restored.field.shieldActive)
+            assertTrue(live.gameTimeMs - restored.field.gameTimeMs in 0..3_000)
+        }
+
     // MC-58 M4: dropping the game.events collector in init leaves this channel forever empty while
     // every other test in this file still passes - this is the one that would have caught it.
     @Test

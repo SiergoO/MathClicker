@@ -198,7 +198,7 @@ fun GameScreen(component: GameComponent) {
         // observes in every branch above (paused, game-over, countdown), not only the running one.
         OnLifecycleEvent { _, event ->
             if (event == Lifecycle.Event.ON_STOP) {
-                component.sendAction(GameViewModel.Action.PersistTargetsNow)
+                component.sendAction(GameViewModel.Action.PersistNow)
             }
         }
     }

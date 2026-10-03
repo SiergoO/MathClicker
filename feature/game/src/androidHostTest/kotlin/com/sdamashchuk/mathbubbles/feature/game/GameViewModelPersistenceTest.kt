@@ -15,6 +15,8 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import kotlin.random.Random
@@ -69,17 +71,25 @@ private class PersistenceFakeSessionHelper(
 private class PersistenceFakeGameRepository : GameRepository {
     val updateTargetsCalls = mutableListOf<List<Target>>()
     val refreshTargetsCalls = mutableListOf<List<Target>>()
+    val updateFieldCalls = mutableListOf<Field>()
+    var storedField: Field? = null
 
     fun persistenceCallCount() = updateTargetsCalls.size + refreshTargetsCalls.size
 
     fun clearCalls() {
         updateTargetsCalls.clear()
         refreshTargetsCalls.clear()
+        updateFieldCalls.clear()
     }
 
-    override suspend fun insertField(field: Field) = Unit
+    override suspend fun insertField(field: Field) {
+        storedField = field
+    }
 
-    override suspend fun updateField(field: Field) = Unit
+    override suspend fun updateField(field: Field) {
+        updateFieldCalls += field
+        storedField = field
+    }
 
     override suspend fun getUnfinishedField(): Field? = null
 
@@ -283,7 +293,7 @@ class GameViewModelPersistenceTest {
         }
 
     @Test
-    fun `PersistTargetsNow writes even when the throttle key is unchanged`() =
+    fun `PersistNow writes even when the throttle key is unchanged`() =
         runTest {
             val repository = PersistenceFakeGameRepository()
             val game = Game(PersistenceFakeSessionHelper(targetAmount = 1), backgroundScope, Random(6))
@@ -292,7 +302,7 @@ class GameViewModelPersistenceTest {
             testScheduler.runCurrent()
             repository.clearCalls()
 
-            viewModel.sendAction(GameViewModel.Action.PersistTargetsNow)
+            viewModel.sendAction(GameViewModel.Action.PersistNow)
             testScheduler.runCurrent()
 
             assertEquals(1, repository.updateTargetsCalls.size)
@@ -312,5 +322,96 @@ class GameViewModelPersistenceTest {
             testScheduler.runCurrent()
 
             assertEquals(1, repository.updateTargetsCalls.size)
+        }
+
+    @Test
+    fun `six hundred ticks write the field a small bounded number of times`() =
+        runTest {
+            val repository = PersistenceFakeGameRepository()
+            val game = Game(PersistenceFakeSessionHelper(targetAmount = 1), backgroundScope, Random(8))
+            game.start()
+            GameViewModel(game, repository, NoOpLogger)
+            testScheduler.runCurrent()
+            repository.clearCalls()
+
+            repeat(600) {
+                game.tick(16)
+                testScheduler.runCurrent()
+            }
+
+            assertTrue("${repository.updateFieldCalls.size} field writes", repository.updateFieldCalls.size in 1..4)
+        }
+
+    @Test
+    fun `PauseGame flushes the field clock that the timer had not yet written`() =
+        runTest {
+            val repository = PersistenceFakeGameRepository()
+            val game = Game(PersistenceFakeSessionHelper(targetAmount = 1), backgroundScope, Random(9))
+            game.start()
+            val viewModel = GameViewModel(game, repository, NoOpLogger)
+            testScheduler.runCurrent()
+            repeat(50) { game.tick(16) }
+            testScheduler.runCurrent()
+            val liveClock = game.stateFlow.value.field.gameTimeMs
+            assertTrue(repository.storedField?.gameTimeMs != liveClock)
+
+            viewModel.sendAction(GameViewModel.Action.PauseGame)
+            testScheduler.runCurrent()
+
+            assertEquals(liveClock, repository.storedField?.gameTimeMs)
+        }
+
+    @Test
+    fun `leaving to the menu flushes the field clock that the timer had not yet written`() =
+        runTest {
+            val repository = PersistenceFakeGameRepository()
+            val game = Game(PersistenceFakeSessionHelper(targetAmount = 1), backgroundScope, Random(10))
+            game.start()
+            val viewModel = GameViewModel(game, repository, NoOpLogger)
+            testScheduler.runCurrent()
+            repeat(50) { game.tick(16) }
+            testScheduler.runCurrent()
+            val liveClock = game.stateFlow.value.field.gameTimeMs
+
+            viewModel.sendAction(GameViewModel.Action.BackToMainMenuClicked)
+            testScheduler.runCurrent()
+
+            assertEquals(liveClock, repository.storedField?.gameTimeMs)
+        }
+
+    @Test
+    fun `PersistNow flushes the field clock that the timer had not yet written`() =
+        runTest {
+            val repository = PersistenceFakeGameRepository()
+            val game = Game(PersistenceFakeSessionHelper(targetAmount = 1), backgroundScope, Random(11))
+            game.start()
+            val viewModel = GameViewModel(game, repository, NoOpLogger)
+            testScheduler.runCurrent()
+            repeat(50) { game.tick(16) }
+            testScheduler.runCurrent()
+            val liveClock = game.stateFlow.value.field.gameTimeMs
+
+            viewModel.sendAction(GameViewModel.Action.PersistNow)
+            testScheduler.runCurrent()
+
+            assertEquals(liveClock, repository.storedField?.gameTimeMs)
+        }
+
+    @Test
+    fun `ticks that leave the targets unchanged keep the very same target list in the state`() =
+        runTest {
+            val repository = PersistenceFakeGameRepository()
+            val game = Game(PersistenceFakeSessionHelper(targetAmount = 3), backgroundScope, Random(12))
+            game.start()
+            val viewModel = GameViewModel(game, repository, NoOpLogger)
+            testScheduler.runCurrent()
+            game.tick(16)
+            testScheduler.runCurrent()
+            val before = viewModel.state.value.targetList
+
+            repeat(20) { game.tick(16) }
+            testScheduler.runCurrent()
+
+            assertSame(before, viewModel.state.value.targetList)
         }
 }

@@ -182,9 +182,9 @@ class GameViewModelLogicTest {
     }
 
     @Test
-    fun `nextPhase for TargetClicked, FireButtonClicked, Tick and PersistTargetsNow never changes phase`() {
+    fun `nextPhase for TargetClicked, FireButtonClicked, Tick and PersistNow never changes phase`() {
         val gameplayActions =
-            listOf(Action.TargetClicked(1), Action.FireButtonClicked, Action.Tick(16), Action.PersistTargetsNow)
+            listOf(Action.TargetClicked(1), Action.FireButtonClicked, Action.Tick(16), Action.PersistNow)
         val phases =
             listOf(
                 GamePhase.ReadyToPlay,
@@ -236,7 +236,7 @@ class GameViewModelLogicTest {
                 Action.TargetClicked(1),
                 Action.FireButtonClicked,
                 Action.Tick(16),
-                Action.PersistTargetsNow,
+                Action.PersistNow,
             )
         startedPhases.forEach { phase ->
             allActions.forEach { action ->

@@ -95,15 +95,34 @@ class GameViewModelResilienceTest {
             val updatesBefore = repository.updatedFields
 
             repository.failWrites = true
-            game.tick(1)
+            game.fireButtonClicked()
+            testScheduler.runCurrent()
+            repository.failWrites = false
+            game.fireButtonClicked()
+            testScheduler.runCurrent()
+
+            assertEquals(1, logger.errors.size)
+            assertEquals(updatesBefore + 1, repository.updatedFields)
+            assertEquals(game.stateFlow.value.field, viewModel.state.value.field)
+        }
+
+    @Test
+    fun `a failed discrete field write is retried on the next clock-only tick`() =
+        runTest {
+            val game = startGame()
+            GameViewModel(game, repository, logger)
+            testScheduler.runCurrent()
+            val updatesBefore = repository.updatedFields
+
+            repository.failWrites = true
+            game.fireButtonClicked()
             testScheduler.runCurrent()
             repository.failWrites = false
             game.tick(1)
             testScheduler.runCurrent()
 
-            assertEquals(1, logger.errors.size)
             assertEquals(updatesBefore + 1, repository.updatedFields)
-            assertEquals(2L, viewModel.state.value.field.gameTimeMs)
+            assertEquals(game.stateFlow.value.field, repository.fields[game.stateFlow.value.field.id])
         }
 
     @Test

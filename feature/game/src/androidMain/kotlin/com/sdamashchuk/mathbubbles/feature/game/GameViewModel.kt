@@ -52,6 +52,10 @@ class GameViewModel(
     // after the closing one.
     private val persistenceLock = Mutex()
 
+    private var persistedField: Field? = null
+
+    private var lastTargetsSource: List<Target>? = null
+
     init {
         handleAction()
         viewModelScope.launch {
@@ -70,14 +74,23 @@ class GameViewModel(
                 if (field.id == 0) return@collect
                 val previousField = state.value.field
                 val previousTargets = state.value.targetList
-                val fieldChanged = field != previousField
-                val targetsChanged = targets.isNotEmpty() && targets != previousTargets
+                val sameTargets = targets === lastTargetsSource
+                val targetsChanged =
+                    targets.isNotEmpty() && !sameTargets && shouldPersistTargets(previousTargets, targets)
                 val justClosed = field.isClosed && !previousField.isClosed
+                if (targets.isNotEmpty()) lastTargetsSource = targets
                 _state.value =
                     state.value.copy(
                         field = field,
                         effects = effects,
-                        targetList = if (targets.isNotEmpty()) targets.toImmutableList() else previousTargets,
+                        targetList =
+                            if (targets.isEmpty() ||
+                                sameTargets
+                            ) {
+                                previousTargets
+                            } else {
+                                targets.toImmutableList()
+                            },
                         // Neither branch is a player action, so both bypass nextPhase. isClosed stays first: GameOver must
                         // always win over LevelIntro.
                         phase =
@@ -92,23 +105,7 @@ class GameViewModel(
                 val persisted =
                     persistenceLock.withLock {
                         if (!sessionEstablished) return@withLock false
-                        val targetsReallyChanged = targetsChanged && shouldPersistTargets(previousTargets, targets)
-                        guarded("mirror the game state") {
-                            if (fieldChanged && targetsReallyChanged) {
-                                val previousIds = previousTargets.map { it.id }.toSet()
-                                val refresh = shouldRefreshTargets(previousIds, targets.map { it.id }.toSet())
-                                gameRepository.saveFieldAndTargets(field, targets, refresh)
-                            } else if (fieldChanged) {
-                                gameRepository.updateField(field)
-                            } else if (targetsReallyChanged) {
-                                val previousIds = previousTargets.map { it.id }.toSet()
-                                if (shouldRefreshTargets(previousIds, targets.map { it.id }.toSet())) {
-                                    gameRepository.refreshTargets(targets)
-                                } else {
-                                    gameRepository.updateTargets(targets)
-                                }
-                            }
-                        }
+                        mirror(field, targets, previousTargets, targetsChanged)
                         true
                     }
                 if (persisted && justClosed) {
@@ -116,6 +113,30 @@ class GameViewModel(
                 }
             }
         }
+    }
+
+    private suspend fun mirror(
+        field: Field,
+        targets: List<Target>,
+        previousTargets: List<Target>,
+        targetsChanged: Boolean,
+    ) {
+        val fieldChanged = persistedField?.let { shouldPersistField(it, field) } ?: true
+        val refresh =
+            targetsChanged && shouldRefreshTargets(previousTargets.map { it.id }.toSet(), targets.map { it.id }.toSet())
+        val written =
+            guarded("mirror the game state") {
+                if (fieldChanged && targetsChanged) {
+                    gameRepository.saveFieldAndTargets(field, targets, refresh)
+                } else if (fieldChanged) {
+                    gameRepository.updateField(field)
+                } else if (targetsChanged && refresh) {
+                    gameRepository.refreshTargets(targets)
+                } else if (targetsChanged) {
+                    gameRepository.updateTargets(targets)
+                }
+            }
+        if (written && fieldChanged) persistedField = field
     }
 
     fun sendAction(actionToSend: Action) {
@@ -135,19 +156,19 @@ class GameViewModel(
                     }
 
                     Action.PauseGame -> {
-                        persistTargetsNow()
+                        persistNow()
                         _state.value = state.value.copy(phase = nextPhase(state.value.phase, action))
                     }
 
                     Action.RestartGame -> {
                         _state.value = state.value.copy(phase = nextPhase(state.value.phase, action))
-                        persistTargetsNow()
+                        persistNow()
                         abandonUnfinishedField()
                         updateSession()
                     }
 
                     Action.BackToMainMenuClicked -> {
-                        persistTargetsNow()
+                        persistNow()
                         _uiEvents.trySend(UiEvent.NavigateToMainMenuScreen)
                         _state.value = state.value.copy(phase = nextPhase(state.value.phase, action))
                     }
@@ -176,20 +197,33 @@ class GameViewModel(
                         game.tick(action.elapsedMs)
                     }
 
-                    Action.PersistTargetsNow -> {
-                        persistTargetsNow()
+                    Action.PersistNow -> {
+                        persistNow()
                     }
                 }
             }
         }
     }
 
-    // Writes unconditionally - the throttle in the collector exists to skip this call, not to skip inside
-    // it - so a kill right after an untracked fall is not lost.
-    private suspend fun persistTargetsNow() {
-        val targets = state.value.targetList
-        if (targets.isEmpty() || !sessionEstablished) return
-        guarded("persist the targets") { gameRepository.updateTargets(targets) }
+    // Targets are written unconditionally - the collector's skip of unchanged ones must not apply here.
+    private suspend fun persistNow() {
+        persistenceLock.withLock {
+            val field = state.value.field
+            val targets = state.value.targetList
+            if (!sessionEstablished || field.id == 0) return
+            val fieldChanged = field != persistedField
+            val written =
+                guarded("persist the game state") {
+                    if (fieldChanged && targets.isNotEmpty()) {
+                        gameRepository.saveFieldAndTargets(field, targets, replaceTargets = false)
+                    } else if (fieldChanged) {
+                        gameRepository.updateField(field)
+                    } else if (targets.isNotEmpty()) {
+                        gameRepository.updateTargets(targets)
+                    }
+                }
+            if (written && fieldChanged) persistedField = field
+        }
     }
 
     // All history, not the recent window: a best outside the last seven must still be found.
@@ -225,16 +259,18 @@ class GameViewModel(
     private suspend fun guarded(
         what: String,
         block: suspend () -> Unit,
-    ) {
+    ): Boolean =
         try {
             block()
+            true
         } catch (failure: PersistenceException) {
             logger.error("Could not $what", failure)
+            false
         }
-    }
 
     private suspend fun updateSession() {
         sessionEstablished = false
+        persistedField = null
         game.resetForNewSession()
         val unfinishedField =
             try {
@@ -260,8 +296,10 @@ class GameViewModel(
                 game.createTargets()
                 val regenerated = game.stateFlow.value
                 gameRepository.saveFieldAndTargets(regenerated.field, regenerated.targets, replaceTargets = true)
+                persistedField = regenerated.field
             } else {
                 game.targetsRestored(unfinishedTargets)
+                persistedField = unfinishedField
             }
             _state.value = state.value.copy(phase = GamePhase.Paused)
             true
@@ -282,9 +320,11 @@ class GameViewModel(
             }
         game.createField(id)
         game.createTargets()
+        val created = game.stateFlow.value
         try {
-            gameRepository.insertField(game.stateFlow.value.field)
-            gameRepository.refreshTargets(game.stateFlow.value.targets)
+            gameRepository.insertField(created.field)
+            gameRepository.refreshTargets(created.targets)
+            persistedField = created.field
             sessionEstablished = true
         } catch (failure: PersistenceException) {
             logger.error("Could not save the new session, playing without saving", failure)
@@ -324,7 +364,7 @@ class GameViewModel(
             val elapsedMs: Int,
         ) : Action()
 
-        object PersistTargetsNow : Action()
+        object PersistNow : Action()
     }
 
     data class State(
@@ -423,7 +463,7 @@ internal fun nextPhase(
         is GameViewModel.Action.ApplyBoosterFromStash,
         GameViewModel.Action.DisarmIcePick,
         is GameViewModel.Action.Tick,
-        GameViewModel.Action.PersistTargetsNow,
+        GameViewModel.Action.PersistNow,
         -> {
             current
         }
