@@ -13,6 +13,8 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
+private const val AMBIENT_CLOCK_MS = 7_000L
+
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [34], qualifiers = "w360dp-h800dp-xhdpi")
@@ -31,7 +33,7 @@ class MenuScreenScreenshotTest {
             )
 
         composeTestRule.setContent {
-            MenuScreen(component = component)
+            MenuScreen(component = component, ambientTimeMsProvider = { AMBIENT_CLOCK_MS })
         }
 
         composeTestRule.onRoot().captureRoboImage()
@@ -48,7 +50,7 @@ class MenuScreenScreenshotTest {
             )
 
         composeTestRule.setContent {
-            MenuScreen(component = component)
+            MenuScreen(component = component, ambientTimeMsProvider = { AMBIENT_CLOCK_MS })
         }
 
         composeTestRule.onRoot().captureRoboImage()

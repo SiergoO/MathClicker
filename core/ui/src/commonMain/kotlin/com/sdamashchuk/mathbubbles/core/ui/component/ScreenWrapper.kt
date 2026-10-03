@@ -20,28 +20,32 @@ fun ScreenWrapper(
     modifier: Modifier = Modifier,
     edgeToEdgeContent: Boolean = false,
     topBar: @Composable () -> Unit = {},
+    background: @Composable () -> Unit = {},
     content: @Composable ColumnScope.() -> Unit,
 ) {
     MathBubblesTheme {
-        Column(
-            modifier =
-                modifier
-                    .fillMaxSize()
-                    .statusBarsPadding()
-                    .navigationBarsPadding(),
-        ) {
-            Box(modifier = Modifier.fillMaxWidth().padding(horizontal = ScreenHorizontalPadding)) {
-                topBar()
-            }
+        Box(modifier = Modifier.fillMaxSize()) {
+            background()
             Column(
                 modifier =
-                    if (edgeToEdgeContent) {
-                        Modifier.fillMaxWidth()
-                    } else {
-                        Modifier.fillMaxWidth().padding(horizontal = ScreenHorizontalPadding)
-                    },
-                content = content,
-            )
+                    modifier
+                        .fillMaxSize()
+                        .statusBarsPadding()
+                        .navigationBarsPadding(),
+            ) {
+                Box(modifier = Modifier.fillMaxWidth().padding(horizontal = ScreenHorizontalPadding)) {
+                    topBar()
+                }
+                Column(
+                    modifier =
+                        if (edgeToEdgeContent) {
+                            Modifier.fillMaxWidth()
+                        } else {
+                            Modifier.fillMaxWidth().padding(horizontal = ScreenHorizontalPadding)
+                        },
+                    content = content,
+                )
+            }
         }
     }
 }

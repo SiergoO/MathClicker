@@ -34,9 +34,9 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.sdamashchuk.mathbubbles.core.model.GAME_COLUMN_COUNT
 import com.sdamashchuk.mathbubbles.core.model.Target
+import com.sdamashchuk.mathbubbles.core.ui.component.drawAmbientBubbles
 import com.sdamashchuk.mathbubbles.core.ui.theme.AccentSoft
 import com.sdamashchuk.mathbubbles.core.ui.theme.WaterDeep
-import com.sdamashchuk.mathbubbles.core.ui.theme.WaterMote
 import com.sdamashchuk.mathbubbles.core.ui.theme.WaterSurface
 import com.sdamashchuk.mathbubbles.feature.game.model.TargetScreenPosition
 import com.sdamashchuk.mathbubbles.feature.game.model.TargetZeroedBurst
@@ -148,7 +148,7 @@ fun PlayArea(
                         if (freezeIntensity > 0f) {
                             drawRect(AccentSoft.copy(alpha = FROZEN_TINT_ALPHA * freezeIntensity))
                         }
-                        drawAmbientBubbles(gameTimeMsProvider())
+                        drawAmbientBubbles(FieldAmbientBubbleStyle, gameTimeMsProvider())
                         drawSpawnMotes(pendingTargets, gameColumnSize, gameTimeMsProvider())
                     }
                 },
@@ -306,23 +306,5 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawSpawnMotes(
                 center = Offset((centerXDp + jitterDp).dp.toPx(), centerYDp.dp.toPx()),
             )
         }
-    }
-}
-
-private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawAmbientBubbles(gameTimeMs: Long) {
-    repeat(AMBIENT_BUBBLE_COUNT) { index ->
-        val progress = ambientBubbleProgress(index, gameTimeMs)
-        val alpha = ambientBubbleAlpha(index, progress)
-        if (alpha <= 0f) return@repeat
-        val radius = size.minDimension * ambientBubbleRadiusFraction(index)
-        drawCircle(
-            color = WaterMote.copy(alpha = alpha),
-            radius = radius,
-            center =
-                Offset(
-                    x = size.width * ambientBubbleCenterXFraction(index, gameTimeMs),
-                    y = size.height * (1f - progress),
-                ),
-        )
     }
 }
