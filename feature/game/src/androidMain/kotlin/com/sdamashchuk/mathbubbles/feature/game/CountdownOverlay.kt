@@ -8,21 +8,24 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.unit.dp
 import com.sdamashchuk.mathbubbles.core.ui.theme.Ink
 import com.sdamashchuk.mathbubbles.core.ui.theme.Scrim
-import io.github.alexzhirkevich.compottie.DotLottie
-import io.github.alexzhirkevich.compottie.LottieCompositionSpec
+import io.github.alexzhirkevich.compottie.LottieCompositionResult
 import io.github.alexzhirkevich.compottie.animateLottieCompositionAsState
-import io.github.alexzhirkevich.compottie.rememberLottieComposition
 import io.github.alexzhirkevich.compottie.rememberLottiePainter
+import kotlinx.coroutines.flow.first
 
 @Composable
-fun CountdownOverlay(onFinish: () -> Unit) {
+fun CountdownOverlay(
+    compositionResult: LottieCompositionResult,
+    onFinish: () -> Unit,
+) {
     Box(
         contentAlignment = Alignment.Center,
         modifier =
@@ -31,10 +34,7 @@ fun CountdownOverlay(onFinish: () -> Unit) {
                 .background(Scrim)
                 .padding(40.dp),
     ) {
-        val resources = LocalResources.current
-        val composition by rememberLottieComposition {
-            LottieCompositionSpec.DotLottie(resources.openRawResource(R.raw.countdown).readBytes())
-        }
+        val composition by compositionResult
         val progress by animateLottieCompositionAsState(composition)
         Image(
             painter = rememberLottiePainter(composition = composition, progress = { progress }),
@@ -42,10 +42,10 @@ fun CountdownOverlay(onFinish: () -> Unit) {
             // The .lottie asset has its own colour baked in; this overrides it.
             colorFilter = ColorFilter.tint(Ink),
         )
-        LaunchedEffect(progress) {
-            if (progress >= 1f) {
-                onFinish.invoke()
-            }
+        val currentOnFinish by rememberUpdatedState(onFinish)
+        LaunchedEffect(Unit) {
+            snapshotFlow { progress >= 1f }.first { it }
+            currentOnFinish()
         }
     }
 }

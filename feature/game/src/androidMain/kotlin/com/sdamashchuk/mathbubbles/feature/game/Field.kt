@@ -101,7 +101,7 @@ fun Field(
             withFrameNanos { frameNanos ->
                 val elapsedMs = ((frameNanos - previousFrameNanos) / 1_000_000L).toInt()
                 previousFrameNanos = frameNanos
-                realElapsedMs += elapsedMs
+                realElapsedMs += realFrameStepMs(elapsedMs)
                 onTick(elapsedMs)
             }
         }

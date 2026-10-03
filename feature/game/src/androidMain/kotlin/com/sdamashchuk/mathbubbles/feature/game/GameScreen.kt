@@ -23,6 +23,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalResources
 import androidx.lifecycle.Lifecycle
 import com.sdamashchuk.mathbubbles.core.model.BOOSTER_STASH_CAPACITY
 import com.sdamashchuk.mathbubbles.core.model.FieldAction
@@ -31,6 +32,9 @@ import com.sdamashchuk.mathbubbles.core.ui.theme.MathBubblesTheme
 import com.sdamashchuk.mathbubbles.feature.game.model.FeedbackEffect
 import com.sdamashchuk.mathbubbles.feature.game.model.ShieldCrackCue
 import com.sdamashchuk.mathbubbles.feature.game.model.TargetZeroedSignal
+import io.github.alexzhirkevich.compottie.DotLottie
+import io.github.alexzhirkevich.compottie.LottieCompositionSpec
+import io.github.alexzhirkevich.compottie.rememberLottieComposition
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
@@ -46,8 +50,19 @@ fun GameScreen(component: GameComponent) {
     var targetZeroedSignal by remember { mutableStateOf<TargetZeroedSignal?>(null) }
     val shieldCrackCue = remember { ShieldCrackCue() }
     val shieldCracking by shieldCrackCue.isCracking
+    val resources = LocalResources.current
+    val countdownComposition =
+        rememberLottieComposition {
+            LottieCompositionSpec.DotLottie(resources.openRawResource(R.raw.countdown).use { it.readBytes() })
+        }
+    val tapHighlightComposition =
+        rememberLottieComposition {
+            LottieCompositionSpec.DotLottie(resources.openRawResource(R.raw.tap_higlight).use { it.readBytes() })
+        }
     val shakeOffset = remember { Animatable(Offset.Zero, Offset.VectorConverter) }
     var shakeSeed by remember { mutableIntStateOf(0) }
+
+    val phase by rememberPhase(gameState)
 
     // See Field's own derivedStateOf comment: reading these fields straight off gameState.value
     // would drag the HUD through composition on every tick, not just the second it changes.
@@ -82,21 +97,21 @@ fun GameScreen(component: GameComponent) {
                         },
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                when (gameState.value.phase) {
+                when (phase) {
                     GamePhase.ReadyToPlay -> {
-                        ReadyToPlayOverlay {
+                        ReadyToPlayOverlay(tapHighlightComposition) {
                             component.sendAction(GameViewModel.Action.ReadyToPlayButtonClicked)
                         }
                     }
 
                     GamePhase.CountingDown -> {
-                        CountdownOverlay {
+                        CountdownOverlay(countdownComposition) {
                             component.sendAction(GameViewModel.Action.StartGame)
                         }
                     }
 
                     GamePhase.Playing, GamePhase.Paused -> {
-                        if (shouldComposeField(gameState.value.phase)) {
+                        if (shouldComposeField(phase)) {
                             GameChrome(
                                 level = level,
                                 score = score,
@@ -105,7 +120,7 @@ fun GameScreen(component: GameComponent) {
                             ) {
                                 Field(
                                     gameState,
-                                    running = shouldRunField(gameState.value.phase),
+                                    running = shouldRunField(phase),
                                     onTargetClicked = { id ->
                                         // Not routed through GameEvent: a tap that does not zero its
                                         // target emits nothing on that stream (see targetClicked), but
@@ -138,7 +153,7 @@ fun GameScreen(component: GameComponent) {
                                 )
                             }
                         }
-                        if (gameState.value.phase == GamePhase.Paused) {
+                        if (phase == GamePhase.Paused) {
                             GamePausedDialog(
                                 onResumeClicked = {
                                     component.sendAction(GameViewModel.Action.ReadyToPlayButtonClicked)
@@ -152,7 +167,7 @@ fun GameScreen(component: GameComponent) {
                     }
 
                     GamePhase.LevelIntro -> {
-                        LevelIntroOverlay(level = gameState.value.field.level) {
+                        LevelIntroOverlay(level = level) {
                             component.sendAction(GameViewModel.Action.LevelIntroFinished)
                         }
                     }
@@ -174,6 +189,9 @@ fun GameScreen(component: GameComponent) {
             }
         }
         BackHandler {
+            component.sendAction(backActionFor(phase))
+        }
+        PauseOnBackground(phase = phase) {
             component.sendAction(GameViewModel.Action.PauseGame)
         }
         // Hoisted here rather than per-TargetButton: one observer for the whole screen, and it

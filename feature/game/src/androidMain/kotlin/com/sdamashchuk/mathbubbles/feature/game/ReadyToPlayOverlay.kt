@@ -14,7 +14,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.intl.Locale
 import androidx.compose.ui.text.toUpperCase
@@ -22,11 +21,9 @@ import com.sdamashchuk.mathbubbles.core.ui.theme.AccentSoft
 import com.sdamashchuk.mathbubbles.core.ui.theme.Ink
 import com.sdamashchuk.mathbubbles.core.ui.theme.Scrim
 import io.github.alexzhirkevich.compottie.Compottie
-import io.github.alexzhirkevich.compottie.DotLottie
 import io.github.alexzhirkevich.compottie.ExperimentalCompottieApi
-import io.github.alexzhirkevich.compottie.LottieCompositionSpec
+import io.github.alexzhirkevich.compottie.LottieCompositionResult
 import io.github.alexzhirkevich.compottie.dynamic.rememberLottieDynamicProperties
-import io.github.alexzhirkevich.compottie.rememberLottieComposition
 import io.github.alexzhirkevich.compottie.rememberLottiePainter
 
 private const val PROMPT_ANCHOR_HEIGHT_FRACTION = 0.5f
@@ -37,7 +34,10 @@ private const val PROMPT_ANCHOR_HEIGHT_FRACTION = 0.5f
  */
 @OptIn(ExperimentalCompottieApi::class)
 @Composable
-fun ReadyToPlayOverlay(onClick: () -> Unit) {
+fun ReadyToPlayOverlay(
+    compositionResult: LottieCompositionResult,
+    onClick: () -> Unit,
+) {
     Column(
         modifier =
             Modifier
@@ -51,10 +51,7 @@ fun ReadyToPlayOverlay(onClick: () -> Unit) {
             modifier = Modifier.fillMaxHeight(PROMPT_ANCHOR_HEIGHT_FRACTION),
             contentAlignment = Alignment.Center,
         ) {
-            val resources = LocalResources.current
-            val composition by rememberLottieComposition {
-                LottieCompositionSpec.DotLottie(resources.openRawResource(R.raw.tap_higlight).readBytes())
-            }
+            val composition by compositionResult
             val dynamicProperties =
                 rememberLottieDynamicProperties {
                     shapeLayer("**") {
