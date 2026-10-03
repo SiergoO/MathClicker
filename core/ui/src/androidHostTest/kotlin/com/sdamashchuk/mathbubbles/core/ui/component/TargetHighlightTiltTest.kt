@@ -1,4 +1,4 @@
-package com.sdamashchuk.mathbubbles.feature.game
+package com.sdamashchuk.mathbubbles.core.ui.component
 
 import org.junit.Assert.assertEquals
 import org.junit.Test

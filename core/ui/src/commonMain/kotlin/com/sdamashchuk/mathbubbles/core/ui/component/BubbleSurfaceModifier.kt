@@ -1,9 +1,5 @@
-package com.sdamashchuk.mathbubbles.feature.game
+package com.sdamashchuk.mathbubbles.core.ui.component
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
@@ -11,9 +7,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
-import androidx.compose.ui.unit.Dp
-import com.sdamashchuk.mathbubbles.core.ui.theme.WaterSurface
-import com.sdamashchuk.mathbubbles.feature.game.model.BubbleStyle
+import com.sdamashchuk.mathbubbles.core.ui.component.model.BubbleStyle
 
 private const val HIGHLIGHT_CORE_RADIUS_FRACTION = 0.15f
 private const val HIGHLIGHT_GLOW_RADIUS_FRACTION = 0.30f
@@ -22,41 +16,10 @@ private const val HIGHLIGHT_GLOW_RADIUS_FRACTION = 0.30f
 // bubble being askew, so the owner picked the straight ellipse from the design system instead.
 private const val HIGHLIGHT_ECCENTRICITY = 1.2f
 
-// The dock bubbles - the fire button, the preview and the stash slots - share one look: the
-// targets' ready-state radial depth shading, a shade lighter than the water, with no specular spot.
-private const val DOCK_FILL_ALPHA = 0.62f
-private const val DOCK_RIM_WIDTH_FRACTION = 0.027f
-private const val DOCK_CONVEXITY = 1f
-
 private const val CONVEX_LIGHT_ALPHA = 0.16f
 private const val CONVEX_SHADE_ALPHA = 0.22f
 
-internal fun dockBubbleStyle(
-    rimColor: Color,
-    diameter: Dp,
-): BubbleStyle =
-    BubbleStyle(
-        fillColor = WaterSurface,
-        fillAlpha = DOCK_FILL_ALPHA,
-        rimColor = rimColor,
-        rimWidth = diameter * DOCK_RIM_WIDTH_FRACTION,
-        convexity = DOCK_CONVEXITY,
-    )
-
-@Composable
-fun BubbleSurface(
-    style: BubbleStyle,
-    modifier: Modifier = Modifier,
-    content: @Composable BoxScope.() -> Unit = {},
-) {
-    Box(
-        modifier = modifier.bubbleSurface(style),
-        contentAlignment = Alignment.Center,
-        content = content,
-    )
-}
-
-internal fun Modifier.bubbleSurface(
+fun Modifier.bubbleSurface(
     style: BubbleStyle,
     highlightOffsetProvider: (() -> Offset)? = null,
 ) = drawWithCache {

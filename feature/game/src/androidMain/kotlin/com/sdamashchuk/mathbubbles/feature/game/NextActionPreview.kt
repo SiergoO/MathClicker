@@ -8,6 +8,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.sdamashchuk.mathbubbles.core.model.FieldAction
+import com.sdamashchuk.mathbubbles.core.ui.component.BubbleSurface
 import com.sdamashchuk.mathbubbles.core.ui.theme.BubbleRimReady
 import com.sdamashchuk.mathbubbles.core.ui.theme.Ink
 

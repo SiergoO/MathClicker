@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.sdamashchuk.mathbubbles.core.ui.component.BubbleSurface
 import com.sdamashchuk.mathbubbles.core.ui.theme.BubbleRimReady
 
 const val GAME_HUD_COMBO_SLOT_TAG = "GameHudComboSlot"

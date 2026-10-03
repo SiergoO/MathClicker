@@ -9,6 +9,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import com.sdamashchuk.mathbubbles.core.model.Booster
+import com.sdamashchuk.mathbubbles.core.ui.component.BubbleSurface
 import com.sdamashchuk.mathbubbles.core.ui.theme.Ink
 
 private const val ICON_SIZE_FRACTION = 0.55f

@@ -4,14 +4,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import com.sdamashchuk.mathbubbles.core.ui.component.AmbientBubbles
 import com.sdamashchuk.mathbubbles.core.ui.component.BottomActions
 import com.sdamashchuk.mathbubbles.core.ui.component.GlassButton
@@ -20,7 +18,6 @@ import com.sdamashchuk.mathbubbles.core.ui.component.NavBar
 import com.sdamashchuk.mathbubbles.core.ui.component.NavBarAction
 import com.sdamashchuk.mathbubbles.core.ui.component.ScreenWrapper
 
-private val LOGO_HORIZONTAL_INSET = 40.dp
 private const val LOGO_AREA_WEIGHT = 2f
 private const val BUTTON_AREA_WEIGHT = 1f
 
@@ -66,7 +63,7 @@ fun MenuScreen(
                 modifier = Modifier.fillMaxWidth().weight(LOGO_AREA_WEIGHT),
                 contentAlignment = Alignment.Center,
             ) {
-                MenuLogo(modifier = Modifier.padding(horizontal = LOGO_HORIZONTAL_INSET))
+                MenuLogo(timeMsProvider = ambientTimeMsProvider, modifier = Modifier.fillMaxSize())
             }
             Box(modifier = Modifier.fillMaxWidth().weight(BUTTON_AREA_WEIGHT)) {
                 BottomActions {

@@ -1,9 +1,9 @@
-package com.sdamashchuk.mathbubbles.feature.game
+package com.sdamashchuk.mathbubbles.core.ui.component
 
 import androidx.compose.ui.geometry.Offset
 
 // One light above the water's centre, so bubbles mirrored across the centre get mirrored highlights.
-internal object TargetHighlightTilt {
+object TargetHighlightTilt {
     private const val X_FRACTION_BASE = -0.34f
     private const val Y_FRACTION_BASE = -0.33f
     private const val TILT_X_FRACTION = 0.22f

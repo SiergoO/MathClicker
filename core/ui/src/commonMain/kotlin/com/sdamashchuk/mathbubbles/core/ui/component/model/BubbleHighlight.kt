@@ -1,4 +1,4 @@
-package com.sdamashchuk.mathbubbles.feature.game.model
+package com.sdamashchuk.mathbubbles.core.ui.component.model
 
 import androidx.compose.runtime.Immutable
 
